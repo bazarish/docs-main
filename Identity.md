@@ -71,6 +71,32 @@ Resolving `alias@server` (or a main-server alias) returns three artifacts, verif
 
 The resolve query travels sealed (see `api/Federation.md`), so the requester's own server never learns which alias was looked up.
 
+### Out-of-band invites
+
+The same trust chain can be packaged for sharing over any channel (a link, a
+QR code, a paper printout) instead of being fetched from a server. An **invite**
+carries two self-verifying artifacts:
+
+1. **Subscription certificate** — signed by the user: serving server + sealing prekey;
+2. **Server card** — signed by the server's root key: transport endpoints + sealing key.
+
+The recipient verifies both signatures and binds them to the user's
+fingerprint locally, so an invite needs **no trust in any server** — not even
+for availability, since nothing is fetched. This is the strongest contact-add
+path; its only cost is size (both certificates are hybrid post-quantum signed,
+≈ 7–8 KB each), which a single QR code cannot hold — an invite spans a short
+sequence of QR symbols (structured append) or rides in a link.
+
+Trust ladder for adding a contact, strongest first:
+
+- **By invite** — fully offline, zero server trust, no metadata leak. Largest to share.
+- **By fingerprint** — the 52-character UID; certificates are fetched and
+  verified against it, so a server cannot forge, only withhold or observe the lookup.
+- **By username (alias)** — a resolver maps the human-readable name to a
+  fingerprint. Convenient for verbal exchange, but the **alias→fingerprint
+  mapping is trusted**: a hostile resolver could return an attacker's
+  fingerprint. Everything after the mapping is verified as above.
+
 ## Algorithms (decided empirically against OpenSSL 3.5)
 
 - **Identity is a post-quantum hybrid: ECDSA P-256 + ML-DSA-65 (FIPS 204).** Every identity-level statement (subscription certificate, alias certificate, server card) carries **both** signatures and is valid only when both verify — forging requires breaking both schemes. This is mandatory, not optional.
