@@ -16,14 +16,19 @@ No direct contact attempt between peers — direct connections harm privacy. A c
 
 ## Signaling message types (draft)
 
+Call signaling is ordinary Layer-2 content (see `../Messages.md`): each signal
+is a `content`-class delivery whose end-to-end payload carries the `call.*`
+type. Server-side components see only opaque blobs of a generic message.
+
 | Type | Direction | Purpose |
 |---|---|---|
-| `call-invite` | caller → callee | Contact type, one-time destination, credentials |
-| `call-accept` | callee → caller | Callee is connecting |
-| `call-decline` | callee → caller | Rejected |
-| `call-end` | either | Hang up / cancel |
+| `call.invite` | caller → callee | Contact type, one-time destination, credentials |
+| `call.accept` | callee → caller | Callee is connecting |
+| `call.decline` | callee → caller | Rejected |
+| `call.end` | either | Hang up / cancel |
 
-All signaling is E2E-encrypted message content; server-side components see only opaque blobs of a generic message.
+These live in the content-type registry in `../Messages.md`; adding or evolving
+a call signal is a client-only change.
 
 ## Open questions
 

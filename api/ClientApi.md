@@ -52,9 +52,16 @@ Delivery over I2P can take tens of seconds, so sending is asynchronous at the AP
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /v1/messaging/pending` | List pending entries for this client ID: `{pending: [{id, kind}]}` where kind is `message` or `contact-request` |
+| `GET /v1/messaging/pending` | List pending entries for this client ID: `{pending: [{id, class}]}` where `class` is the delivery class `content` or `contact` (the admission selector, not the content type — see `../Messages.md`) |
 | `GET /v1/messaging/pending/{blobId}` | Fetch the raw E2E payload bytes |
 | `POST /v1/messaging/ack` | Confirm receipt for this client ID; when all registered client IDs of the user have acked, the server deletes the content immediately |
+
+### Content store (bulk media, see `../Messages.md`)
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /v1/content` | Upload opaque ciphertext; returns `{id, size}` where `id = sha256(ciphertext)` hex. Content-addressed and deduplicated; the store never sees the content type or decryption key |
+| `GET /v1/content/{id}` | Fetch the ciphertext for a content id |
 
 ### Delivery tokens (see `../Contacts.md`)
 

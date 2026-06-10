@@ -36,9 +36,10 @@ DeliveryEnvelope:
   toServer: <server fingerprint>            # routing only — all the sender's server sees
   sealed:                                   # CMS envelope, encrypted to the recipient
                                             # server's sealing key (from its server card)
-    kind: message | contact-request
+    class: content | contact                # delivery class (admission selector), not the
+                                            # content type, which is E2E — see ../Messages.md
     mailbox: <recipient UID>
-    token: <one-time delivery token>        # absent for contact-request
+    token: <one-time delivery token>        # absent for class "contact"
     messageId: <client-generated random id> # idempotency / dedup
   payload: <E2E blob>                       # opaque to every server-side component
 ```

@@ -16,6 +16,7 @@ component implements.
 - [Architecture](Architecture.md) — components, topology, trust boundaries, key decisions
 - [Identity](Identity.md) — keys, UIDs, certificates, server card, algorithms
 - [Contacts](Contacts.md) — contact admission via one-time delivery tokens
+- [Messages](Messages.md) — delivery class vs content type; the content-type registry
 - [DeviceSync](DeviceSync.md) — multi-device enrollment and E2E state sync
 - [Groups](Groups.md) — group chats (direction fixed, design deferred)
 - [Errors](Errors.md) — typed error registry
