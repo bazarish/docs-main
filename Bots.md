@@ -89,6 +89,22 @@ A button press is not itself shown as a message in the tapping client
 (`Messages.md`) are not sent for `bot.command` / `bot.callback`; they are
 control content, not user-visible lines.
 
+### Editing in place
+
+Rather than reply with a new message, a bot can edit the keyboard message the
+button belongs to (an `edit`, `Messages.md`), keyed by the callback's `ref` —
+the familiar "the message changes when you tap a button" behaviour. The same
+`edit` primitive lets ordinary users revise their own messages, so it is not a
+bot-only feature. A bot edits only messages it sent; a client enforces that on
+receipt.
+
+### Read receipts
+
+The reference runtime sends a delivery receipt for the user-visible content it
+receives (text and media), so the sender's tick advances to the delivered
+("green") state — a bot is a normal recipient in this respect. Receipts are not
+sent for the control types (`bot.command`, `bot.callback`, `edit`).
+
 ## Forward compatibility
 
 `bot.command` and `bot.callback` are ordinary registry rows: a client that does

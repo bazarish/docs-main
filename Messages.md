@@ -82,6 +82,7 @@ versioned envelope:
 | `receipt` | content | `ref` (the acknowledged message's `id`). The recipient's client sends it to confirm receipt — the "green" delivery state below. Optional/toggleable. |
 | `bot.command` | content | A command invocation aimed at a bot: `command` (name, no leading slash), `args` (raw argument string). See *Bots & interactive messages*. |
 | `bot.callback` | content | An inline-keyboard button press: `data` (the button's payload), `ref` (the `id` of the keyboard message). See *Bots & interactive messages*. |
+| `edit` | content | An in-place edit of a message the sender previously sent: `ref` (the target message's `id`), `text` (new text), `keyboard` (new inline keyboard, `[]` to clear). The recipient replaces its copy. Applied only to a message `from` actually sent. See *Editing messages*. |
 
 The registry is **open**: new rows are added here and implemented in clients.
 No server, facade, federation or storage change accompanies a new row.
@@ -122,6 +123,24 @@ acts on the `data` and may reply (e.g. with a new message or a fresh keyboard).
 Because all three are `content`-class deliveries, the server, facades,
 federation and storage are unchanged and never learn that a conversation
 involved a bot. The full model and the reference bot runtime are in `Bots.md`.
+
+### Editing messages
+
+A sender can revise a message it already sent with an `edit` (above): the
+recipient finds the message whose `id` equals `ref` and replaces its `text` and
+`keyboard` in place, marking it edited. It is the same primitive for two cases:
+
+- **Bots** edit their own keyboard message on a callback — the Telegram-style
+  "the message updates when you tap a button" — by sending an `edit` whose `ref`
+  is the callback's `ref`.
+- **Users** edit their own line: the client updates its local copy and sends an
+  `edit` so the peer updates theirs.
+
+A client applies an `edit` **only** to a message the `from` party actually sent
+(for a recipient, an incoming message from that peer); it must not let a peer
+rewrite messages it did not author. There is no separate "delete"; an edit to
+empty text is the closest equivalent. History of prior revisions is not
+retained by the protocol (a client may keep its own).
 
 ### Forward compatibility
 
