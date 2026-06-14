@@ -17,6 +17,7 @@ component implements.
 - [Identity](Identity.md) — keys, UIDs, certificates, server card, algorithms
 - [Contacts](Contacts.md) — contact admission via one-time delivery tokens
 - [Messages](Messages.md) — delivery class vs content type; the content-type registry
+- [Bots](Bots.md) — bots as ordinary identities; commands, inline keyboards, callbacks
 - [DeviceSync](DeviceSync.md) — multi-device enrollment and E2E state sync
 - [Groups](Groups.md) — group chats (direction fixed, design deferred)
 - [Errors](Errors.md) — typed error registry

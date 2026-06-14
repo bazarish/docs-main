@@ -80,9 +80,48 @@ versioned envelope:
 | `call.invite` | content | Contact type (audio/video), one-time tunnel destination + credentials (`api/Calls.md`). |
 | `call.accept` / `call.decline` / `call.end` | content | Call control (`api/Calls.md`). |
 | `receipt` | content | `ref` (the acknowledged message's `id`). The recipient's client sends it to confirm receipt — the "green" delivery state below. Optional/toggleable. |
+| `bot.command` | content | A command invocation aimed at a bot: `command` (name, no leading slash), `args` (raw argument string). See *Bots & interactive messages*. |
+| `bot.callback` | content | An inline-keyboard button press: `data` (the button's payload), `ref` (the `id` of the keyboard message). See *Bots & interactive messages*. |
 
 The registry is **open**: new rows are added here and implemented in clients.
 No server, facade, federation or storage change accompanies a new row.
+
+### Bots & interactive messages
+
+A bot is not a server concept either: it is an **ordinary identity** that
+subscribes to a server like any client, accepts contacts and exchanges the same
+`content`/`contact` envelopes. "Botness" lives entirely in Layer 2 — three
+client-only pieces, all forward-compatible:
+
+**Inline keyboard.** Any content message (typically `text`) may carry an
+optional `keyboard` field: rows of buttons rendered under the message. A client
+that does not understand it still renders the message body, so the field is
+additive.
+
+```
+"keyboard": [
+  [ { "text": "🏓 Ping", "data": "ping" }, { "text": "🕑 Time", "data": "time" } ],
+  [ { "text": "❔ Help", "command": "help" } ]
+]
+```
+
+A button carries a label (`text`) and exactly one action:
+
+| Field | Tap result |
+|---|---|
+| `data` | Sends a `bot.callback` to the message's sender with this `data` and `ref` = the keyboard message's `id`. |
+| `command` | Sends a `bot.command` to the sender with this command name. |
+
+**Commands.** A `bot.command` is the structured form of a `/name args` line;
+clients dispatch both the same way. It lets a bot expose a command interface
+without parsing free text (though a bot may do either).
+
+**Callbacks.** A `bot.callback` reports a button press back to the bot, which
+acts on the `data` and may reply (e.g. with a new message or a fresh keyboard).
+
+Because all three are `content`-class deliveries, the server, facades,
+federation and storage are unchanged and never learn that a conversation
+involved a bot. The full model and the reference bot runtime are in `Bots.md`.
 
 ### Forward compatibility
 
