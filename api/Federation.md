@@ -52,10 +52,10 @@ DeliveryEnvelope:
 1. Sender's client → own server: `send` with the envelope. The server accepts it **in memory only** (no outbound persistence, no outbound queue) and returns an attempt id; the client polls for the outcome (see `ClientApi.md`).
 2. Sender's server → recipient's server over I2P: `deliver` with the envelope.
 3. Recipient's server unseals and processes in strict order:
-   1. **messageId dedup** — if already seen within the retention window, respond success *without* consuming a token (makes client retries idempotent);
+   1. **messageId dedup** — if the `messageId` is still pending in the mailbox, or is in the retained **seen-messageId set** (every admitted id, kept independently of the blob until the TTL sweep ages it out), respond success *without* consuming a token. This makes client retries idempotent and blocks replays of an already-delivered envelope — including tokenless `contact` requests that have since been fetched, acked and swept;
    2. **token check** — hash the presented token, look it up in the mailbox's registered set (`../Contacts.md`); no match → `DELIVERY_REJECTED`;
    3. **size/quota checks** — explicit typed errors (`QUOTA_EXCEEDED`, `STORAGE_FULL`), revealed only past a valid token;
-   4. **store** as pending content; the token is consumed atomically with the store.
+   4. **store** as pending content; the token is consumed atomically with the store, and the `messageId` is added to the seen set.
 4. The outcome propagates back to the sender's client via polling. On failure the message stays **only on the client**, which may retry with the same messageId; the sender's server drops its in-memory copy as soon as the attempt concludes.
 
 `contact-request` deliveries skip the token check, are capped in payload size (default 256 bytes, server-configurable), and are subject to a separate quota and per-origin-server rate limiting.

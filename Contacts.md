@@ -19,13 +19,13 @@ What this yields:
 
 - **No social graph at rest.** The server holds a flat set of opaque hashes per mailbox; nothing maps a hash to a contact.
 - **Unlinkability.** Tokens are random and single-use; the server cannot link two messages to the same contact.
-- **Replay protection for free.** A consumed token cannot be presented again.
+- **Replay protection.** A consumed token cannot be presented again, so token-gated messages cannot be replayed. Tokenless contact requests (which have no token to spend) are covered instead by the server's retained **seen-messageId set**: every admitted `messageId` is remembered independently of the stored blob's lifecycle, so an already-delivered envelope cannot be re-admitted even after it has been fetched, acked and swept from the mailbox (see `api/Federation.md`).
 - **Targeted revocation still works.** The *issuing client* keeps the private bookkeeping of which tokens went to which contact. Revoking a contact = asking the server to delete that contact's unused hashes. The server learns only "these hashes died together" at the moment of revocation.
 
 ## Token lifecycle
 
 1. **Issuance** — recipient's client generates a batch (default size TBD, e.g. 50–100) per contact, delivers it inside an E2E message, registers the hashes with its server (`POST /v1/messaging/tokens`, see `api/ClientApi.md`). Registration must precede or accompany delivery of the batch to the contact.
-2. **Consumption** — exactly one token per accepted message. Processing order on the recipient's server: messageId dedup first (a retried message must succeed idempotently *without* consuming a second token), then token lookup, then size/quota checks; the token is consumed only if the message is actually stored.
+2. **Consumption** — exactly one token per accepted message. Processing order on the recipient's server: messageId dedup first (a retried message must succeed idempotently *without* consuming a second token — checked against both the pending blob and the retained seen-messageId set), then token lookup, then size/quota checks; the token is consumed only if the message is actually stored, and the `messageId` is recorded in the seen set on a successful store.
 3. **Refill** — fully E2E, invisible to servers: when a sender's stash for a peer drops below a threshold, its client signals this in the E2E payload; the peer's client auto-issues a fresh batch (attached to a reply or sent as a dedicated protocol message). Each direction has its own independent stash.
 4. **Revocation** — `DELETE /v1/messaging/tokens` with the unused hashes issued to the revoked contact. Epoch reset (drop *all* hashes, re-issue to remaining contacts over E2E) remains the nuclear option, e.g. after client-state compromise.
 
