@@ -159,6 +159,46 @@ its session.
 
 Defaults (configurable): `poolSize = 10`, `linkLimitPerDest = 10`.
 
+### Encrypted leasesets & the `.b32.i2p` address
+
+Every pooled destination publishes an **encrypted LeaseSet2** (`i2cp.leaseSetType=5`,
+no per-client auth), never a standard/cleartext leaseset. A standard leaseset is
+stored in the netdb at floodfills in the clear, so a floodfill — or anyone passively
+monitoring floodfills — can enumerate the destination and its current tunnel
+endpoints. An encrypted LS2 stores the leases encrypted under a key derived from the
+blinded address, so floodfills hold opaque data and cannot be queried without the
+blinded key. This is a **project-wide invariant**: all Bazarish I2P destinations
+(federation, per-user, pool, blob storage) use encrypted leasesets.
+
+The shareable address of an encrypted leaseset is the **blinded b32** (its "b33"),
+derived from the destination's signing key — *not* `base32(sha256(destination))`
+(the standard-LS form). For an Ed25519 destination (sig type 7, blinded sig type 11
+= RedDSA-Ed25519), with signing public key `A` (32 bytes):
+
+```
+addr[0]      = flags            // 0 (0x04 would mark per-client auth — not used)
+addr[1]      = sigType          // 1 byte  (7)
+addr[2]      = blindedSigType   // 1 byte  (11)
+addr[3..34]  = A                // 32-byte signing public key
+checksum     = crc32(addr[3..34])          // zlib CRC-32, little-endian
+addr[0] ^= checksum;  addr[1] ^= checksum>>8;  addr[2] ^= checksum>>16
+b33  = base32_rfc4648_lower_nopad(addr[0..34])   // 56 chars
+host = b33 + ".b32.i2p"
+```
+
+(Per I2P proposals 123/149; matches i2pd's `BlindedPublicKey::ToB33`.) SAM
+`NAMING LOOKUP ME` returns the raw destination, not the blinded address, so the
+store derives the b33 itself from the session's signing key — reusing the vendored
+trimmed **libi2pd** (`IdentityEx` + `Blinding`), the same library the client uses
+for key generation. Recipients reach it with SAM `STREAM CONNECT <host>`; the router
+performs the blinded lookup and decrypts the leaseset.
+
+**Strict rule — blob storage emits `.b32.i2p` download links only, with no
+alternative.** There is no clearnet, LAN, or direct-host fallback for a download URL.
+The sole way to fetch a blob is over I2P, so a client (or a careless tool) that
+fetches a link directly can never leak its IP. The store has no non-I2P serving
+mode.
+
 ## Fetch: direct (preferred) or proxied (fallback)
 
 The download is a generic authless I2P `GET` — **federation is not involved**; the
