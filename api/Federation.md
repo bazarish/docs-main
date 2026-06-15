@@ -68,14 +68,39 @@ DeliveryEnvelope:
 | `resolve` | Sealed alias-resolution query (see below) |
 | `card` | Fetch the current server card (TBD whether exposed here) |
 
+## Facade locality
+
+A facade is the client↔own-server last mile and **never** crosses a server
+boundary (see `Facade.md`). Servers reach each other only over the federation
+transport (I2P), and a client only ever talks to its own server's facade. So no
+cross-server operation — delivery, contact request, or alias resolution — may
+require a client to connect to, learn, or carry a foreign facade URL. The unit
+of cross-server reachability is the **server card** (endpoints + sealing key,
+signed by the server root key), distributed inside an invite or as a standalone
+`bazarish://server-card/…` link — never a facade.
+
+This holds in both directions on first contact: a contact request carries the
+sender's **own server card** (not a facade) in its bootstrap, so the recipient
+replies by federating through its own server over I2P, having learned only the
+sender's server card.
+
 ## Alias resolution
 
-First contact with `alias@server` (or a main-server alias) needs the target user's UID, serving statement, and server card — with nothing leaked to intermediaries:
+First contact with `alias@server` (or a main-server alias) needs the target user's UID, serving statement, and server card — with nothing leaked to intermediaries, and **without the client ever touching the target server's facade**:
 
+0. To route and seal to the target server the client must already hold that server's **card** (its federation endpoints + sealing key). It obtains the card from a `bazarish://server-card/…` link (or a prior contact); the card is self-verifying against the server fingerprint. A bare server fingerprint alone is not routable.
 1. The client builds a query `{ alias }` sealed to the **target** server's sealing key, plus an ephemeral response key. Its own server sees only "user U queries server S", never the alias.
-2. The client submits it via its own server (`resolve`, submit+poll like `send`); the own server relays it over I2P without reading it.
+2. The client submits it via its own server (`resolve`, submit+poll like `send`); the own server relays it over I2P without reading it. The client never connects to the target server itself.
 3. The target server unseals, asks its service node, and responds with the trust chain — **alias certificate + subscription certificate + server card** (see `../Identity.md`) — sealed to the ephemeral key, or `ALIAS_UNKNOWN`.
 4. The requesting client verifies all three signatures itself; intermediaries are trusted for availability only.
+
+**Implementation status.** The facade-locality invariant is enforced on the
+client: the earlier shortcut that dialled a *foreign* facade to look up a
+contact or resolve an alias has been removed. Today the facade-free first-contact
+path is the **invite** (`bazarish://invite/…`, self-verifying, no live lookup),
+and same-server `@alias` resolves at the client's own service node. The sealed
+federated `resolve`/`card` flow above (cross-server `@alias` over I2P) is the
+next federation track and is **not yet implemented**.
 
 ## Authentication
 

@@ -34,6 +34,39 @@ http[s]://host[:port][/secret-path]
   forwarding. It is excluded from the signed canonical path, so the backend
   verifies the stripped, query-less path.
 
+### Facade locality (invariant)
+
+A facade URL belongs to **exactly one** server and is known **only** to that
+server's own clients. This is a hard invariant, not a convention:
+
+- A client only ever connects to **its own** server's facade. It never reaches
+  another server's facade, and it does not store, learn, or carry a foreign
+  facade URL at all.
+- A facade URL therefore never appears in any artifact that crosses a server
+  boundary — not in an invite, not in a contact request, not in an alias
+  resolution. The unit of cross-server reachability is the **server card**
+  (`Identity.md`), which carries the server's federation endpoints
+  (`i2p:<destination>`) and sealing key — and **no facade**.
+- A facade may be secret (a private secret-path, an unlisted host). The design
+  must never force revealing one in order to reach a user on that server, so a
+  server operator can keep its last mile confidential to its own clientele.
+
+Consequences for first contact (`Contacts.md`, `Federation.md`):
+
+- **Invite / QR** (`bazarish://invite/…`) — the contact's whole self-verifying
+  chain (subscription certificate + the contact's server card) travels in the
+  link; it is verified offline and the requester's **own** server federates the
+  contact request to the contact's server over the private channel. No facade,
+  on either side. The contact request itself carries the sender's own server
+  card (not a facade), so the reply path is equally facade-free.
+- **By `@alias`** — resolved at the requester's **own** server's service node;
+  a cross-server alias is resolved by a sealed query relayed by the requester's
+  own server over federation (`Federation.md`), never by dialling the foreign
+  facade.
+- **By bare fingerprint** — only meaningful for a peer on the requester's own
+  server; a bare fingerprint is not routable across servers (it carries no
+  endpoints), so cross-server first contact always uses an invite or `@alias`.
+
 ### Multiple facades and failover
 
 A server may publish **several** facade URLs (different hosts, proxies, or
@@ -56,9 +89,24 @@ bazarish://server/<base64url(JSON)>
 
 where the JSON payload is `{ "v": 1, "fp": <server fingerprint>, "facades":
 [<facade URL>, …] }`. The fingerprint is the trust anchor; everything the server
-signs is verified against it as usual. (This is distinct from
-`bazarish://invite/…`, which carries a self-verifying **contact** chain — a
-subscription certificate plus a server card — see `Identity.md` / `Contacts.md`.)
+signs is verified against it as usual.
+
+This is the **only** artifact that carries facade URLs, and it has a single,
+narrow purpose: configuring **your own** server. Its audience is the prospective
+clients of *this* server (an operator publishes it, e.g. on the server's site),
+and it is consumed solely to populate the local facade list. It is never used to
+reach another user — sharing it as if it were a contact would leak your server's
+facades. To avoid that confusion the three shareable artifacts are kept distinct:
+
+| Artifact | Carries | Audience | Facade? |
+|---|---|---|---|
+| `bazarish://server/…` | server fingerprint + facade URLs | prospective clients of **this** server | **yes** — own server only |
+| `bazarish://invite/…` | subscription certificate + server card | anyone, to add **you** as a contact | no |
+| `bazarish://server-card/…` | a signed server card (endpoints + sealing key) | anyone, to route to a **server** (e.g. for a cross-server `@alias`) | no |
+
+The invite and server-card chains are self-verifying against the relevant
+fingerprint, so intermediaries are trusted for availability only (`Identity.md` /
+`Contacts.md` / `Federation.md`).
 
 ## Requirements
 
