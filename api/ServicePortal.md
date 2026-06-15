@@ -132,16 +132,29 @@ certificate via `GET /v1/account/subscription`. No payment, no balance touched.
 
 ## 5. Payments (config-driven gateways)
 
-Gateways are selected **by config**, not hardcoded:
+The gateway and the paid-service prices are selected **by config**, not
+hardcoded — a single JSON file passed as `--payments-config <path>`, the one
+source feeding both the discovery advertisement and the buy endpoints (see
+`service-node/payments.example.json`):
 
-```
-payments.gateways = [ { type: "monerod", params: { … } } ]
+```json
+{
+  "gateway": { "type": "monerod", "params": { "url": "...", "user": "...", "password": "...", "minconf": "10", "callback_secret": "..." } },
+  "settlementCurrency": "XMR",
+  "freeStorageBytes": 10485760,
+  "services": {
+    "username": { "enabled": true, "priceAtomic": "...", "periodDays": 365 },
+    "i2pDest":  { "enabled": true, "priceAtomic": "...", "periodDays": 30 },
+    "storage":  { "enabled": true, "priceAtomic": "...", "periodDays": 30, "quotaBytes": ... }
+  }
+}
 ```
 
-The code ships **one** backend for now — **monerod** — plus a deterministic
-`mock` used in tests. Backends implement the `PaymentGateway` interface and
-register by `type`; a self-written gateway plugs in via
-`registerPaymentGateway(type, factory)` with no change to the plumbing.
+With no config file the node runs a local-dev default (an auto-confirm `mock`
+gateway and cheap services). The code ships **one** real backend — **monerod** —
+plus the deterministic `mock` used in tests. Backends implement the
+`PaymentGateway` interface and register by `type`; a self-written gateway plugs
+in via `registerPaymentGateway(type, factory)` with no change to the plumbing.
 
 ### PaymentGateway interface (server-side)
 
