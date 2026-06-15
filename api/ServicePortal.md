@@ -64,8 +64,13 @@ GET /v1/account/portal  →
   "links":   ["https://portal-a.example/…", "https://portal-b.example/…"],  // ≥1
   "services": {
     "freeRegistration": { "enabled": true, "captcha": true },
-    "username":  { "enabled": true,  "priceAtomic": "...", "currency": "XMR" },
-    "i2pDest":   { "enabled": true,  "priceAtomic": "...", "currency": "XMR" }
+    "username":  { "enabled": true, "priceAtomic": "...", "periodDays": 365, "currency": "XMR" },
+    "i2pDest":   { "enabled": true, "priceAtomic": "...", "periodDays": 30,  "currency": "XMR" },
+    "storage":   {
+      "freeQuotaBytes": 10485760,
+      "paid": { "enabled": true, "quotaBytes": 5368709120,
+                "priceAtomic": "...", "periodDays": 30, "currency": "XMR" }
+    }
   }
 }
 ```
@@ -73,8 +78,29 @@ GET /v1/account/portal  →
 The client shows the message and the link(s); the user opens one in a browser.
 Several links allow mirrors/onion/clearnet alternatives. The `services` block is
 driven by the server's config: a node may offer only free registration, or also
-sell a username and/or a personal I2P destination. server-core, when it rejects
-an unsubscribed sender, returns an error that points at the same portal.
+sell a username, a personal I2P destination, and/or a larger storage quota.
+
+**Every paid service is recurring (term-based) and renewed from the cabinet —
+none are one-shot.** This is deliberate: an ongoing server-side cost must map to
+ongoing payment, otherwise a one-time fee lets a user load the server with a huge
+number of always-online destinations for almost nothing. Recurring pricing turns
+that into a competitive market of servers (whoever offers a given resource
+cheaper wins), instead of a tragedy of the commons. Terms:
+
+- **username** — registered for **one year**, renewed yearly from the cabinet. A
+  username is a pure naming layer: it maps `alias → fingerprint` and resolves to
+  **whatever I2P destination that user currently uses, even one operated by
+  another server** (destinations are user-owned and portable, see `Facade.md` /
+  `Federation.md`). So a server can sell names independently of where the named
+  user's traffic is actually carried.
+- **i2pDest** — a personal always-online destination, billed **monthly** (its
+  tunnels/leaseset are a continuous resource).
+- **storage** — every account gets `freeQuotaBytes` free (the config minimum,
+  10 MiB by default); the paid plan raises the quota and is billed **monthly**.
+
+A lapsed term reverts the service to its free baseline (name released, dest
+dropped to the shared pool, quota back to the free minimum). server-core, when it
+rejects an unsubscribed sender, returns an error that points at the same portal.
 
 ## 3. Account model
 
@@ -88,9 +114,15 @@ Per user (`subscriptions/<fp>.json`, `ledger/<fp>.json`):
 - **ledger** — append-only entries `{ ts, type: topup|spend, amount, currency,
   ref, balanceAfter }`. Top-ups credit; purchases debit. This is the account
   history the portal shows.
-- **entitlements** — `username` (the registered alias) and `i2pDest` (the
-  per-user-destination flag honoured by the messaging server / pool
-  provisioning, see `Facade.md` / `Federation.md`).
+- **entitlements** — each is term-based with its own paid-through date, renewed
+  from the cabinet, reverting to a free baseline on lapse:
+  - `username` (alias → fingerprint, yearly) — a naming registration that
+    resolves to the user's portable destination, possibly carried by another
+    server (see `Facade.md` / `Federation.md`);
+  - `i2pDest` (the per-user-destination flag honoured by the messaging server /
+    pool provisioning, monthly);
+  - **storage quota** — the subscription's `quotaBytes`, the free default
+    (10 MiB) until a paid plan raises it, monthly.
 
 ## 4. Free registration
 
