@@ -83,6 +83,16 @@ versioned envelope:
 | `bot.command` | content | A command invocation aimed at a bot: `command` (name, no leading slash), `args` (raw argument string). See *Bots & interactive messages*. |
 | `bot.callback` | content | An inline-keyboard button press: `data` (the button's payload), `ref` (the `id` of the keyboard message). See *Bots & interactive messages*. |
 | `edit` | content | An in-place edit of a message the sender previously sent: `ref` (the target message's `id`), `text` (new text), `keyboard` (new inline keyboard, `[]` to clear). The recipient replaces its copy. Applied only to a message `from` actually sent. See *Editing messages*. |
+| `group.invite` | content | Adds a recipient to a group: `groupId`, `name`, `roster` (b64 signed roster). See `Groups.md`. |
+| `group.tokens` | contact | A member's one-time token pool for a group: `groupId`, `tokens`. Tokenless distribution. See `Groups.md`. |
+| `group.roster` | contact | A signed roster update (membership/admin/epoch). Sent over the tokenless contact class so a critical update never fails on a drained pool. See `Groups.md`. |
+| `group.leave` | contact | The sender is leaving a group: `groupId`. See `Groups.md`. |
+
+A content message of any group type **and** any ordinary content type (`text`,
+`file`, …) may additionally carry a `"group": { "id": <groupId> }` field — it
+files the message under that group conversation instead of the one-to-one thread.
+The group is invisible to the server: group messages are ordinary `content`
+deliveries fanned out to each member client-side (`Groups.md`).
 
 The registry is **open**: new rows are added here and implemented in clients.
 No server, facade, federation or storage change accompanies a new row.
