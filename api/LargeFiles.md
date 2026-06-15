@@ -188,10 +188,12 @@ host = b33 + ".b32.i2p"
 
 (Per I2P proposals 123/149; matches i2pd's `BlindedPublicKey::ToB33`.) SAM
 `NAMING LOOKUP ME` returns the raw destination, not the blinded address, so the
-store derives the b33 itself from the session's signing key — reusing the vendored
-trimmed **libi2pd** (`IdentityEx` + `Blinding`), the same library the client uses
-for key generation. Recipients reach it with SAM `STREAM CONNECT <host>`; the router
-performs the blinded lookup and decrypts the leaseset.
+store derives the b33 itself from the session's signing key. It is computed
+directly (I2P-base64 decode → Ed25519 signing key → CRC-32 prefix → base32), with
+no libi2pd dependency, and is verified byte-for-byte against an i2pd-produced golden
+vector (`i2pd-tools keyinfo -b`). Recipients reach it with SAM
+`STREAM CONNECT <host>`; the router performs the blinded lookup and decrypts the
+leaseset.
 
 **Strict rule — blob storage emits `.b32.i2p` download links only, with no
 alternative.** There is no clearnet, LAN, or direct-host fallback for a download URL.
