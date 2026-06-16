@@ -56,12 +56,16 @@ Delivery over I2P can take tens of seconds, so sending is asynchronous at the AP
 | `GET /v1/messaging/pending/{blobId}` | Fetch the raw E2E payload bytes |
 | `POST /v1/messaging/ack` | Confirm receipt for this client ID; when all registered client IDs of the user have acked, the server deletes the content immediately |
 
-### Content store (bulk media, see `../Messages.md`)
+### Large media: blob storage (see `LargeFiles.md`)
+
+Large content (files, and any message blob over 512 KB) is not stored on the
+messaging server. The client uploads ciphertext to the **blob store** and the
+message carries only a small sealed pointer; the recipient fetches it over I2P.
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /v1/content` | Upload opaque ciphertext; returns `{id, size}` where `id = sha256(ciphertext)` hex. Content-addressed and deduplicated; the store never sees the content type or decryption key |
-| `GET /v1/content/{id}` | Fetch the ciphertext for a content id |
+| `PUT /v1/storage/blob` | Upload blob ciphertext (authed; forwarded by the facade to the blob store). Returns `{blobUrl, blobId, deleteToken}`. Retention rides in `X-Blob-Ttl`/`X-Blob-Count`/`X-Blob-Sha256` headers |
+| `GET /v1/messaging/blob-proxy?host=&path=` | Own-server I2P proxy fetch of a blob's `.b32.i2p` host+path, for clients without a local SAM bridge (the direct path is a transient SAM session straight to the blob's b33) |
 
 ### Delivery tokens (see `../Contacts.md`)
 

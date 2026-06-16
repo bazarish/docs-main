@@ -181,33 +181,33 @@ opt in. The receipt carries the original message's `id`, so the sender matches
 it back to the sent message. A failed delivery surfaces as a distinct failed
 state, not a tick.
 
-## Media: content-store references
+## Media: blob-storage pointers
 
-Bulk content (files, photos, audio, voice) is **never** inlined in the mailbox
-envelope. It rides through a generic, content-addressed **content store**
-(`api/ClientApi.md`):
+Bulk content (files, photos, audio, voice) — and any message blob over **512 KB**
+— is **never** inlined in the mailbox envelope. It rides through the **blob store**
+(rotating encrypted-LeaseSet destinations served only over I2P; full design in
+`api/LargeFiles.md`):
 
-1. The sender encrypts the bytes with a fresh random content key
-   (CMS password-based envelope, AES-256; the key is the password — standard
-   primitives only, no custom construction).
-2. The sender uploads the ciphertext to the content store, which returns a
-   content id = `sha256(ciphertext)`. The store is **type-blind**: it holds
-   opaque bytes addressed by hash, with its own quota and TTL, and dedups
-   identical ciphertext.
-3. The sender's message (`type: "file"` etc.) carries `{ ref: <content id>,
-   key: <base64 content key>, size, mime, name }` — all end-to-end encrypted.
-4. The recipient fetches `ref` from the content store and decrypts it with
-   `key`. The store never sees the key and cannot read the content.
+1. The sender encrypts the bytes with a fresh random key (CMS password-based
+   envelope, AES-256; the key is the password — standard primitives only, no
+   custom construction).
+2. The sender uploads the ciphertext to the blob store, which returns a
+   `.b32.i2p` capability URL, a `blobId` and a `deleteToken`. The store holds
+   opaque ciphertext only, with its own quota and TTL.
+3. The sender's message (`type: "file"` etc.) carries `{ ptr: base64(sealed
+   BlobPointer), size, mime, name }` — all end-to-end encrypted. The pointer
+   holds the download URL, the decryption key and the integrity digest.
+4. The recipient fetches the ciphertext over I2P (a transient SAM session
+   straight to the blob's b33, or its own server's proxy fetch), verifies the
+   digest and decrypts. The store never sees the key and cannot read the content.
 
-Why a reference and not an inline blob: it keeps the messaging path light,
-lets a large transfer resume independently of the conversation, dedups shared
-media, and supports group fan-out (one upload, many references) without
-re-encrypting per recipient. Crucially the content store is **one generic
-mechanism**: it is added once and every present and future media type reuses it
-with zero further server work — which is the whole point of the two-layer model.
+Why a pointer and not an inline blob: the messaging server never carries the
+bulk bytes, so a **quota-constrained recipient can receive arbitrarily large
+content**; the transfer is independent of the conversation; and download is
+I2P-only (`.b32.i2p`), so a direct fetch can never leak the fetcher's IP.
 
-The content store sees: ciphertext bytes, their size, an opaque content id.
-It never sees: who the content is for, what type it is, or its plaintext.
+The blob store sees: ciphertext bytes and their size. It never sees: who the
+content is for, what type it is, the decryption key, or its plaintext.
 
 ## Calls
 
