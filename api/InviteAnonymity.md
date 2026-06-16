@@ -101,6 +101,31 @@ The sender's own server still learns only "user U sent something to destination
 D" — and D is shared by a whole pool of free users, so it is weaker than a
 server fingerprint, not stronger.
 
+### Local delivery only within a destination (no co-location timing channel)
+
+A server may short-circuit delivery (store straight into the local mailbox
+instead of dialling out over I2P) **only when the sender and the recipient are
+on the same destination** — i.e. `toDest` equals the **sender's own** assigned
+destination. In every other case, including a recipient who is a local user but
+on a *different* destination the same server operates (e.g. a pool sender to a
+home-destination recipient, or any two users the server hosts on distinct
+destinations), the server **must federate** — dial `toDest` over I2P, even
+though it is one of its own destinations (a self-dial).
+
+Rationale: if the server delivered cross-destination recipients locally (fast)
+but remote recipients over I2P (slow), the **delivery latency** would reveal
+whether the recipient is co-located on the sender's server — a timing
+side-channel that re-introduces exactly the co-location signal the
+destination-routing model removes. Routing within one destination is safe (the
+two parties already share that destination by construction, so "local" leaks
+nothing new); routing across destinations must be indistinguishable from a
+remote delivery.
+
+The server determines the sender's destination authoritatively from its own
+assignment of the authenticated sender (the same lookup that backs the
+destination-surfacing step below) — never from a value the sender supplies, so a
+sender cannot force a revealing short-circuit.
+
 ## The destination knob (`dest_U`)
 
 - **Free tier** — `dest_U` is one of the server's **address-pool** destinations
@@ -189,6 +214,12 @@ mapping.
 ## Federation impact
 
 - `toServer` → `toDest`; the sender's server dials `toDest` directly.
+- **Local short-circuit only within a destination**: deliver locally iff
+  `toDest` equals the **sender's own** destination; otherwise federate (dial
+  `toDest`), even when the server operates `toDest` (a same-server recipient on a
+  different destination) — see "Local delivery …" above. This is the rule, not an
+  optimisation; a fast local path for a different-destination recipient is a
+  co-location timing leak.
 - Accept side is unchanged in shape: home / pool / personal destinations each
   already run an accept loop into the shared `DeliveryEngine`; add per-dest
   serving-sealing-key selection.
