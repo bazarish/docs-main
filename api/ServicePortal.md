@@ -146,9 +146,21 @@ source feeding both the discovery advertisement and the buy endpoints (see
     "username": { "enabled": true, "priceAtomic": "...", "periodDays": 365 },
     "i2pDest":  { "enabled": true, "priceAtomic": "...", "periodDays": 30 },
     "storage":  { "enabled": true, "priceAtomic": "...", "periodDays": 30, "quotaBytes": ... }
+  },
+  "portal": {
+    "message": "<onboarding text shown by the client>",
+    "links": ["https://portal-a.example", "http://mirror.b32.i2p"],
+    "captcha": { "enabled": true, "length": 5, "ttlSeconds": 300 }
   }
 }
 ```
+
+The `portal` block drives onboarding discovery (§2): `message` and `links` are
+advertised verbatim by `GET /v1/account/portal`, and `captcha.enabled` is both
+advertised there as `freeRegistration.captcha` **and** enforced at
+`POST /portal/register` — the two cannot disagree. With `captcha.enabled` false,
+free registration is open to any signed-in (sign-in-with-key) user without a
+captcha; `length`/`ttlSeconds` size the self-hosted captcha when it is on.
 
 With no config file the node runs a local-dev default (an auto-confirm `mock`
 gateway and cheap services). The code ships **one** real backend — **monerod** —
