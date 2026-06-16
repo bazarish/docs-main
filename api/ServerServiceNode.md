@@ -9,7 +9,7 @@ Internal API over the operator private channel. The service node owns user-manag
 | Request | Purpose |
 |---|---|
 | `subscription-status` | Is user U actively subscribed? Returns expiry and quota (MB) |
-| `resolve-alias` | alias → trust chain for locally registered aliases: alias certificate + subscription certificate (the service node holds both; the server card the server adds itself). Serves federation `resolve` queries. Realized as the account API `GET /v1/account/resolve` |
+| `resolve-alias` | alias → trust chain for locally registered aliases: alias certificate + the user's subscription certificate (its contact card, carrying the destination + serving sealing key — the service node holds both; no server card is added). Serves federation `resolve` queries. Realized as the account API `GET /v1/account/resolve` |
 
 ## Service node → Server (draft)
 

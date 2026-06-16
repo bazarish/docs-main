@@ -46,19 +46,20 @@ server's own clients. This is a hard invariant, not a convention:
   facade URL at all.
 - A facade URL therefore never appears in any artifact that crosses a server
   boundary — not in an invite, not in a contact request, not in an alias
-  resolution. The unit of cross-server reachability is the **server card**
-  (`Identity.md`), which carries the server's federation endpoints
-  (`i2p:<destination>`) and sealing key — and **no facade**.
+  resolution. The unit of cross-server reachability is the recipient's serving
+  **destination** (its b33), carried in the user-signed **contact card**
+  (`Identity.md`, `InviteAnonymity.md`) — and **no facade**.
 - A facade may be secret (a private secret-path, an unlisted host). The design
   must never force revealing one in order to reach a user on that server, so a
   server operator can keep its last mile confidential to its own clientele.
 
 Consequences for first contact (`Contacts.md`, `Federation.md`):
 
-- **Invite / QR** (`bazarish://invite/…`) — the contact's whole self-verifying
-  chain (subscription certificate + the contact's server card) travels in the
-  link; it is verified offline and the requester's **own** server federates the
-  contact request to the contact's server over the private channel. No facade,
+- **Invite / QR** (`bazarish://invite/…`) — the contact's single self-verifying
+  **contact card** (the user-signed certificate: prekey + destination + serving
+  sealing key) travels in the link; it is verified offline and the requester's
+  **own** server federates the contact request to the contact's destination over
+  the private channel. No facade,
   on either side. The contact request itself carries the sender's own server
   card (not a facade), so the reply path is equally facade-free.
 - **By `@alias`** — resolved at the requester's **own** server's service node;
@@ -103,10 +104,10 @@ facades. To avoid that confusion the three shareable artifacts are kept distinct
 | Artifact | Carries | Audience | Facade? |
 |---|---|---|---|
 | `bazarish://server/…` | server fingerprint + facade URLs | prospective clients of **this** server | **yes** — own server only |
-| `bazarish://invite/…` | subscription certificate + server card | anyone, to add **you** as a contact | no |
-| `bazarish://server-card/…` | a signed server card (endpoints + sealing key) | anyone, to route to a **server** (e.g. for a cross-server `@alias`) | no |
+| `bazarish://invite/…` | a single user-signed **contact card** (prekey + destination + serving sealing key) | anyone, to add **you** as a contact | no |
+| `bazarish://server-card/…` | a signed server card (endpoint + resolve key) | a server's resolve key for cross-server `@alias` (pending Stage-2 resolution) | no |
 
-The invite and server-card chains are self-verifying against the relevant
+The invite and server-card artifacts are self-verifying against the relevant
 fingerprint, so intermediaries are trusted for availability only (`Identity.md` /
 `Contacts.md` / `Federation.md`).
 

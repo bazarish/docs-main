@@ -17,7 +17,7 @@ Each sync message carries a batch of events stamped `(deviceId, seq)` — a per-
 
 | Event | Content |
 |---|---|
-| `contact-added` / `contact-revoked` | Contact identity, server card |
+| `contact-added` / `contact-revoked` | Contact identity, contact card (destination + serving sealing key) |
 | `token-batch-issued` | Which tokens (and their hashes) went to which contact |
 | `token-hashes-registered` | Hashes registered with the own server |
 | `token-spent` | Outgoing token consumed for a peer |
@@ -39,7 +39,7 @@ Two devices may race to spend the same token from the shared per-contact stash. 
 
 ## Enrollment (adding a device)
 
-1. An existing device displays a QR code containing: the identity private keys (classical + post-quantum), the home server fingerprint + server card, and the facade secret URI. The ML-DSA private key (~4 KB) pushes the payload beyond comfortable QR capacity — the enrollment bundle may need a QR-carried one-time secret plus a local-channel transfer; settle at client design time.
+1. An existing device displays a QR code containing: the identity private keys (classical + post-quantum), the home server fingerprint + facade secret URI, and (for a paid per-user destination) the user-owned destination key. The new device re-fetches the user's current routing (destination + serving sealing key) from the server (`GET /v1/messaging/destination`). The ML-DSA private key (~4 KB) pushes the payload beyond comfortable QR capacity — the enrollment bundle may need a QR-carried one-time secret plus a local-channel transfer; settle at client design time.
 2. The new device authenticates as the user and **registers its client ID**.
 3. It announces itself with a sync event; an existing device responds with a `snapshot` (contacts, token bookkeeping, settings, recent history).
 4. Content delivered and fully acked *before* registration is gone by design and is not replayed; prior history arrives via the snapshot.

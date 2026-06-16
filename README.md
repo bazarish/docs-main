@@ -14,18 +14,21 @@ component implements.
 ## Specification
 
 - [Architecture](Architecture.md) — components, topology, trust boundaries, key decisions
-- [Identity](Identity.md) — keys, UIDs, certificates, server card, algorithms
+- [Identity](Identity.md) — keys, UIDs, certificates, contact card, algorithms
 - [Contacts](Contacts.md) — contact admission via one-time delivery tokens
 - [Messages](Messages.md) — delivery class vs content type; the content-type registry
 - [Bots](Bots.md) — bots as ordinary identities; commands, inline keyboards, callbacks
 - [DeviceSync](DeviceSync.md) — multi-device enrollment and E2E state sync
-- [Groups](Groups.md) — group chats (direction fixed, design deferred)
+- [Groups](Groups.md) — group chats (client-side fan-out)
 - [Errors](Errors.md) — typed error registry
 - API contracts:
   - [ClientApi](api/ClientApi.md) — client ↔ facade ↔ {server, service node}
   - [Facade](api/Facade.md) — the last-mile contract
-  - [Federation](api/Federation.md) — server ↔ server over hidden networks
+  - [Federation](api/Federation.md) — server ↔ server over I2P (destination-routed)
+  - [InviteAnonymity](api/InviteAnonymity.md) — destination-routed contact cards
+  - [ServicePortal](api/ServicePortal.md) — sign-in-with-key portal, payments, grants
   - [ServerServiceNode](api/ServerServiceNode.md) — internal server ↔ service node API
+  - [LargeFiles](api/LargeFiles.md) — large-message blob storage over I2P
   - [Storage](api/Storage.md) — pending-content storage backends
   - [Calls](api/Calls.md) — audio/video calls
 
@@ -37,9 +40,11 @@ One repository per component, developed side by side:
 |---|---|
 | Shared C++ library | [common-cpp](https://github.com/bazarish/common-cpp) |
 | Messaging server | [server-core](https://github.com/bazarish/server-core) |
-| Service node (user management) | [service-node](https://github.com/bazarish/service-node) |
+| Service node (user management, portal, payments) | [service-node](https://github.com/bazarish/service-node) |
 | HTTP facade (last mile) | [facade-http](https://github.com/bazarish/facade-http) |
 | Client (core, CLI, Qt6 GUI) | [client-qt6](https://github.com/bazarish/client-qt6) |
+| Large-message blob store (encrypted-LeaseSet hosts over I2P) | [blob-storage](https://github.com/bazarish/blob-storage) |
+| Fleet management / monitoring panel (non-priority) | [admin-panel](https://github.com/bazarish/admin-panel) |
 | Specification | this repository |
 
 ## Cryptography

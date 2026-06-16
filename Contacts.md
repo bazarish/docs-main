@@ -36,8 +36,8 @@ Token bookkeeping (issuance records, registrations, spends) is private client st
 A is not B's contact and B is not A's — the first exchange must bootstrap both directions:
 
 1. A's client generates an initial token batch *for B*, registers its hashes on A's own server.
-2. A sends a **contact request** to B: a tokenless delivery, flagged as a request, payload capped (default 256 bytes, server-configurable). Inside the E2E payload: A's identity, the introduction message, the token batch for B, plus A's **serving statement and server card** (see `../Identity.md`) — without them B would not know where to send the acceptance.
-3. B's user accepts → B's client registers a batch for A on B's server and replies *using one of A's tokens*, embedding B's batch, serving statement, and server card in the E2E payload. Both directions are now live.
+2. A sends a **contact request** to B: a tokenless delivery, flagged as a request, payload capped (default 256 bytes, server-configurable). Inside the E2E payload: A's identity, the introduction message, the token batch for B, plus A's routing **bootstrap** — `{ sealing prekey, dest, servingKey }` (see `../Identity.md`) — without it B would not know where to send the acceptance. (No server fingerprint or server card: routing is by destination.)
+3. B's user accepts → B's client registers a batch for A on B's server and replies *using one of A's tokens*, embedding B's batch and the same routing bootstrap in the E2E payload. Both directions are now live.
 4. B declines → silent drop, nothing is sent. A's client revokes the pre-registered hashes after a timeout.
 
 Contact requests are the only tokenless path into a mailbox; they get a separate small quota and per-origin-server rate limiting.

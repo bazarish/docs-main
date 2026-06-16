@@ -72,9 +72,9 @@ versioned envelope:
 | `type` | Delivery class | Purpose / payload |
 |---|---|---|
 | `text` | content | `text` — a plain text line. |
-| `contact.request` | contact | Bootstrap: `fromSealing`, `fromServer`, `fromServerCard`, `replyTokens`, `text`. The first message; see `Contacts.md`. |
+| `contact.request` | contact | Carries a `bootstrap` block (`sealing` prekey, `dest`, `servingKey`, `replyTokens`) plus `text`. The first message; see `Contacts.md`. |
 | `token-refill` | content | `replyTokens` — a fresh stash when the peer's drops low (`Contacts.md`). |
-| `file` | content | A content-store reference: `ref`, `key`, `size`, `mime`, `name`. See *Media* below. |
+| `file` | content | A sealed blob-storage pointer `ptr` (base64) — the encrypted blob lives in blob storage, fetched over I2P. See *Media* below and `api/LargeFiles.md`. |
 | `photo` | content | Same shape as `file`, plus optional `width`, `height`. |
 | `audio` / `voice` | content | Same shape as `file`, plus optional `duration`. |
 | `call.invite` | content | Contact type (audio/video), one-time tunnel destination + credentials (`api/Calls.md`). |

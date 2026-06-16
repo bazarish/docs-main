@@ -17,14 +17,14 @@ Status: draft skeleton. The single client-facing API, reached through a facade (
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /v1/account/subscribe` | Submit a subscription certificate (`{cert}`). The service node verifies the hybrid signature, that it names this server, is unexpired, and is within the max term; responds `{notAfter, quotaBytes, maxTermSeconds, serverCard}`. The certificate may carry the user's sealing **prekey** (see `../Identity.md`) |
+| `POST /v1/account/subscribe` | Submit a subscription certificate (`{cert}`). The service node verifies the hybrid signature, that it names this server, is unexpired, and is within the max term; responds `{notAfter, quotaBytes, maxTermSeconds}`. The certificate is the user's **contact card** — it carries the sealing **prekey** plus the serving **destination** + **serving sealing key** the client fetched from `GET /v1/messaging/destination` (see `../Identity.md`, `InviteAnonymity.md`). Registration is grant-gated through the portal (`ServicePortal.md`) |
 | `POST /v1/account/renew` | Renew the subscription before expiry (submit a fresh certificate; same handler) |
 | `GET /v1/account/subscription` | Current subscription state: `{notAfter, quotaBytes}`. (Usage lives on the messaging server.) |
 | `DELETE /v1/account/subscription` | Unsubscribe (migration cutover); the server purges all pending content immediately |
 | `POST /v1/account/alias` | Register an alias (`{cert}`, signed nickname certificate); `ALIAS_TAKEN` if owned by another user |
 | `DELETE /v1/account/alias` | Release an alias (`{alias}`; owner only) |
-| `GET /v1/account/resolve?alias=X` | Resolve an alias to `{user, aliasCert, subscriptionCert}` (the messaging server adds its server card). Unauthenticated; `ALIAS_UNKNOWN` is explicit (aliases are findable by design) |
-| `GET /v1/account/contact?user=X` | Look up a user by fingerprint: returns `{user, subscriptionCert}`. The certificate carries the serving server and the user's sealing **prekey**, which a first-contact sender uses to E2E-encrypt the contact request. Unauthenticated, like resolve |
+| `GET /v1/account/resolve?alias=X` | Resolve an alias to `{user, aliasCert, subscriptionCert}`; the subscription certificate is the user's contact card (destination + serving sealing key), so no server card is added. Unauthenticated; `ALIAS_UNKNOWN` is explicit (aliases are findable by design) |
+| `GET /v1/account/contact?user=X` | Look up a user by fingerprint: returns `{user, subscriptionCert}`. The certificate is the contact card — the user's sealing **prekey**, serving **destination** and **serving sealing key**, which a first-contact sender uses to route to and E2E-encrypt the contact request. Unauthenticated, like resolve |
 
 Implemented in the `service-node` repository (`SubscriptionStore`, `AccountApi`; covered by tests). The service node is bound to its messaging server by that server's card (passed at startup), from which it takes the server fingerprint subscription certificates must name.
 
@@ -42,6 +42,14 @@ Delivery over I2P can take tens of seconds, so sending is asynchronous at the AP
 - Unknown `attemptId` (server restarted, state expired) → the client treats it as failure and resubmits with the **same messageId**; the recipient's server dedups, so retries are idempotent and never consume a second token.
 - On failure the message stays only on the client; the server holds no outbound queue.
 - A contact accept is not a separate endpoint: it is an ordinary `message` send using a token received in the request (see `../Contacts.md`). Declining a request sends nothing.
+
+### Own destination
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /v1/messaging/destination` | Returns the caller's assigned `{dest, servingKey}` — the serving destination this server routes to the user (its b33, or the raw destination for a paid offline-key destination) and the public serving sealing key for it. The client folds them into its self-signed subscription certificate (its contact card) |
+
+### Alias resolution relay
 
 | Endpoint | Purpose |
 |---|---|

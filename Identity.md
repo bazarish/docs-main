@@ -20,12 +20,19 @@ Status: draft skeleton.
 ## Server identity
 
 - A server's root identity is a hybrid keypair set; its fingerprint is the `@server` part of addresses.
-- **Server card** — a document signed by the server's root key, containing:
-  - the server's transport endpoints, as a list of typed entries (`i2p:<destination>` first; extensible to future transports);
-  - the server's **sealing public key** — used by sending clients to encrypt the sealed part of delivery envelopes (recipient, token, messageId) so that only the destination server can read it (see `api/Federation.md`);
-  - a version/issued-at field so newer cards supersede older ones;
-  - (TBD) facade bootstrap info given to a user at registration: secret URI list.
-- Distribution: handed to the user at registration, exchanged between servers during federation, and embeddable in contact-exchange payloads.
+- **Server card** — a document signed by the server's root key, binding the
+  server's identity to its transport endpoint(s) (`i2p:<b33>`) and a server-level
+  sealing key. It is the server's own identity document (the service node is
+  bound to it) and the entry point for sealed cross-server **alias resolution**
+  (`api/Federation.md`). It is **not** the peer-facing routing artifact any more
+  and is **not** carried in invites: delivery routing and sealing are
+  per-destination and travel in the user's contact card (below).
+- **Delivery sealing is per-destination.** Each serving destination (the home
+  destination, each address-pool destination, a paid per-user destination) has
+  its **own serving sealing key**; the delivery envelope's admission header
+  (recipient, token, messageId) is sealed to the serving sealing key of the
+  recipient's destination, whose private half the recipient's server holds. There
+  is no single server-wide delivery sealing key (`InviteAnonymity.md`).
 
 ## Certificates
 
@@ -33,28 +40,32 @@ Status: draft skeleton.
 
 ### Subscription certificate
 
-Issued **by the user**, signed with the identity key; asserts "server S serves user U until T".
+Issued **by the user**, signed with the identity key; asserts "server S serves user U until T" **and** carries the user's peer-facing routing — it doubles as the **contact card**.
 
-Body (draft): `{ v, user: <fingerprint>, server: <server-fingerprint>, issuedAt, notAfter, sealingKey? }`.
+Body (draft): `{ v, user: <fingerprint>, server: <server-fingerprint>, issuedAt, notAfter, sealingKey?, dest?, servingSealingKey? }`.
 
-The optional `sealingKey` is the user's sealing public key (SPKI DER, base64) — a **prekey**. Because it rides inside the user-signed certificate, a contact can fetch it (`GET /v1/account/contact` or alias resolution) and E2E-encrypt the very first contact request before any token exchange, with no risk of an intermediary substituting the key. This closes the first-message bootstrap gap: every payload, including the contact request, is end-to-end encrypted.
+- `sealingKey` — the user's E2E sealing **prekey** (SPKI DER, base64): a contact encrypts the very first contact request to it before any token exchange. Because it rides inside the user-signed certificate, no intermediary can substitute it, closing the first-message bootstrap gap.
+- `dest` — the user's serving **destination** (its b33; the raw destination for a paid offline-key destination): where a contact routes deliveries.
+- `servingSealingKey` — the public **serving sealing key** of that destination: a contact seals the delivery envelope's admission header to it. Not a signature and not a trust anchor — the user just vouches for it under their one signature; a wrong value only makes delivery fail (`InviteAnonymity.md`). Its private half is held by the user's server. The client learns `dest`/`servingSealingKey` from its server (`GET /v1/messaging/destination`) and folds them into the certificate.
+
+There is **no server fingerprint dependency or server card** in the peer-facing artifact — routing is by destination.
 
 It has **two consumers**:
 
-1. **The serving server (via the service node)** — the lifecycle anchor: "subscription active" ⇔ "valid certificate on file". Renewal = a fresh certificate; the server publishes its maximum term and rejects longer ones. After expiry the server may purge all pending content for the user (grace period is server config).
-2. **Contacts' clients** — the **serving statement**: the same artifact, pushed to contacts over E2E, is the cryptographic answer to "where do I deliver to U?". It is signed by U, so it stays trustworthy through any untrusted intermediary.
+1. **The serving server (via the service node)** — the lifecycle anchor: "subscription active" ⇔ "valid certificate on file". Renewal = a fresh certificate; the server publishes its maximum term and rejects longer ones. After expiry the server may purge all pending content for the user (grace period is server config). Registration is grant-gated through the service portal (`api/ServicePortal.md`).
+2. **Contacts' clients** — the **contact card**: the same artifact, handed to contacts over E2E (or in an invite), is the cryptographic answer to "where and how do I deliver to U?" (prekey + destination + serving sealing key). Signed by U, so it stays trustworthy through any untrusted intermediary.
 
-Routing-staleness policy for contacts: the last known statement remains the routing target even past `notAfter` — expiry signals staleness, not invalidity. A fresh statement is pushed to **the server on every renewal**, but to **contacts only when the serving server changes** (avoids re-broadcast every few days).
+Routing-staleness policy for contacts: the last known card remains the routing target even past `notAfter` — expiry signals staleness, not invalidity. A fresh card is pushed to **the server on every renewal**, but to **contacts only when the destination changes** (avoids re-broadcast every few days).
 
 ### One serving server, hard-cutover migration
 
 A user holds a subscription with **exactly one server at a time**. Migration S1 → S2:
 
 1. Subscribe to S2, register fresh token hashes there, unsubscribe from S1 (or let the certificate lapse).
-2. Push the new serving statement + S2's server card + fresh token batches to all contacts over E2E.
-3. Contacts switch as the statement arrives. Deliveries that race the cutover **fail and stay on the sender's client** (standard send semantics) and are retried after the new statement arrives — messages are delayed, not lost.
+2. Push the new contact card (S2 destination + serving sealing key + prekey) + fresh token batches to all contacts over E2E.
+3. Contacts switch as the card arrives. Deliveries that race the cutover **fail and stay on the sender's client** (standard send semantics) and are retried after the new card arrives — messages are delayed, not lost.
 
-Failure mode accepted: if S1 dies before the user prepared the migration, contacts' retries keep failing until the user pushes a new statement (or, with an alias, contacts re-resolve it).
+Failure mode accepted: if S1 dies before the user prepared the migration, contacts' retries keep failing until the user pushes a new card (or, with an alias, contacts re-resolve it). A paid per-user destination is portable across servers (it is the user's own offline key), so migration need not change the destination at all.
 
 ### Alias certificate
 
@@ -63,29 +74,29 @@ Failure mode accepted: if S1 dies before the user prepared the migration, contac
 
 ### First-contact trust chain (alias resolution)
 
-Resolving `alias@server` (or a main-server alias) returns three artifacts, verified end-to-end by the requesting client with no trust in intermediaries:
+Resolving `alias@server` (or a main-server alias) returns two artifacts, verified end-to-end by the requesting client with no trust in intermediaries:
 
 1. **Alias certificate** — signed by the user: "I am alias X";
-2. **Subscription certificate** — signed by the user: "server S serves me";
-3. **Server card** — signed by S's root key: transport endpoints and sealing key.
+2. **Contact card** (the user-signed subscription certificate) — prekey + destination + serving sealing key.
 
 The resolve query travels sealed (see `api/Federation.md`), so the requester's own server never learns which alias was looked up.
 
 ### Out-of-band invites
 
-The same trust chain can be packaged for sharing over any channel (a link, a
-QR code, a paper printout) instead of being fetched from a server. An **invite**
-carries two self-verifying artifacts:
+The contact card can be packaged for sharing over any channel (a link, a QR
+code, a paper printout) instead of being fetched from a server. An **invite**
+carries a **single** self-verifying artifact:
 
-1. **Subscription certificate** — signed by the user: serving server + sealing prekey;
-2. **Server card** — signed by the server's root key: transport endpoints + sealing key.
+- **Contact card** (the user-signed subscription certificate) — prekey +
+  destination + serving sealing key, all under the user's one signature.
 
-The recipient verifies both signatures and binds them to the user's
+The recipient verifies that one signature and binds the card to the user's
 fingerprint locally, so an invite needs **no trust in any server** — not even
-for availability, since nothing is fetched. This is the strongest contact-add
-path; its only cost is size (both certificates are hybrid post-quantum signed,
-≈ 7–8 KB each), which a single QR code cannot hold — an invite spans a short
-sequence of QR symbols (structured append) or rides in a link.
+for availability, since nothing is fetched, and no server-identifying fields are
+shared (`InviteAnonymity.md`). This is the strongest contact-add path; its only
+cost is size (the hybrid post-quantum signature makes the card ≈ 7–8 KB), which a
+single QR code cannot hold — an invite spans a short sequence of QR symbols
+(structured append) or rides in a link.
 
 Trust ladder for adding a contact, strongest first:
 

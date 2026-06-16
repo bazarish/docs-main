@@ -28,15 +28,15 @@ identity fingerprint on verification):
 ```
 { "v": 1, "groupId": <hex>, "name": <string>, "epoch": <int>,
   "members": [
-    { "fp": <fingerprint>, "sealing": <b64 SPKI>, "server": <server fp>,
-      "serverSealing": <b64 SPKI>, "admin": <bool> }, ... ],
+    { "fp": <fingerprint>, "sealing": <b64 SPKI>, "dest": <i2p destination>,
+      "servingKey": <b64 SPKI>, "admin": <bool> }, ... ],
   "admins": [ <fingerprint>, ... ] }
 ```
 
 Each member entry carries everything needed to deliver to that member (their user
-sealing key, their server, and that server's sealing key), so a member learns how
-to reach **every** other member from the roster alone — no per-member contact
-lookup. A recipient **verifies** the embedded signature, checks the signer's
+sealing key, their serving destination, and that destination's serving sealing
+key), so a member learns how to reach **every** other member from the roster
+alone — no per-member contact lookup. A recipient **verifies** the embedded signature, checks the signer's
 fingerprint is in `admins`, and only then trusts the body. The trust anchor for a
 fresh member is the inviter (a known contact) who signed/forwarded the first
 roster; later rosters are accepted when signed by any listed admin and carrying a
@@ -93,8 +93,8 @@ member spends one token from the **recipient's** pool, per recipient.
   treats members as mutually trusted for authorship.
 - **Ordering** is best-effort by `sentAt` plus local arrival; there is no global
   order.
-- **Attachment fan-out** costs ×N uplink (one content-store upload, N references —
-  the reference/key ride each member's sealed message). Mitigations deferred.
+- **Attachment fan-out** costs ×N uplink (one blob-storage upload, N pointers —
+  the sealed blob pointer rides each member's sealed message). Mitigations deferred.
 - **Scale** ≤ ~100 members (see *Decided direction*). Larger broadcast is a
   separate future concept.
 

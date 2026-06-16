@@ -1,8 +1,9 @@
 # Invite Anonymity: destination-routed contact cards
 
-Status: design (decided direction; not yet implemented). Supersedes the
-invite/server-card shape described in `../Identity.md`, `../Contacts.md` and
-`Federation.md` once the phased implementation below lands.
+Status: **implemented and live-validated** over real I2P (single-server +
+cross-server `demo-federation-i2p.sh`, 2026-06-17). Supersedes the old
+invite/server-card shape; `../Identity.md`, `../Contacts.md`, `Facade.md` and
+`Federation.md` have been updated to match.
 
 ## Problem
 
@@ -241,23 +242,30 @@ mapping.
 The strongest cross-user clustering field (the shared server fingerprint and the
 byte-identical root-signed card) is gone.
 
-## Phased implementation plan
+## Implementation (all phases done)
 
-1. **common** — the contact-card / extended subscription-cert format: add
-   `dest` and `servingSealingKey` to the user-signed body; the card is the
-   peer-facing object. Issue/verify/round-trip tests (`TestCertificates`).
-2. **server-core** — per-destination serving sealing keys (generate, persist,
-   select by the destination a connection arrived on); the subscribe response
+1. **common** ✓ — the contact-card / extended subscription-cert format: `dest`
+   and `servingSealingKey` in the user-signed body (`TestCertificates`). Plus
+   `encryptedLeaseSetHost()` (b33 derivation) and `SamSession::routingAddress()`
+   so a destination is addressed by its b33 (encrypted LeaseSet2) or raw
+   destination (standard LeaseSet2, offline-key per-user) — `TestI2pAddress`.
+2. **server-core** ✓ — per-destination serving sealing keys (generate, persist,
+   select by the destination a connection arrived on); `GET /v1/messaging/destination`
    returns the assigned dest + public serving sealing key; the delivery envelope
-   is keyed by `toDest`; federation routes and accepts by destination. Unit
-   tests + live-I2P smoke. (Fresh-alpha: drop the fingerprint path rather than
-   keep a shim — see Compatibility.)
-3. **client** — `createInvite` / `addByInvite` / contact-request bootstrap /
-   `addByUsername` / groups rewired to the contact card and route-by-dest;
-   `deliver` targets a destination. Unit tests + demo scripts.
-4. **docs** — fold the result into `../Identity.md`, `../Contacts.md`,
-   `Facade.md`, `Federation.md`; retire the server card from the invite/contact
-   path and update the artifact tables; mark this file implemented.
+   is keyed by `toDest`; federation routes/accepts by destination and **dials the
+   b33** (not the raw destination — an encrypted leaseset is only reachable via
+   the b33); local short-circuit only on same-destination. TCP federation removed;
+   `--i2p` mandatory.
+3. **client** ✓ — `createInvite` / `addByInvite` / contact-request bootstrap /
+   `addByUsername` / groups on the contact card and route-by-dest; `deliver`
+   targets a destination; `Client::myDestination()` fetches the assigned routing.
+4. **docs** ✓ — folded into `../Identity.md`, `../Contacts.md`, `Facade.md`,
+   `Federation.md`, `Architecture.md`, `Messages.md`, `Groups.md`, `DeviceSync.md`,
+   `ClientApi.md`; the server card is retired from the invite/contact path.
+
+Live-validated end-to-end over real I2P (2026-06-17, vs i2pd 2.60.0): full
+single-server dialog and full cross-server Alice↔Bob conversation via invite,
+with no `peers.json`, dialling each other's b33.
 
 ## Compatibility
 
