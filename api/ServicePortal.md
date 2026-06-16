@@ -215,8 +215,11 @@ default, preserving the privacy posture.
 The service node serves the portal HTML on the same port as the JSON API, at
 `/` (the JSON API stays under `/portal/*` and `/v1/*`, untouched). The
 **JS-free** path (server-rendered forms, full-page reloads, post-redirect-get)
-is implemented; a **JS-enhanced** layer on top (live status polling, inline QR)
-is planned. Pages, all reusing the JSON endpoints' logic:
+is implemented; the first **JS-enhanced** layer — inline, same-origin live
+payment-status polling on the pay page — is implemented on top (with the
+Refresh link as the JS-free fallback). Inline QR is still planned (kept out of
+the JS-free path; a JS QR renderer would add a third-party dependency). Pages,
+all reusing the JSON endpoints' logic:
 
 - **login** (`GET /login`, `POST /login`) — render a challenge; a field to paste
   the Client signature; on success set a session cookie and redirect to `/`.
