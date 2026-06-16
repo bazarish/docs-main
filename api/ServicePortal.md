@@ -212,17 +212,22 @@ default, preserving the privacy posture.
 
 ## 7. Web frontend (JS + JS-free)
 
-The service node serves the portal HTML. Every flow has a **JS-free** path
-(server-rendered forms, full-page reloads) and a **JS-enhanced** path (live
-status polling, inline QR):
+The service node serves the portal HTML on the same port as the JSON API, at
+`/` (the JSON API stays under `/portal/*` and `/v1/*`, untouched). The
+**JS-free** path (server-rendered forms, full-page reloads, post-redirect-get)
+is implemented; a **JS-enhanced** layer on top (live status polling, inline QR)
+is planned. Pages, all reusing the JSON endpoints' logic:
 
-- **login** — render challenge; field to paste the Client signature.
-- **dashboard** — balance, ledger, available services.
-- **register** — captcha → free subscription.
-- **top-up / pay** — create invoice; show `payTo` + amount + QR; JS polls
-  `GET /pay/{id}`; JS-free offers a "refresh" link and a "I paid → enter txid"
-  form (`POST /pay/{id}/txid`).
-- **buy username / buy i2p-dest** — debit balance, grant entitlement.
+- **login** (`GET /login`, `POST /login`) — render a challenge; a field to paste
+  the Client signature; on success set a session cookie and redirect to `/`.
+- **cabinet** (`GET /`) — balance, subscription state, offered services.
+- **register** (`GET /register`, `POST /register`) — inline captcha (when
+  enabled) → free subscription.
+- **top-up / pay** (`GET /topup`, `POST /topup`, `GET /pay/{id}`) — create
+  invoice; show `payTo` + amount; JS-free offers a "refresh" link and a
+  "I paid → enter txid" form (`POST /pay/{id}/txid`); JS may poll `GET /pay/{id}`.
+- **buy** (`POST /buy`, `service` field) — debit balance, grant/renew the
+  entitlement.
 
 ## 8. API relationships
 
@@ -233,7 +238,7 @@ status polling, inline QR):
 | Browser | `GET /login`, `POST /login` | sig → session | sign-in-with-key |
 | Browser | `POST /register` | session + captcha | free subscription |
 | Browser | `POST /topup`, `GET /pay/{id}`, `POST /pay/{id}/txid` | session | balance + payment |
-| Browser | `POST /buy/username`, `POST /buy/i2p-dest` | session | spend balance, grant entitlement |
+| Browser | `POST /buy` (`service` field) | session | spend balance, grant/renew entitlement |
 | watcher | `POST /v1/pay/callback/<gateway>` | HMAC | payment push notification |
 | Client | `GET /v1/account/subscription` | key | fetch the issued certificate |
 | Client | `GET /v1/account/resolve`, `/contact` | none | messaging lookups (unchanged) |
