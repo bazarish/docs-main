@@ -18,7 +18,7 @@ arbitrarily large content without it ever touching their mailbox.
  sender Client                     blob-storage                 recipient Client
  ──────────────                    ────────────                 ────────────────
  blob > 512 KB                                                  
-   │ encrypt (CMS/AES-GCM, per-blob key)
+   │ encrypt (CMS PWRI / AES-256-CBC, per-blob key)
    │ PUT ciphertext + retention  ─────────►  store, assign dest+id
    │ ◄───────────────────────────────────   return i2p URL + delete-token
    │ build pointer {url,id,key,sha256,size,meta}
@@ -41,7 +41,8 @@ arbitrarily large content without it ever touching their mailbox.
   unchanged (inline through the mailbox).
 - Packing happens **entirely on the client**:
   1. Serialize the message; if `> 512 KB`, generate a per-blob symmetric key and
-     encrypt the whole blob (CMS `AuthEnvelopedData` / AES-GCM — standard
+     encrypt the whole blob (CMS password-based envelope, RFC 3211 PWRI, with
+     AES-256-CBC content encryption — the per-blob key is the password; standard
      primitives only, no custom containers).
   2. `PUT` the ciphertext to a blob storage and receive its download URL.
   3. Replace the message with a **pointer** carrying the metadata needed for a
@@ -75,7 +76,8 @@ bundled with a messaging server (default deployment) or on a separate cheap box,
 including a third-party operator. Three faces:
 
 1. **Upload — through the facade, authenticated, quota-gated.** The client `PUT`s
-   ciphertext plus a **retention policy**. Storage assigns a `blobId` and an I2P
+   ciphertext plus a **retention policy**, streamed and signed over the body digest
+   (see Streaming). Storage assigns a `blobId` and an I2P
    download dest, records `owner` (for quota accounting and `DELETE`), and returns
    the download URL plus a **delete-token**. The client keeps the delete-token
    with the message metadata, so the sender can later **manually unsend** the
@@ -230,24 +232,76 @@ load the recipient's quota for something the sender already provides. This follo
 the project's storage principle — **keep the minimum**: a blob lives only until the
 intended clients have received it (count) or its TTL elapses, then it is gone.
 
+## Streaming: the blob is never held whole in memory
+
+The whole large-file path is **streamed end to end** — sender, facade, storage and
+recipient each spool the blob to disk and pass it on in bounded chunks, so no node
+ever holds the blob in RAM. This lets a client on a memory-constrained device send
+or receive a file far larger than its available memory.
+
+```
+ sender                facade                 blob-storage            recipient
+ ──────                ──────                  ────────────            ─────────
+ encrypt file ─► temp  PUT ─► spool ─► temp    PUT ─► temp ─►(rename)  GET ─► temp
+ streamed PUT  ─────►  stream on ────────►     stored ciphertext       verify ─► decrypt
+   (no RAM)             (no RAM)                 (no RAM)               file→file (no RAM)
+```
+
+- **Sender.** The client encrypts the file straight to a temp ciphertext file
+  (streaming CMS), hashes it from disk, and `PUT`s it through an HTTP content
+  provider — neither the plaintext nor the ciphertext is ever materialized in
+  memory.
+- **Facade.** The upload `PUT` is read through a content reader, spooled to a temp
+  file on the facade, then streamed on to the storage backend through a content
+  provider. The facade never buffers the blob — and since an upload **always**
+  traverses the facade (it is not an optional path like the download proxy), this
+  matters on every large send.
+- **Storage.** The backend receives the `PUT` through a content reader, writes the
+  body straight to a temp file while hashing it, and on success moves it into the
+  store with an **atomic rename** — never reading it back through memory.
+- **Recipient.** The download is streamed to a temp file (with range/resume); its
+  digest is verified **before** decryption, then it is decrypted **file-to-file**
+  into the destination. A tampered or truncated transfer is rejected before any
+  cleartext is produced.
+
+### Signing a streamed body
+
+An authenticated `PUT` is signed over the **digest** of the body
+(`hex(sha256(body))`), never the raw bytes, so a multi-gigabyte upload can be
+signed and streamed without ever materializing it. The storage backend hashes the
+body as it streams in and verifies the signature against *that* digest — which both
+authenticates the caller and **binds the stored bytes to what was signed**: a body
+that does not match its signed digest is rejected.
+
+The one copy that remains is OpenSSL's: parsing a CMS envelope for decryption
+materializes its embedded content once. That is inherent to the high-level CMS
+decrypt API for embedded content and is bounded by the file size; everything else
+on the path is bounded by a fixed chunk buffer.
+
 ## Crypto
 
-- Per-blob random symmetric key; ciphertext is CMS `AuthEnvelopedData` (AES-GCM)
-  via OpenSSL — standard primitives only.
+- Per-blob random symmetric key; ciphertext is a CMS password-based envelope
+  (RFC 3211 PWRI, AES-256-CBC content) via OpenSSL, with the per-blob key as the
+  password — standard primitives only. Integrity is the whole-blob `sha256` in the
+  pointer (verify-then-decrypt), not an AEAD tag.
 - Whole-blob `sha256` in the pointer for integrity; resume via HTTP range over the
-  ciphertext bytes (integrity verified after full assembly). Chunked AEAD with a
-  manifest (incremental verification, random access) is a later optimization, not
-  v1.
+  ciphertext bytes. The digest is computed by streaming the assembled ciphertext
+  from disk and is verified **before** decryption (verify-then-decrypt — see
+  Streaming), so a tampered or truncated transfer never yields cleartext. Chunked
+  AEAD with a manifest (incremental verification, random access) is a later
+  optimization, not v1.
 - `GET`/`confirm` are authless because the payload is ciphertext and `blobId` is an
   unguessable bearer capability; `PUT`/`DELETE` are authenticated (sign-in-with-key
-  + storage grant for `PUT`; delete-token for `DELETE`).
+  + storage grant for `PUT`; delete-token for `DELETE`). The `PUT` signature covers
+  the body's `sha256` digest, not the raw bytes, so the upload streams while the
+  stored bytes stay bound to the signature (see Streaming).
 
 ## Responsibilities
 
 | Component | Role |
 |---|---|
-| `client-qt6` | 512 KB detection, encrypt/pack, upload, build+seal pointer; keep delete-token with meta; on receive: fetch (direct/proxy), validate, confirm, decrypt |
-| `blob-storage` | upload (authed, quota-gated) / authless capability download / anonymous confirm; retention (TTL or count); dest pool + rotation; rate-limit |
+| `client-qt6` | 512 KB detection, encrypt/pack **streamed to a temp file**, **streamed** upload, build+seal pointer; keep delete-token with meta; on receive: fetch **streamed to disk** (direct/proxy), validate, confirm, decrypt **file-to-file** |
+| `blob-storage` | upload (authed, quota-gated, **streamed to disk**) / authless capability download / anonymous confirm; retention (TTL or count); dest pool + rotation; rate-limit |
 | `service-node` | controls blob-storage per-user quota (storage grant + quota push, extending the existing publisher to a second target) |
-| `facade-http` | fronts blob-storage uploads |
+| `facade-http` | fronts blob-storage uploads, **streamed (spooled) — never buffers the blob** |
 | `server-core` | untouched — only ever delivers the small pointer |

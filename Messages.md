@@ -185,8 +185,10 @@ state, not a tick.
 
 Bulk content (files, photos, audio, voice) — and any message blob over **512 KB**
 — is **never** inlined in the mailbox envelope. It rides through the **blob store**
-(rotating encrypted-LeaseSet destinations served only over I2P; full design in
-`api/LargeFiles.md`):
+(rotating encrypted-LeaseSet destinations served only over I2P). The whole path is
+**streamed end-to-end** — sender, facade, store and recipient each spool to disk, so
+no node holds the blob in memory and a file can exceed any one node's RAM (full
+design in `api/LargeFiles.md`):
 
 1. The sender encrypts the bytes with a fresh random key (CMS password-based
    envelope, AES-256; the key is the password — standard primitives only, no
