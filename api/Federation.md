@@ -67,8 +67,16 @@ DeliveryEnvelope:
 
 - The sender's own server learns only "user U sent something to destination D"
   (plus size and time) — never the recipient identity. For a free user D is a
-  shared address-pool destination (k-anonymity); for a paid user it is their
-  personal destination.
+  shared address-pool destination (k-anonymity), assigned round-robin and fixed
+  per user (default pool size 10, `--pool-size`; the assignment is a stable hash,
+  so a user can neither pick nor enumerate it); for a paid user with the
+  **per-user i2p-dest** option on it is their own personal destination (an
+  offline-key master held by the client, see `ServicePortal.md`). Only one
+  destination serves a user at a time (no dual-dest, which would be a
+  deanonymisation surface): when a paid term lapses past its grace the personal
+  destination simply goes **offline** until the user tops up or turns the option
+  off (then they revert to their fixed pool address) — the server never silently
+  re-points a live, already-shared address.
 - The recipient's server learns only "something arrived from destination X into mailbox V with a valid token" — never the sender identity (see `../Contacts.md`).
 
 ## Message delivery flow

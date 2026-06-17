@@ -23,6 +23,9 @@ Status: draft skeleton. The single client-facing API, reached through a facade (
 | `DELETE /v1/account/subscription` | Unsubscribe (migration cutover); the server purges all pending content immediately |
 | `POST /v1/account/alias` | Register an alias (`{cert}`, signed nickname certificate); `ALIAS_TAKEN` if owned by another user |
 | `DELETE /v1/account/alias` | Release an alias (`{alias}`; owner only) |
+| `POST /v1/account/i2p-dest/setting` | Turn the **per-user i2p-dest** option on/off (`{enabled}`). On charges a term (or resumes if still paid; `402` on an insufficient balance); off stops auto-renew and revokes the personal destination (fall back to the pool). See `ServicePortal.md` |
+| `POST /v1/account/i2p-dest` | Upload a signed offline **transient** (`{transient, expiresUnix}`; empty revokes). Gated by an active i2pDest entitlement; the server hands it to the messaging server, which operates the personal destination, and records its validity |
+| `GET /v1/account/i2p-status` | `{enabled, active, paidThrough, projectedShutoff, transientExpires, transientUpdatedAt, storageQuotaBytes, storageActive, storageProjectedShutoff, balanceAtomic, currency}` — the client polls this to drive transient re-issue and to show the user when their dest/storage will lapse from the balance |
 | `GET /v1/account/resolve?alias=X` | Resolve a **per-operator** alias to `{user, aliasCert, subscriptionCert}`. **Transitional**: the global `username` namespace is moving to the central resolver (`api/AliasResolver.md`, `api/FederatedResolve.md`); once the registry leaves the service node, this row and the two `…/account/alias` rows above are retired and only the fingerprint `contact` lookup below remains (it backs the federation `card` fetch). Unauthenticated; `ALIAS_UNKNOWN` is explicit |
 | `GET /v1/account/contact?user=X` | Look up a user by fingerprint: returns `{user, subscriptionCert}`. The certificate is the contact card — the user's sealing **prekey**, serving **destination** and **serving sealing key**, which a first-contact sender uses to route to and E2E-encrypt the contact request. Unauthenticated, like resolve |
 
@@ -47,7 +50,7 @@ Delivery over I2P can take tens of seconds, so sending is asynchronous at the AP
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /v1/messaging/destination` | Returns the caller's assigned `{dest, servingKey}` — the serving destination this server routes to the user (its b33, or the raw destination for a paid offline-key destination) and the public serving sealing key for it. The client folds them into its self-signed subscription certificate (its contact card) |
+| `GET /v1/messaging/destination` | Returns the caller's assigned `{dest, servingKey, state}` — the serving destination this server routes to the user (its b32; a paid offline-key personal destination is a standard-LeaseSet2 b32), the public serving sealing key for it, and the serving `state` (`home` / `pool` / for a personal destination `building` → `active` → `expired`) so the client only publishes a personal address once it is `active`. The client folds dest+key into its self-signed subscription certificate (its contact card) |
 
 ### Alias resolution relay
 

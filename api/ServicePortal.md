@@ -93,14 +93,33 @@ cheaper wins), instead of a tragedy of the commons. Terms:
   another server** (destinations are user-owned and portable, see `Facade.md` /
   `Federation.md`). So a server can sell names independently of where the named
   user's traffic is actually carried.
-- **i2pDest** — a personal always-online destination, billed **monthly** (its
-  tunnels/leaseset are a continuous resource).
+- **i2pDest** — a personal always-online destination, an **opt-in toggle**
+  (off by default — every user already has a fixed pool address) billed
+  **monthly**. The cabinet states the privacy trade-off: a personal destination
+  is portable and stable across servers, but a unique, lasting address across all
+  the user's contacts (less crowd-blending than the shared pool). See
+  *Per-user i2p-dest* below.
 - **storage** — every account gets `freeQuotaBytes` free (the config minimum,
   10 MiB by default); the paid plan raises the quota and is billed **monthly**.
 
-A lapsed term reverts the service to its free baseline (name released, dest
-dropped to the shared pool, quota back to the free minimum). server-core, when it
-rejects an unsubscribed sender, returns an error that points at the same portal.
+Term-based services **auto-renew from the prepaid balance**; a lapse reverts to
+the free baseline, but the lapse rule differs per service so the user notices:
+- **username** — released to the pool after its grace (see `AliasResolver.md`).
+- **storage** — strict: when the balance cannot cover a renewal the upgrade
+  drops to the free quota (a visible shrink, pushed to the messaging server) and
+  stops; the user re-buys to restore it.
+- **i2pDest** — a **one-step negative-balance grace**: the first unfunded
+  renewal is debited anyway (the balance goes negative) and the destination is
+  served a further 30 days; a second is refused while the balance is negative, so
+  the personal destination goes **offline** (the user is **not** silently moved
+  to the pool — that would either break already-shared descriptors or expose a
+  second destination, a deanonymisation surface). The user comes back online by
+  topping up (the same b32 is restored) or by turning the option **off**
+  explicitly, which reverts them to their fixed pool address. A top-up that
+  clears the debt re-arms the grace.
+
+server-core, when it rejects an unsubscribed sender, returns an error that points
+at the same portal.
 
 ## 3. Account model
 
@@ -123,6 +142,41 @@ Per user (`subscriptions/<fp>.json`, `ledger/<fp>.json`):
     pool provisioning, monthly);
   - **storage quota** — the subscription's `quotaBytes`, the free default
     (10 MiB) until a paid plan raises it, monthly.
+
+### Per-user i2p-dest (key custody + lifecycle)
+
+The master I2P destination key stays on the **client** (the user's long-term
+routing identity, sealed at rest in the profile beside the messaging keys). The
+client either **generates** a fresh master or **loads** one it already owns from
+an unencrypted Ed25519 (signing type 7) `.dat`. The server only ever holds a
+short-lived **offline transient** delegated from that master, so the b32 is the
+user's own and stable as they move between servers, and an operator is locked out
+once its transient expires.
+
+Two clocks: the **entitlement** is monthly (auto-renewed from balance, with the
+one-step grace above); the **transient** is short (≈ 1 week). The client re-issues
+a fresh transient ≈ 2 days before it lapses, with a few hours of per-device
+**jitter**, and always **polls `GET /v1/account/i2p-status` before issuing** — so
+when one of the user's devices has already renewed, the others stand down
+(the multi-device race). `i2p-status` reports `enabled`/`active`, the recorded
+transient validity (so any device knows when to re-issue without storing it),
+the effective **storage quota**, and **honest projected shutoff dates** for both
+storage and i2pDest computed from the remaining balance.
+
+On install/enable the client also sends the master to its **other devices** as a
+`device.i2p-master` service message — sealed to the account's own sealing key and
+delivered tokenlessly to the account's own destination — so every device adopts
+the same master (preserving the b32) and can re-issue transients.
+
+The server provisions/serves the personal destination over SAM
+(`POST /v1/account/i2p-dest` → the messaging server's operator-internal
+per-user-destination endpoint), reports its state on `GET /v1/messaging/destination`
+(`building` → `active` → `expired`), and falls a free user back to a fixed
+round-robin **pool** address (default pool size 10; see `Federation.md`).
+
+> Off the box: minting the offline transient and the master `.dat` is the
+> client's job (vendored libi2pd); the server consumes and serves the blob but
+> never generates it.
 
 ## 4. Free registration
 
@@ -242,8 +296,12 @@ all reusing the JSON endpoints' logic:
 | Browser | `POST /register` | session + captcha | free subscription |
 | Browser | `POST /topup`, `GET /pay/{id}`, `POST /pay/{id}/txid` | session | balance + payment |
 | Browser | `POST /buy` (`service` field) | session | spend balance, grant/renew entitlement |
+| Browser | `POST /i2p-dest` (+ JSON `POST /portal/i2p-dest`) | session | turn the per-user i2p-dest option on/off |
 | watcher | `POST /v1/pay/callback/<gateway>` | HMAC | payment push notification |
 | Client | `GET /v1/account/subscription` | key | fetch the issued certificate |
+| Client | `POST /v1/account/i2p-dest/setting` | key | turn the per-user i2p-dest option on/off |
+| Client | `POST /v1/account/i2p-dest` | key | upload a signed offline transient (gated by an active i2pDest entitlement) |
+| Client | `GET /v1/account/i2p-status` | key | enabled/active, transient validity, storage quota, balance-projected shutoff dates |
 | Client | `GET /v1/account/resolve`, `/contact` | none | messaging lookups (unchanged) |
 
 ## 9. Removed (replaced by the portal)
