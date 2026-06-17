@@ -55,20 +55,20 @@ server's own clients. This is a hard invariant, not a convention:
 
 Consequences for first contact (`Contacts.md`, `Federation.md`):
 
-- **Invite / QR** (`bazarish://invite/…`) — the contact's single self-verifying
-  **contact card** (the user-signed certificate: prekey + destination + serving
-  sealing key) travels in the link; it is verified offline and the requester's
-  **own** server federates the contact request to the contact's destination over
-  the private channel. No facade,
-  on either side. The contact request itself carries the sender's own server
-  card (not a facade), so the reply path is equally facade-free.
-- **By `@alias`** — resolved at the requester's **own** server's service node;
-  a cross-server alias is resolved by a sealed query relayed by the requester's
-  own server over federation (`Federation.md`), never by dialling the foreign
-  facade.
-- **By bare fingerprint** — only meaningful for a peer on the requester's own
-  server; a bare fingerprint is not routable across servers (it carries no
-  endpoints), so cross-server first contact always uses an invite or `@alias`.
+- **Descriptor / QR** (`bazarish://invite?fp=…&srv=…&srv_key=…`, rendered as
+  `fp:b33`) — carries the contact's fingerprint, serving destination and the
+  server's serving sealing key. The client fetches the user-signed contact card
+  for that fingerprint over I2P and verifies it against the fingerprint
+  (`FederatedResolve.md`) — direct transient-SAM preferred, the requester's
+  **own** server as a proxy fallback, never the foreign facade. The contact
+  request bootstrap carries the sender's own routing (prekey + destination +
+  serving sealing key), so the reply path is equally facade-free.
+- **By `<alias>`** — resolved at the **central resolver** over its I2P endpoint
+  (`AliasResolver.md`); again direct-dial preferred, own-server proxy fallback,
+  never the foreign facade.
+- **By bare fingerprint** — a fingerprint is an identity, not a route, so it is
+  always paired with a destination (the descriptor above). Cross-server first
+  contact uses a descriptor or `<alias>`.
 
 ### Multiple facades and failover
 
@@ -99,17 +99,17 @@ narrow purpose: configuring **your own** server. Its audience is the prospective
 clients of *this* server (an operator publishes it, e.g. on the server's site),
 and it is consumed solely to populate the local facade list. It is never used to
 reach another user — sharing it as if it were a contact would leak your server's
-facades. To avoid that confusion the three shareable artifacts are kept distinct:
+facades. To avoid that confusion the two shareable artifacts are kept distinct:
 
 | Artifact | Carries | Audience | Facade? |
 |---|---|---|---|
 | `bazarish://server/…` | server fingerprint + facade URLs | prospective clients of **this** server | **yes** — own server only |
-| `bazarish://invite/…` | a single user-signed **contact card** (prekey + destination + serving sealing key) | anyone, to add **you** as a contact | no |
-| `bazarish://server-card/…` | a signed server card (endpoint + resolve key) | a server's resolve key for cross-server `@alias` (pending Stage-2 resolution) | no |
+| `bazarish://invite?…` (descriptor) | fingerprint + serving destination + serving sealing key (`fp:b33` + `srv_key`) | anyone, to add **you** as a contact | no |
 
-The invite and server-card artifacts are self-verifying against the relevant
-fingerprint, so intermediaries are trusted for availability only (`Identity.md` /
-`Contacts.md` / `Federation.md`).
+The descriptor carries no facade URL; the contact card it points at is fetched
+over I2P and is user-signed, so it is verified against the fingerprint and
+intermediaries are trusted for availability only (`Identity.md` /
+`FederatedResolve.md` / `Federation.md`).
 
 ## Requirements
 

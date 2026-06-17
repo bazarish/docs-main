@@ -5,6 +5,14 @@ cross-server `demo-federation-i2p.sh`, 2026-06-17). Supersedes the old
 invite/server-card shape; `../Identity.md`, `../Contacts.md`, `Facade.md` and
 `Federation.md` have been updated to match.
 
+> **Note (later supersession).** The destination-routing, per-destination serving
+> sealing keys, and route-by-b33 model below still hold. The **invite artifact**
+> itself — the full ≈ 8 KB user-signed contact card carried inline — has since
+> been replaced by a small **descriptor** (`fp:b33` + serving sealing key) plus a
+> live card fetch (`FederatedResolve.md`, `AliasResolver.md`). Read this document
+> for the destination-routing rationale; read `FederatedResolve.md` for the
+> current first-contact/discovery shape.
+
 ## Problem
 
 An invite today carries two artifacts: the user's **subscription certificate**

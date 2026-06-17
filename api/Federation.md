@@ -89,8 +89,11 @@ DeliveryEnvelope:
 | Request | Purpose |
 |---|---|
 | `deliver` | Deliver an envelope (message or contact request) for a local mailbox |
-| `resolve` | Sealed alias-resolution query (see below) |
-| `card` | Fetch the current server card (TBD whether exposed here) |
+| `card` | Return a local user's contact card for a sealed fingerprint query — the first-contact card fetch (`FederatedResolve.md`) |
+
+Username resolution (`alias` → descriptor) is **not** an operator-to-operator
+verb; it is served by the separate central resolver over its own I2P endpoint
+(`AliasResolver.md`, `FederatedResolve.md`).
 
 ## Facade locality
 
@@ -109,28 +112,28 @@ sender's own **routing** (sealing prekey + destination + serving sealing key) in
 its bootstrap, so the recipient replies by federating to the sender's destination
 over I2P, having learned only that destination — not a server fingerprint.
 
-## Alias resolution
+## First-contact discovery
 
-First contact with `alias@server` (or a main-server alias) needs the target
-user's UID and contact card (prekey + destination + serving sealing key) — with
-nothing leaked to intermediaries, and **without the client ever touching the
-target server's facade**:
+First contact needs the peer's UID and contact card (prekey + destination +
+serving sealing key) without leaking to intermediaries and without the client
+touching a foreign facade. The model is specified in `FederatedResolve.md`; in
+summary:
 
-1. The client builds a query `{ alias }` sealed to the **target server's
-   resolve key** (a server-level key — the one residual server-scoped artifact,
-   since the client cannot yet seal to a per-destination key for a user whose
-   destination it does not know), plus an ephemeral response key. Its own server
-   sees only "user U queries server S", never the alias.
-2. The client submits it via its own server (`resolve`, submit+poll like `send`); the own server relays it over I2P without reading it. The client never connects to the target server itself.
-3. The target server unseals, asks its service node, and responds with the trust chain — **alias certificate + the user's contact card** (`../Identity.md`) — sealed to the ephemeral key, or `ALIAS_UNKNOWN`.
-4. The requesting client verifies the signatures itself; intermediaries are trusted for availability only.
+- A **descriptor** (`fp:b33` plus the serving sealing key, shared as a QR or link)
+  carries the fingerprint and route directly. The client fetches the user-signed
+  contact card for that fingerprint over I2P — the `card` request above, with the
+  fingerprint sealed to the serving sealing key — direct transient-SAM preferred,
+  own-server proxy fallback, and verifies the card against the fingerprint. `fp`
+  anchors integrity; the relay learns neither the fingerprint (sealed) nor the
+  result.
+- A **username** resolves to a descriptor at the central resolver
+  (`AliasResolver.md`), which returns a signed self-verifying record over its SAM
+  endpoint; the client then runs the card fetch above.
 
-**Implementation status.** The facade-locality invariant is enforced on the
-client. Today the facade-free first-contact path is the **invite**
-(`bazarish://invite/…`, a single self-verifying contact card, no live lookup),
-and same-server `@alias` resolves at the client's own service node. The sealed
-federated `resolve` flow above (cross-server `@alias` over I2P) is the next
-federation track and is **not yet implemented**.
+**Implementation status.** The facade-locality and `.b32.i2p` address invariants
+are enforced in code. The descriptor / card-fetch and the central-resolver
+`resolve` flows are the active federation track (`FederatedResolve.md`) and are
+**not yet implemented**.
 
 ## Authentication
 

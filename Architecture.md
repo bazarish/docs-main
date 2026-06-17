@@ -40,7 +40,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 2. **Service node is a separate process** with its own API, keeping messaging logic and user management separated.
 3. **Facade ↔ server transport** — operator private channel, not a hidden network hop.
 4. **Wire format** — JSON for control messages, raw HTTP bodies for binary content (no base64 overhead). E2E-encrypted payloads are opaque blobs to all server-side components.
-5. **Destination routing** — delivery routes by the recipient's I2P **destination** (its b33), carried in the user-signed contact card, not by server fingerprint; the sender's server dials it directly (no resolver, no `peers.json`). `@server` is still the fingerprint of the server's root key for addressing/aliases. See `Identity.md`, `api/Federation.md`, `api/InviteAnonymity.md`.
+5. **Destination routing** — delivery routes by the recipient's I2P **destination** (its b33), carried in the user-signed contact card, not by server fingerprint; the sender's server dials it directly (no resolver, no `peers.json`). A contact is shared as a **descriptor** (`fp:b33`); a **username** resolves at the central resolver. Every routing target is a `.b32.i2p` host. See `Identity.md`, `api/Federation.md`, `api/FederatedResolve.md`, `api/AliasResolver.md`.
 6. **Single facade entry point** — the client uses one secret URI; the facade fans out to server and service node.
 7. **Docs language** — English (code comments are English per codestyle).
 8. **Shared code** — protocol types, OpenSSL wrappers, and JSON helpers live in the `common` repository, consumed by the other components via CMake (FetchContent or submodule). No duplicated crypto code.

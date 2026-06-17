@@ -10,23 +10,25 @@ Status: draft skeleton.
 ## User identity
 
 - A user **is** a hybrid keypair set. The canonical UID is the identity fingerprint covering both public keys.
-- Address forms:
-  - `<fingerprint>@<server-fingerprint>` — fully qualified.
-  - `<alias>@<server-fingerprint>` — alias registered at that server's service node.
-  - `<alias>` — exclusive alias on the **main server**, which is substituted when the `@server` part is absent (paid exclusive usernames — the project's monetization).
+- Address / contact forms:
+  - `<fingerprint>:<b33>` — the **descriptor**: identity fingerprint + the user's serving destination (a `.b32.i2p` host). The primary scannable/QR form; the full link `bazarish://invite?fp=…&srv=…&srv_key=…` also carries the server's serving sealing key (`api/FederatedResolve.md`). A fingerprint is an identity, not a route, so it is always paired with a destination — there is no `@server-fingerprint` form (nothing maps a fingerprint to an endpoint).
+  - `<alias>` — an exclusive **username** on the central resolver (paid; the project's monetization, `api/AliasResolver.md`). Resolving it yields a descriptor, after which the contact card is fetched and verified.
 - Users have no strict binding to a server; the binding is expressed by a time-limited subscription certificate.
 - All clients (devices/app instances) of a user **share the identity keypair set**; a new device receives it during enrollment (see `DeviceSync.md`). Each client registers a unique random **client ID** so the server can track delivery completeness across clients.
 
 ## Server identity
 
-- A server's root identity is a hybrid keypair set; its fingerprint is the `@server` part of addresses.
+- A server's root identity is a hybrid keypair set.
 - **Server card** — a document signed by the server's root key, binding the
   server's identity to its transport endpoint(s) (`i2p:<b33>`) and a server-level
   sealing key. It is the server's own identity document (the service node is
-  bound to it) and the entry point for sealed cross-server **alias resolution**
-  (`api/Federation.md`). It is **not** the peer-facing routing artifact any more
-  and is **not** carried in invites: delivery routing and sealing are
-  per-destination and travel in the user's contact card (below).
+  bound to it). It is **not** the peer-facing routing artifact and is **not**
+  carried in invites: delivery routing and sealing are per-destination and travel
+  in the user's contact card (below); a contact discovers the serving sealing key
+  needed to fetch that card from the **descriptor** (`srv_key`,
+  `api/FederatedResolve.md`), not from a fetched server card. Cross-server
+  username resolution is served by the separate central resolver
+  (`api/AliasResolver.md`), which signs its own records.
 - **Delivery sealing is per-destination.** Each serving destination (the home
   destination, each address-pool destination, a paid per-user destination) has
   its **own serving sealing key**; the delivery envelope's admission header
@@ -74,39 +76,43 @@ Failure mode accepted: if S1 dies before the user prepared the migration, contac
 
 ### First-contact trust chain (alias resolution)
 
-Resolving `alias@server` (or a main-server alias) returns two artifacts, verified end-to-end by the requesting client with no trust in intermediaries:
+Resolving an `alias` returns a **descriptor** (`fingerprint`, serving destination,
+serving sealing key) signed by the central resolver (a delegation chain to a
+hardcoded root fingerprint, `api/FederatedResolve.md`). The client then fetches and
+verifies the user-signed **contact card** for that fingerprint. Two trust layers:
 
-1. **Alias certificate** — signed by the user: "I am alias X";
-2. **Contact card** (the user-signed subscription certificate) — prekey + destination + serving sealing key.
+1. **alias → fingerprint** is asserted by the resolver — the inherent trust of
+   names; the UI surfaces the resolved fingerprint for out-of-band verification.
+2. everything after — the contact card (prekey + destination + serving sealing
+   key) — is **user-signed and verified against the fingerprint**, so no
+   intermediary can forge it.
 
-The resolve query travels sealed (see `api/Federation.md`), so the requester's own server never learns which alias was looked up.
+The lookup travels over I2P (direct transient-SAM, or sealed via the client's own
+server), so the requester's own server never learns which name was looked up
+(`api/FederatedResolve.md`).
 
-### Out-of-band invites
+### Out-of-band invites (the descriptor)
 
-The contact card can be packaged for sharing over any channel (a link, a QR
-code, a paper printout) instead of being fetched from a server. An **invite**
-carries a **single** self-verifying artifact:
-
-- **Contact card** (the user-signed subscription certificate) — prekey +
-  destination + serving sealing key, all under the user's one signature.
-
-The recipient verifies that one signature and binds the card to the user's
-fingerprint locally, so an invite needs **no trust in any server** — not even
-for availability, since nothing is fetched, and no server-identifying fields are
-shared (`InviteAnonymity.md`). This is the strongest contact-add path; its only
-cost is size (the hybrid post-quantum signature makes the card ≈ 7–8 KB), which a
-single QR code cannot hold — an invite spans a short sequence of QR symbols
-(structured append) or rides in a link.
+A contact is shared out of band as a small **descriptor** — `<fingerprint>:<b33>`,
+or the link `bazarish://invite?fp=…&srv=…&srv_key=…`: identity + serving
+destination + the server's serving sealing key. It fits a single QR. The recipient
+fetches the user-signed **contact card** for that fingerprint from the destination
+and verifies it against the fingerprint, so the binding is cryptographic and
+intermediaries are trusted for availability only. This replaces the earlier
+full-card invite (the whole ≈ 7–8 KB user-signed card inline, spanning several QR
+symbols): smaller and always-fresh, at the cost of a live fetch at add-time
+(`api/FederatedResolve.md`, `api/AliasResolver.md`).
 
 Trust ladder for adding a contact, strongest first:
 
-- **By invite** — fully offline, zero server trust, no metadata leak. Largest to share.
-- **By fingerprint** — the 52-character UID; certificates are fetched and
-  verified against it, so a server cannot forge, only withhold or observe the lookup.
-- **By username (alias)** — a resolver maps the human-readable name to a
-  fingerprint. Convenient for verbal exchange, but the **alias→fingerprint
-  mapping is trusted**: a hostile resolver could return an attacker's
-  fingerprint. Everything after the mapping is verified as above.
+- **By descriptor / fingerprint** (`fp:b33`, a QR or link) — the contact card is
+  fetched and verified against the fingerprint, so a server cannot forge, only
+  withhold; on a direct transient-SAM fetch it cannot even observe the lookup.
+- **By username (alias)** — the central resolver maps the human-readable name to a
+  fingerprint. Convenient, but the **alias→fingerprint mapping is trusted**: a
+  hostile resolver could return an attacker's fingerprint, so the UI surfaces the
+  resolved fingerprint for out-of-band verification. Everything after the mapping
+  is verified as above.
 
 ## Algorithms (decided empirically against OpenSSL 3.5)
 
@@ -115,6 +121,6 @@ Trust ladder for adding a contact, strongest first:
 - **Identity fingerprint**: lowercase unpadded base32 (RFC 4648) of SHA-256 over the concatenation `classical SPKI DER || ML-DSA SPKI DER` — 52 characters, covering both keys; substituting either key changes the identity. Display shortening is a client UX concern.
 - **Sealing keys: ECDH P-256** (CMS KeyAgreeRecipientInfo, RFC 5753) with **AES-256-GCM** content encryption. X25519 recipients are not supported by OpenSSL CMS. A sealing key is distinct from the identity keys by design.
   - **Accepted PQC gap**: sealing is not yet hybrid — OpenSSL CMS has no ML-KEM/KEMRecipientInfo (RFC 9629) support. Sealed envelopes protect routing metadata (recipient, token), so harvest-now-decrypt-later applies to *metadata*, not message content (which is E2E on top). Revisit as soon as OpenSSL ships KEMRI/ML-KEM in CMS; threat-model item.
-- **Alias syntax**: `[a-z0-9_.-]`, 1–32 characters, must not start or end with a separator. The length cap guarantees aliases never collide with the 52-character fingerprint form.
+- **Alias syntax**: `a-z` and `0-9` only, case-insensitive (normalized to lowercase), 1–32 characters (`api/AliasResolver.md`). The length cap keeps an alias distinct from the 52-character fingerprint form.
 
 Implementation: the `common` repository (`Crypto`, `Cms`, `Certificates` modules; covered by tests, including pq-tamper and downgrade cases). Notable sizes: ML-DSA-65 signature ≈ 3.3 KB, public key ≈ 2 KB — certificates are ~7–8 KB.
