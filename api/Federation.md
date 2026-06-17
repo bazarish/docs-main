@@ -8,12 +8,16 @@ Status: draft skeleton.
   non-I2P transport; the earlier plain-TCP federation was removed). Each server
   runs an I2P **STREAM** session via the SAM v3 bridge. The destination is
   persisted (`<state>/i2p-dest.key`) so the address is stable across restarts.
-- Every destination is published as an **encrypted LeaseSet2**, so its shareable,
-  routable address is the blinded **b33** (`<b33>.b32.i2p`) — the raw destination
-  is not connectable (no plain leaseset is published). The one exception is a
-  paid per-user offline-key destination, which can only publish a **standard
-  LeaseSet2** (the raw destination is its address) — offline keys cannot sign a
-  b33 (see `Identity.md`, `InviteAnonymity.md`).
+- Every routing/connection target is a full **`.b32.i2p`** address — a
+  cryptographic destination address, never an addressbook name (poisonable) and
+  never a raw base64 destination. This is enforced in code (`common`
+  `isB32I2pHost`/`validateB32I2pHost`, applied wherever a destination is ingested
+  or dialled). Most destinations are published as an **encrypted LeaseSet2**, so
+  the address is the blinded **b33** (`<b33>.b32.i2p`); the raw destination of
+  such a dest is not connectable (no plain leaseset is published). A paid per-user
+  offline-key destination can only publish a **standard LeaseSet2**, so it is
+  addressed by its standard **b32** (`<b32>.b32.i2p` = base32(sha256(destination)))
+  — offline keys cannot sign a b33 (see `Identity.md`, `InviteAnonymity.md`).
 - The delivery framing operates on an abstract connected stream, so a future
   overlay transport would only need to supply a byte stream; nothing above the
   transport assumes I2P specifics.

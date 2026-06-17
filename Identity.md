@@ -45,7 +45,7 @@ Issued **by the user**, signed with the identity key; asserts "server S serves u
 Body (draft): `{ v, user: <fingerprint>, server: <server-fingerprint>, issuedAt, notAfter, sealingKey?, dest?, servingSealingKey? }`.
 
 - `sealingKey` — the user's E2E sealing **prekey** (SPKI DER, base64): a contact encrypts the very first contact request to it before any token exchange. Because it rides inside the user-signed certificate, no intermediary can substitute it, closing the first-message bootstrap gap.
-- `dest` — the user's serving **destination** (its b33; the raw destination for a paid offline-key destination): where a contact routes deliveries.
+- `dest` — the user's serving **destination** as a `.b32.i2p` host (its b33; its standard b32 for a paid offline-key destination, which cannot publish a b33): where a contact routes deliveries. Never a raw destination or an addressbook name (`api/Federation.md`).
 - `servingSealingKey` — the public **serving sealing key** of that destination: a contact seals the delivery envelope's admission header to it. Not a signature and not a trust anchor — the user just vouches for it under their one signature; a wrong value only makes delivery fail (`InviteAnonymity.md`). Its private half is held by the user's server. The client learns `dest`/`servingSealingKey` from its server (`GET /v1/messaging/destination`) and folds them into the certificate.
 
 There is **no server fingerprint dependency or server card** in the peer-facing artifact — routing is by destination.
