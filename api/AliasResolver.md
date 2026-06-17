@@ -28,13 +28,28 @@ loop). What is done:
   management; reuses the operator service node's payment/auth primitives **as a
   library** (own ledger/wallet/prices, no runtime coupling).
 - **Lifecycle scheduler** — hourly auto-renew-from-balance + release-after-grace.
+- **Admin face** (`--admin <fingerprint>`) — an admin-gated portal (sign-in-with-key;
+  the signed-in fingerprint must equal the configured admin, else no admin routes
+  exist at all): a dashboard (active/frozen name counts, outstanding top-up invoices,
+  total user balance, payments received all-time / last year / last 30 days, and live
+  key status), **manual balance credit** by user fingerprint (grant balance for
+  buying/renewing), and **key rotation** (below).
+- **Key rotation (operator-driven, hot)** — the admin uploads new signing material
+  (delegated key PEM + delegation cert), validated against the root anchor and
+  hot-swapped **immediately**, or a new I2P destination key, where a new SAM tunnel
+  is built and serves **at once** while the old one is **drained**. The root
+  fingerprint stays constant; with an offline-key transient of the same master the
+  b32 stays constant too.
 
-**Pending hardening:** the production I2P destination uses a *persisted standard
-LeaseSet2 key* (stable b32, the full key on the box) rather than an *offline-key
-transient* (master offline, delegated short-lived transients, hot-swap rotation).
-The b32 is already stable, so this is a key-custody hardening, not a protocol or
-address change; it requires vendoring `libi2pd` for offline-key issuance and a
-live hot-swap verification on i2pd (*Key rotation*, below).
+**Pending hardening:** by default the destination still uses a *persisted standard
+LeaseSet2 key* (the full key on the box). The hot-swap rotation **mechanism** is now
+implemented (admin upload → new SAM tunnel + drain of the old), but minting an
+*offline-key transient* (master offline, short-lived delegated transients — what
+keeps the b32 constant across a swap) still happens **off the box** (i2pd-tools, or
+the client's vendored `libi2pd`); the resolver consumes and serves the blob but does
+not generate it, and cannot itself prove a swap preserves the b32 (it reports the
+resulting b32 for the operator to confirm). This is a key-custody step, not a
+protocol or address change.
 
 This service is intentionally **centralized**: a globally-unique sellable name
 requires a single registry (like a domain registrar). The centralization is
@@ -97,6 +112,15 @@ can never be confused.
 - **Manage.** Update the bound descriptor (e.g. after the owner migrates servers —
   the alias then points at the new `srv`/`srv_key`); view owned aliases and their
   state/expiry.
+- **Admin face** (opt-in via `--admin <fingerprint>`). Admin-gated pages
+  (sign-in-with-key; the signed-in fingerprint must equal the configured admin): an
+  overview dashboard (active/frozen names, outstanding top-up invoices, total user
+  balance, payments received all-time / last year / last 30 days, live key status
+  with install/expiry times), **manual balance credit** by user fingerprint (grant
+  balance to oneself or others for buying/renewing — recorded as `admin-credit:`, so
+  it never counts as a received payment), and the **key rotation** upload forms
+  (*Key rotation*). With no admin fingerprint configured the admin routes do not
+  exist.
 
 ## Alias lifecycle
 
@@ -175,7 +199,9 @@ proxy path), not by this record.
 
 Two independent anchors; the master/root keys never leave the developer's offline
 custody, and production holds only short-lived delegated material, so a prod
-compromise is bounded to the delegation window.
+compromise is bounded to the delegation window. Both rotations are **operated through
+the admin face** (upload forms, validated server-side) — see *Implementation status*
+for what is wired today.
 
 - **I2P destination — I2P offline keys.** The master destination key is offline;
   the **b32 is derived from the master and is stable forever**. Production serves
