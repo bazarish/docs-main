@@ -1,12 +1,40 @@
 # Alias Resolver (central username service)
 
-Status: **design**. The `bazarish/alias-resolver` repository (9th repo) — a single
-global daemon run only by the developer. It owns the global `username` namespace
-(the project's monetization) and serves the cryptographically-signed
-`username → descriptor` resolution. The resolve **protocol** (wire format,
-descriptor, direct-dial vs proxy, address forms) is specified in
-`FederatedResolve.md`; this document specifies the **daemon**: its shape, the web
-portal, the alias lifecycle, key rotation and payments.
+Status: **implemented** (one hardening pending — see *Implementation status*). The
+`bazarish/alias-resolver` repository (9th repo) — a single global daemon run only
+by the developer. It owns the global `username` namespace (the project's
+monetization) and serves the cryptographically-signed `username → descriptor`
+resolution. The resolve **protocol** (wire format, descriptor, direct-dial vs
+proxy, address forms) is specified in `FederatedResolve.md`; this document
+specifies the **daemon**: its shape, the web portal, the alias lifecycle, key
+rotation and payments.
+
+## Implementation status
+
+Built and unit-tested (`AliasRegistry`, `ResolveResponder`/`ResolveServer`,
+`Lifecycle`, `PortalApi`), and the daemon is **live-validated over real I2P** (it
+builds its standard-LeaseSet2 destination via SAM and serves the signed-resolve
+loop). What is done:
+
+- **Registry + lifecycle** — `alias → descriptor` with `active → frozen (30-day
+  anti-hijack grace) → free`, state a pure function of term + clock; atomic claim,
+  yearly renew, owner-only redeem, server-migration descriptor update, post-grace
+  release.
+- **Signed resolve over SAM** — query opened with the serving key, a self-verifying
+  record signed by the delegated key + delegation cert, sealed to the response key;
+  verified end to end against the client's `verifyResolveRecord` and over the wire.
+- **Web portal** — sign-in-with-key, display-only search, atomic balance-only
+  purchase (alias cert + descriptor + length-tier debit), balance/top-up, owned-name
+  management; reuses the operator service node's payment/auth primitives **as a
+  library** (own ledger/wallet/prices, no runtime coupling).
+- **Lifecycle scheduler** — hourly auto-renew-from-balance + release-after-grace.
+
+**Pending hardening:** the production I2P destination uses a *persisted standard
+LeaseSet2 key* (stable b32, the full key on the box) rather than an *offline-key
+transient* (master offline, delegated short-lived transients, hot-swap rotation).
+The b32 is already stable, so this is a key-custody hardening, not a protocol or
+address change; it requires vendoring `libi2pd` for offline-key issuance and a
+live hot-swap verification on i2pd (*Key rotation*, below).
 
 This service is intentionally **centralized**: a globally-unique sellable name
 requires a single registry (like a domain registrar). The centralization is

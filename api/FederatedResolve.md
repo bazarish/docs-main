@@ -149,8 +149,11 @@ Namespace anti-enumeration is out of scope (resolve is unauthenticated by design
    dest + serving key) is a configurable placeholder until phase 4 ships. Unit
    tests drive resolve/card over an injected transport (happy path, unknown name,
    wrong root, alias mismatch).
-4. **alias-resolver** — the central daemon (`AliasResolver.md`): registry, signed
-   resolve over SAM, portal/payments, offline-key + delegation-cert rotation. Once
+4. **alias-resolver** — *implemented* (`AliasResolver.md`): registry + lifecycle,
+   signed resolve over SAM (live-validated on i2pd), portal/payments (sign-in-with-key,
+   atomic balance-only purchase, balance/top-up, manage), delegation-cert signing,
+   hourly lifecycle scheduler. Pending hardening: offline-key destination +
+   hot-swap rotation (the b32 is already stable via a persisted key). Once
    deployed, its root fingerprint + destination + serving key are baked into the
    client (`defaultResolverCoordinate`), enabling the `<alias>` path end to end.
 5. **docs + live** — cross-I2P validation. The card-fetch (`fp:b33`) path is
