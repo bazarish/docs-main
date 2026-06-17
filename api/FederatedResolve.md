@@ -131,22 +131,31 @@ Namespace anti-enumeration is out of scope (resolve is unauthenticated by design
 
 ## Phasing
 
-1. **common** — descriptor parse/encode (`bazarish://invite?…`), the resolve
-   query/response and signed-record bodies + JSON, and the delegation-cert
+1. **common** — *done.* Descriptor parse/encode (`bazarish://invite?…`), the
+   resolve query/response and signed-record bodies + JSON, and the delegation-cert
    (`record → delegated → root`) on the existing hybrid-cert primitives. Unit
    tests round-trip each.
-2. **server-core** — the card-fetch responder over the home dest (unseal `fp`
-   query → return the card sealed to the response key); the client paths
-   (direct transient-SAM preferred, own-server proxy fallback) for both card fetch
-   and alias resolve relay.
-3. **client** — descriptor handling, transient-SAM direct dial + proxy fallback,
+2. **server-core** — *done.* The card-fetch responder on every serving
+   destination (home/pool/per-user: unseal `fp` query → return the card sealed to
+   the response key) and the proxy relay (`POST /v1/messaging/fetch`, op `card`
+   and `resolve`, `.b32.i2p`-validated `toDest`) that moves opaque sealed bytes.
+3. **client** — *done.* Descriptor handling, a fetch transport that prefers a
+   direct transient-SAM dial and falls back to the own-server proxy (a served
+   `CARD_UNKNOWN` / `ALIAS_UNKNOWN` is authoritative and does not fall back),
    ephemeral seal/verify, address parsing (`fp:b33` vs `<alias>`), `addByUsername`
-   routed to the resolver, OOB-fingerprint display. Unit tests with an injected
-   transport.
+   routed to the resolver (record chain verified against the hardcoded root,
+   alias normalized to `a-z0-9`/1-32), and OOB-fingerprint display (the resolved
+   fingerprint is returned to the CLI/GUI). The resolver coordinate (root fp +
+   dest + serving key) is a configurable placeholder until phase 4 ships. Unit
+   tests drive resolve/card over an injected transport (happy path, unknown name,
+   wrong root, alias mismatch).
 4. **alias-resolver** — the central daemon (`AliasResolver.md`): registry, signed
-   resolve over SAM, portal/payments, offline-key + delegation-cert rotation.
-5. **docs + live** — cross-I2P validation (`fp:b33` add and `<alias>` resolve from
-   a second machine).
+   resolve over SAM, portal/payments, offline-key + delegation-cert rotation. Once
+   deployed, its root fingerprint + destination + serving key are baked into the
+   client (`defaultResolverCoordinate`), enabling the `<alias>` path end to end.
+5. **docs + live** — cross-I2P validation. The card-fetch (`fp:b33`) path is
+   live-validated over real I2P (the cross-server invite demo); the `<alias>`
+   path waits on phase 4 (the resolver is not yet deployed).
 
 ## Open / follow-up
 
