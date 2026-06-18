@@ -41,15 +41,20 @@ loop). What is done:
   fingerprint stays constant; with an offline-key transient of the same master the
   b32 stays constant too.
 
-**Pending hardening:** by default the destination still uses a *persisted standard
-LeaseSet2 key* (the full key on the box). The hot-swap rotation **mechanism** is now
-implemented (admin upload → new SAM tunnel + drain of the old), but minting an
-*offline-key transient* (master offline, short-lived delegated transients — what
-keeps the b32 constant across a swap) still happens **off the box** (i2pd-tools, or
-the client's vendored `libi2pd`); the resolver consumes and serves the blob but does
-not generate it, and cannot itself prove a swap preserves the b32 (it reports the
-resulting b32 for the operator to confirm). This is a key-custody step, not a
-protocol or address change.
+- **Offline-key destination custody** — the serving destination is operated from an
+  *offline-key transient*: the operator generates the permanent master signing key
+  **offline** with `bazarish-alias-resolver-offlinekeys generate-master` (kept
+  air-gapped, never on the live box) and issues short delegated transients from it
+  (`issue-transient <master.dat> <days> <out>`). The daemon runs with
+  `--dest-transient <file>` and holds only the transient — a compromise leaks at most
+  an expiring transient, never the master — and writes **no key to disk**. Every
+  transient shares the master's b32, so the hardcoded resolver address is stable and a
+  rotation is a seamless hot-swap (admin upload → new SAM tunnel + drain of the old).
+  The `libi2pd` key material is vendored into the offline tool only; the daemon stays
+  a pure SAM consumer of the blob. Without `--dest-transient` the daemon falls back to
+  a self-generated *persisted* key — a dev convenience for demos, not production
+  custody. Live-validated over real I2P: a daemon started on a transient serves the
+  master's exact b32, with no key persisted.
 
 This service is intentionally **centralized**: a globally-unique sellable name
 requires a single registry (like a domain registrar). The centralization is
@@ -211,8 +216,12 @@ for what is wired today.
   drain and close the old session. The b32 never changes ⇒ **zero downtime, no
   client-visible change**. (Offline-key destinations publish a standard LeaseSet2,
   so the address is the standard b32 `…​.b32.i2p` — consistent with the project's
-  `.b32.i2p`-only invariant.) The hot-swap for an offline-key destination must be
-  live-verified on i2pd.
+  `.b32.i2p`-only invariant.) Generated offline with
+  `bazarish-alias-resolver-offlinekeys` and served via `--dest-transient`; the
+  serving path is **live-verified on i2pd** (a daemon on a transient serves the
+  master's exact b32, no key on disk). The two-session hot-swap-with-overlap (admin
+  rotate to a fresh transient of the same master) is mechanism-complete; exercising it
+  live needs two concurrent destinations.
 - **Signing — delegation certificates.** The root hybrid identity (offline) signs
   short-lived `{delegatedPubKey, notAfter}` delegation certs. Production signs each
   resolve record with the **current delegated key** and ships the delegation cert.
