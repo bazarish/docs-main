@@ -21,13 +21,10 @@ Status: draft skeleton. The single client-facing API, reached through a facade (
 | `POST /v1/account/renew` | Renew the subscription before expiry (submit a fresh certificate; same handler) |
 | `GET /v1/account/subscription` | Current subscription state: `{notAfter, quotaBytes}`. (Usage lives on the messaging server.) |
 | `DELETE /v1/account/subscription` | Unsubscribe (migration cutover); the server purges all pending content immediately |
-| `POST /v1/account/alias` | Register an alias (`{cert}`, signed nickname certificate); `ALIAS_TAKEN` if owned by another user |
-| `DELETE /v1/account/alias` | Release an alias (`{alias}`; owner only) |
 | `POST /v1/account/i2p-dest/setting` | Turn the **per-user i2p-dest** option on/off (`{enabled}`). On charges a term (or resumes if still paid; `402` on an insufficient balance); off stops auto-renew and revokes the personal destination (fall back to the pool). See `ServicePortal.md` |
 | `POST /v1/account/i2p-dest` | Upload a signed offline **transient** (`{transient, expiresUnix}`; empty revokes). Gated by an active i2pDest entitlement; the server hands it to the messaging server, which operates the personal destination, and records its validity |
 | `GET /v1/account/i2p-status` | `{enabled, active, paidThrough, projectedShutoff, transientExpires, transientUpdatedAt, storageQuotaBytes, storageActive, storageProjectedShutoff, balanceAtomic, currency}` — the client polls this to drive transient re-issue and to show the user when their dest/storage will lapse from the balance |
-| `GET /v1/account/resolve?alias=X` | Resolve a **per-operator** alias to `{user, aliasCert, subscriptionCert}`. **Transitional**: the global `username` namespace is moving to the central resolver (`api/AliasResolver.md`, `api/FederatedResolve.md`); once the registry leaves the service node, this row and the two `…/account/alias` rows above are retired and only the fingerprint `contact` lookup below remains (it backs the federation `card` fetch). Unauthenticated; `ALIAS_UNKNOWN` is explicit |
-| `GET /v1/account/contact?user=X` | Look up a user by fingerprint: returns `{user, subscriptionCert}`. The certificate is the contact card — the user's sealing **prekey**, serving **destination** and **serving sealing key**, which a first-contact sender uses to route to and E2E-encrypt the contact request. Unauthenticated, like resolve |
+| `GET /v1/account/contact?user=X` | Look up a user by fingerprint: returns `{user, subscriptionCert}`. The certificate is the contact card — the user's sealing **prekey**, serving **destination** and **serving sealing key**, which a first-contact sender uses to route to and E2E-encrypt the contact request. Unauthenticated (a user must be reachable to be added). The `username` namespace lives on the central resolver, not the service node (`api/AliasResolver.md`, `api/FederatedResolve.md`) |
 
 Implemented in the `service-node` repository (`SubscriptionStore`, `AccountApi`; covered by tests). The service node is bound to its messaging server by that server's card (passed at startup), from which it takes the server fingerprint subscription certificates must name.
 
@@ -52,12 +49,11 @@ Delivery over I2P can take tens of seconds, so sending is asynchronous at the AP
 |---|---|
 | `GET /v1/messaging/destination` | Returns the caller's assigned `{dest, servingKey, state}` — the serving destination this server routes to the user (its b32; a paid offline-key personal destination is a standard-LeaseSet2 b32), the public serving sealing key for it, and the serving `state` (`home` / `pool` / for a personal destination `building` → `active` → `expired`) so the client only publishes a personal address once it is `active`. The client folds dest+key into its self-signed subscription certificate (its contact card) |
 
-### Alias resolution relay
+### Federation fetch relay
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /v1/messaging/resolve` | Submit a sealed alias-resolution query for relay to a target server (see `Federation.md`); returns an `attemptId` |
-| `GET /v1/messaging/resolve/{attemptId}` | Poll the resolution outcome (same attempt semantics as `send`) |
+| `POST /v1/messaging/fetch` | Relay a sealed fetch frame (`{op, sealed}`; `op` is `card` or `resolve`) to a target destination over I2P and return the sealed reply synchronously (see `Federation.md`, `FederatedResolve.md`). This is the own-server proxy fallback for clients with no local SAM bridge; the preferred path is a direct transient-SAM fetch |
 
 ### Receiving
 

@@ -4,8 +4,8 @@ Status: design (2026-06-15).
 
 The **service node** owns user accounts. It exposes a **web portal** (the
 "Service site") through which a user registers, proves ownership of their key,
-tops up a prepaid balance, and buys paid services (a username, a personal
-I2P destination). The **messaging server (server-core)** stays a pure delivery
+tops up a prepaid balance, and buys paid services (a personal I2P
+destination, a larger storage quota). The **messaging server (server-core)** stays a pure delivery
 layer: it never sees payments and never registers anyone. A client can sign and
 fetch, but **cannot self-register** — registration is a human/web flow guarded by
 a captcha (free tier) and payment (paid tier).
@@ -19,7 +19,7 @@ a captcha (free tier) and payment (paid tier).
                   │   service node   │  accounts, balance ledger, captcha,
                   │  + payments mod  │  payment gateways (config-driven)
                   └────────┬─────────┘
-       issues subscription │ / alias certs, sets entitlements
+       issues subscription │ certs, sets entitlements
                   ┌────────▼─────────┐
                   │   server-core    │  delivery only; points unsubscribed
                   └──────────────────┘  senders at the portal
@@ -46,8 +46,8 @@ the browser.
    consumed (a short-lived used-nonce cache stops in-window replay). The
    **signer fingerprint = userId**.
 4. On success the portal sets a session (a signed cookie carrying `userId` and an
-   expiry; HttpOnly, SameSite=Strict). All subsequent account actions — top-ups,
-   alias registration, buying services — are logged under that `userId`.
+   expiry; HttpOnly, SameSite=Strict). All subsequent account actions — top-ups
+   and buying services — are logged under that `userId`.
 
 Rationale: the key stays in the Client; the browser only relays a one-shot
 signature. `purpose` and `audience` stop the signed blob being replayed against
@@ -64,7 +64,6 @@ GET /v1/account/portal  →
   "links":   ["https://portal-a.example/…", "https://portal-b.example/…"],  // ≥1
   "services": {
     "freeRegistration": { "enabled": true, "captcha": true },
-    "username":  { "enabled": true, "priceAtomic": "...", "periodDays": 365, "currency": "XMR" },
     "i2pDest":   { "enabled": true, "priceAtomic": "...", "periodDays": 30,  "currency": "XMR" },
     "storage":   {
       "freeQuotaBytes": 10485760,
@@ -78,7 +77,9 @@ GET /v1/account/portal  →
 The client shows the message and the link(s); the user opens one in a browser.
 Several links allow mirrors/onion/clearnet alternatives. The `services` block is
 driven by the server's config: a node may offer only free registration, or also
-sell a username, a personal I2P destination, and/or a larger storage quota.
+sell a personal I2P destination and/or a larger storage quota. (The global
+`username` namespace is a separate product sold by the central alias-resolver,
+not the service node — see `AliasResolver.md`.)
 
 **Every paid service is recurring (term-based) and renewed from the cabinet —
 none are one-shot.** This is deliberate: an ongoing server-side cost must map to
@@ -87,12 +88,6 @@ number of always-online destinations for almost nothing. Recurring pricing turns
 that into a competitive market of servers (whoever offers a given resource
 cheaper wins), instead of a tragedy of the commons. Terms:
 
-- **username** — registered for **one year**, renewed yearly from the cabinet. A
-  username is a pure naming layer: it maps `alias → fingerprint` and resolves to
-  **whatever I2P destination that user currently uses, even one operated by
-  another server** (destinations are user-owned and portable, see `Facade.md` /
-  `Federation.md`). So a server can sell names independently of where the named
-  user's traffic is actually carried.
 - **i2pDest** — a personal always-online destination, an **opt-in toggle**
   (off by default — every user already has a fixed pool address) billed
   **monthly**. The cabinet states the privacy trade-off: a personal destination
@@ -104,7 +99,6 @@ cheaper wins), instead of a tragedy of the commons. Terms:
 
 Term-based services **auto-renew from the prepaid balance**; a lapse reverts to
 the free baseline, but the lapse rule differs per service so the user notices:
-- **username** — released to the pool after its grace (see `AliasResolver.md`).
 - **storage** — strict: when the balance cannot cover a renewal the upgrade
   drops to the free quota (a visible shrink, pushed to the messaging server) and
   stops; the user re-buys to restore it.
@@ -135,9 +129,6 @@ Per user (`subscriptions/<fp>.json`, `ledger/<fp>.json`):
   history the portal shows.
 - **entitlements** — each is term-based with its own paid-through date, renewed
   from the cabinet, reverting to a free baseline on lapse:
-  - `username` (alias → fingerprint, yearly) — a naming registration that
-    resolves to the user's portable destination, possibly carried by another
-    server (see `Facade.md` / `Federation.md`);
   - `i2pDest` (the per-user-destination flag honoured by the messaging server /
     pool provisioning, monthly);
   - **storage quota** — the subscription's `quotaBytes`, the free default
@@ -197,7 +188,6 @@ source feeding both the discovery advertisement and the buy endpoints (see
   "settlementCurrency": "XMR",
   "freeStorageBytes": 10485760,
   "services": {
-    "username": { "enabled": true, "priceAtomic": "...", "periodDays": 365 },
     "i2pDest":  { "enabled": true, "priceAtomic": "...", "periodDays": 30 },
     "storage":  { "enabled": true, "priceAtomic": "...", "periodDays": 30, "quotaBytes": ... }
   },
@@ -302,18 +292,19 @@ all reusing the JSON endpoints' logic:
 | Client | `POST /v1/account/i2p-dest/setting` | key | turn the per-user i2p-dest option on/off |
 | Client | `POST /v1/account/i2p-dest` | key | upload a signed offline transient (gated by an active i2pDest entitlement) |
 | Client | `GET /v1/account/i2p-status` | key | enabled/active, transient validity, storage quota, balance-projected shutoff dates |
-| Client | `GET /v1/account/resolve`, `/contact` | none | messaging lookups (unchanged) |
+| Client | `GET /v1/account/contact` | none | fingerprint → contact card lookup |
 
 ## 9. Removed (replaced by the portal)
 
 - `POST /v1/account/subscribe` (client-initiated grant, no captcha/payment) and
   the client `Session::subscribe` direct flow.
-- `POST /v1/account/alias` direct registration; aliases become a portal purchase
-  (the alias certificate is still user-signed; the node stores it once the user
-  is entitled).
+- `POST`/`DELETE /v1/account/alias`, `GET /v1/account/resolve`, and the on-node
+  alias registry: the global `username` namespace moved out to the central
+  **alias-resolver** (`AliasResolver.md`). The service node no longer sells,
+  stores, or resolves names; it sells only `i2pDest` and `storage`.
 - The `bitcoind` payment backend (the abstraction stays; only `monerod` ships).
 
-Kept: `GET /v1/account/subscription`, `resolve`, `contact`; the `mock` gateway
+Kept: `GET /v1/account/subscription`, `contact`; the `mock` gateway
 (tests); the `PaymentGateway` registry/abstraction.
 
 ## 10. Security notes
