@@ -57,7 +57,11 @@ matching the owner's real identity. What is done:
   a pure SAM consumer of the blob. Without `--dest-transient` the daemon falls back to
   a self-generated *persisted* key — a dev convenience for demos, not production
   custody. Live-validated over real I2P: a daemon started on a transient serves the
-  master's exact b32, with no key persisted.
+  master's exact b32, with no key persisted; and the **two-session hot-swap** runs
+  end to end — the admin rotates the serving destination to a second transient of the
+  same master, the new SAM session comes up and serves at the **identical b32** while
+  the old one drains, and a fresh client's resolve still reaches the owner over I2P
+  (b32 stable across the swap, resolve continuous).
 
 This service is intentionally **centralized**: a globally-unique sellable name
 requires a single registry (like a domain registrar). The centralization is
