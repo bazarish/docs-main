@@ -12,9 +12,12 @@ rotation and payments.
 ## Implementation status
 
 Built and unit-tested (`AliasRegistry`, `ResolveResponder`/`ResolveServer`,
-`Lifecycle`, `PortalApi`), and the daemon is **live-validated over real I2P** (it
-builds its standard-LeaseSet2 destination via SAM and serves the signed-resolve
-loop). What is done:
+`Lifecycle`, `PortalApi`), and **live-validated over real I2P end to end**: the
+daemon builds its standard-LeaseSet2 destination via SAM and serves the
+signed-resolve loop, a client claims a name through the portal, and another
+client's `add-user <alias>` resolves it over a transient SAM session, fetches the
+owner's contact card (fp:b33) and opens a conversation — the resolved fingerprint
+matching the owner's real identity. What is done:
 
 - **Registry + lifecycle** — `alias → descriptor` with `active → frozen (30-day
   anti-hijack grace) → free`, state a pure function of term + clock; atomic claim,
@@ -107,8 +110,10 @@ can never be confused.
   only asynchronous payment step is top-up). The buyer submits an **alias
   certificate** (user-signed `{alias, user: fp}`, `Identity.md`) plus their
   **descriptor** (`{fp, srv, srv_key}`; `srv`/`srv_key` come from the buyer's home
-  server). The resolver verifies the cert (signer == fp), claims the name, and
-  stores `alias → descriptor`.
+  server). The client produces both with `bazarish-client alias-cert <state>
+  <alias>` (the signing key never leaves the client) and the portal `POST
+  /portal/buy` is driven with that JSON. The resolver verifies the cert (signer ==
+  fp), claims the name, and stores `alias → descriptor`.
 - **Balance.** Prepaid ledger (`LedgerStore`, reused): top-up (monero invoice via
   the payment gateway → idempotent credit), history display, current balance.
 - **Yearly auto-renewal from balance.** Aliases are **term-based (1 year)**. A
@@ -229,8 +234,12 @@ for what is wired today.
   atomically. The **root fingerprint is the constant anchor** hardcoded in clients,
   so rotation is invisible to them ⇒ zero downtime.
 
-The client hardcodes only `{root fingerprint, resolver b32}`. Both are added to
-the client code later by the developer.
+The client hardcodes only the resolver coordinate `{root fingerprint, resolver
+b32, serving sealing key}` (`defaultResolverCoordinate()`), baked into the shipped
+binary by the developer once the resolver is deployed — until then it is an empty
+placeholder and the alias path reports "no resolver configured". The three parts
+can be overridden at runtime with `BAZARISH_RESOLVER_ROOT` / `_DEST` / `_KEY` (all
+required), so a freshly built or local resolver is exercised without a rebuild.
 
 ## Payments
 
