@@ -19,41 +19,41 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 
 ```
                           clearnet          operator-controlled private channel
-                             │             ┌···································┐
-[Client] ──HTTPS, secret URI─┼─▶ [Reverse proxy] ─▶ [Facade] ──┬─▶ [Server] ───┼──▶ [Storage: disk / object]
-                             │             │                   │       │       │
-                             │             │                   └─▶ [Service    │
-                             │             │                        node]      │
-                             │             └·······················│··········┘
-                             │                                  [SAM API]
-                             │                                      │
-                             │                                 [I2P router] ◀══════▶ other servers (federation)
+                             |             +...................................+
+[Client] --HTTPS, secret URI---> [Reverse proxy] -> [Facade] ----> [Server] ------> [Storage: disk / object]
+                             |             |                   |       |       |
+                             |             |                   +-> [Service    |
+                             |             |                        node]      |
+                             |             +.......................|..........+
+                             |                                  [SAM API]
+                             |                                      |
+                             |                                 [I2P router] <======> other servers (federation)
 ```
 
 - The server has **no public IP interfaces**. Its only public presence is in hidden networks (I2P first).
-- Facade ↔ Server / Service node communication goes over an **operator-controlled private channel** (unix socket, localhost, or VPN — deployment choice). Splitting facade and server across hosts is an operator concern.
-- The facade routes client requests by path prefix: messaging → server, account management → service node.
+- Facade <-> Server / Service node communication goes over an **operator-controlled private channel** (unix socket, localhost, or VPN - deployment choice). Splitting facade and server across hosts is an operator concern.
+- The facade routes client requests by path prefix: messaging -> server, account management -> service node.
 
 ## Key decisions
 
-1. **Repository scope** — one repository per component: `server-core`, `service-node`, `facade-http`, `client-qt6`, `common-cpp` (shared C++ library), `blob-storage` (large-message store, rotating encrypted-LeaseSet hosts over I2P), `admin-panel` (fleet management/monitoring — non-priority), and `docs-main` (this repository — the canonical protocol specification all components implement). Repositories are developed side by side in a single workspace.
+1. **Repository scope** - one repository per component: `server-core`, `service-node`, `facade-http`, `client-qt6`, `common-cpp` (shared C++ library), `blob-storage` (large-message store, rotating encrypted-LeaseSet hosts over I2P), `admin-panel` (fleet management/monitoring - non-priority), and `docs-main` (this repository - the canonical protocol specification all components implement). Repositories are developed side by side in a single workspace.
 2. **Service node is a separate process** with its own API, keeping messaging logic and user management separated.
-3. **Facade ↔ server transport** — operator private channel, not a hidden network hop.
-4. **Wire format** — JSON for control messages, raw HTTP bodies for binary content (no base64 overhead). E2E-encrypted payloads are opaque blobs to all server-side components.
-5. **Destination routing** — delivery routes by the recipient's I2P **destination** (its b33), carried in the user-signed contact card, not by server fingerprint; the sender's server dials it directly (no resolver, no `peers.json`). A contact is shared as a **descriptor** (`fp:b33`); a **username** resolves at the central resolver. Every routing target is a `.b32.i2p` host. See `Identity.md`, `api/Federation.md`, `api/FederatedResolve.md`, `api/AliasResolver.md`.
-6. **Single facade entry point** — the client uses one secret URI; the facade fans out to server and service node.
-7. **Docs language** — English (code comments are English per codestyle).
-8. **Shared code** — protocol types, OpenSSL wrappers, and JSON helpers live in the `common` repository, consumed by the other components via CMake (FetchContent or submodule). No duplicated crypto code.
+3. **Facade <-> server transport** - operator private channel, not a hidden network hop.
+4. **Wire format** - JSON for control messages, raw HTTP bodies for binary content (no base64 overhead). E2E-encrypted payloads are opaque blobs to all server-side components.
+5. **Destination routing** - delivery routes by the recipient's I2P **destination** (its b33), carried in the user-signed contact card, not by server fingerprint; the sender's server dials it directly (no resolver, no `peers.json`). A contact is shared as a **descriptor** (`fp:b33`); a **username** resolves at the central resolver. Every routing target is a `.b32.i2p` host. See `Identity.md`, `api/Federation.md`, `api/FederatedResolve.md`, `api/AliasResolver.md`.
+6. **Single facade entry point** - the client uses one secret URI; the facade fans out to server and service node.
+7. **Docs language** - English (code comments are English per codestyle).
+8. **Shared code** - protocol types, OpenSSL wrappers, and JSON helpers live in the `common` repository, consumed by the other components via CMake (FetchContent or submodule). No duplicated crypto code.
 9. **Sending is submit + poll, with no server-side outbound persistence.** The sender's server relays in memory only and never queues outbound messages; undeliverable messages stay on the client (see `api/ClientApi.md`, `api/Federation.md`).
 10. **Sealed delivery envelopes.** The recipient identity, delivery token, and messageId are encrypted by the sending client to the **serving sealing key of the recipient's destination** (per-destination, held by the recipient's server). The sender's server sees only the destination (a shared pool destination for free users); the recipient's server never sees the sender identity.
-11. **Contact admission via one-time unlinkable delivery tokens** — the server enforces "contacts only" without holding a readable social graph (see `Contacts.md`).
-12. **Shared identity key across devices** — new devices are enrolled by QR transfer of the identity key; per-device keys with cross-signing remain a possible future evolution (see `DeviceSync.md`).
-13. **Explicit client registry** — client IDs are registered/retired via the API; the delete-when-all-acked rule operates on the registered set. The registry is owned by the server, not the service node.
-14. **Device sync via the own mailbox** — an E2E event journal (contacts, token bookkeeping, full message-history echo) delivered through the standard send/pending/ack path; no dedicated server mechanism.
-15. **Subscription certificate is dual-purpose** — the lifecycle anchor on the serving server and, pushed to contacts over E2E, the **contact card** (prekey + destination + serving sealing key) that answers "where and how do I deliver?". Exactly one serving server at a time; migration is a hard cutover that leans on retry-on-client send semantics (messages delayed, not lost). Registration is grant-gated through the service portal. See `Identity.md`, `api/ServicePortal.md`, `api/InviteAnonymity.md`.
-16. **All certificates are CMS SignedData over JSON bodies** (subscription/contact card, alias, server card) — OpenSSL-native standard container, consistent with the JSON wire format.
-17. **Sealed alias resolution** — first-contact lookups are encrypted to the target server's resolve key and relayed blindly; the requester's own server never learns the alias. The response is a self-verifying chain (alias cert + the user's contact card). Cross-server resolution is the next federation track (not yet implemented); invite-based first contact is.
-18. **Identity is a post-quantum hybrid (mandatory)** — ECDSA P-256 + ML-DSA-65; every identity statement is dual-signed and valid only when both signatures verify. The fingerprint covers both public keys. Sealing remains classical for now (OpenSSL CMS lacks ML-KEM) — recorded as an accepted, revisitable gap in `Identity.md`.
+11. **Contact admission via one-time unlinkable delivery tokens** - the server enforces "contacts only" without holding a readable social graph (see `Contacts.md`).
+12. **Shared identity key across devices** - new devices are enrolled by QR transfer of the identity key; per-device keys with cross-signing remain a possible future evolution (see `DeviceSync.md`).
+13. **Explicit client registry** - client IDs are registered/retired via the API; the delete-when-all-acked rule operates on the registered set. The registry is owned by the server, not the service node.
+14. **Device sync via the own mailbox** - an E2E event journal (contacts, token bookkeeping, full message-history echo) delivered through the standard send/pending/ack path; no dedicated server mechanism.
+15. **Subscription certificate is dual-purpose** - the lifecycle anchor on the serving server and, pushed to contacts over E2E, the **contact card** (prekey + destination + serving sealing key) that answers "where and how do I deliver?". Exactly one serving server at a time; migration is a hard cutover that leans on retry-on-client send semantics (messages delayed, not lost). Registration is grant-gated through the service portal. See `Identity.md`, `api/ServicePortal.md`, `api/InviteAnonymity.md`.
+16. **All certificates are CMS SignedData over JSON bodies** (subscription/contact card, alias, server card) - OpenSSL-native standard container, consistent with the JSON wire format.
+17. **Sealed alias resolution** - first-contact lookups are encrypted to the target server's resolve key and relayed blindly; the requester's own server never learns the alias. The response is a self-verifying chain (alias cert + the user's contact card). Cross-server resolution (central-resolver `resolve` + sealed card fetch) is implemented and live-validated over real I2P, as is invite-based first contact; only the production resolver deployment (baking the resolver coordinate into the client) remains.
+18. **Identity is a post-quantum hybrid (mandatory)** - ECDSA P-256 + ML-DSA-65; every identity statement is dual-signed and valid only when both signatures verify. The fingerprint covers both public keys. Sealing remains classical for now (OpenSSL CMS lacks ML-KEM) - recorded as an accepted, revisitable gap in `Identity.md`.
 
 ## Trust boundaries
 
@@ -66,25 +66,25 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 One repository per component, developed side by side in a single workspace:
 
 ```
-docs-main/                       # this repository — canonical protocol specification
-├── Architecture.md              # this file
-├── Identity.md                  # keys, UIDs, certificates, contact card
-├── Contacts.md                  # contact admission via one-time delivery tokens
-├── DeviceSync.md                # multi-device enrollment and E2E state sync
-├── Groups.md                    # group chats: client-side fan-out
-├── Messages.md                  # two-layer message typing, content-type registry
-├── Bots.md                      # bots & interactive messages
-├── Errors.md                    # typed error registry
-└── api/
-    ├── ClientApi.md             # client ↔ facade ↔ {server, service node}
-    ├── Facade.md                # last-mile contract
-    ├── Federation.md            # server ↔ server over I2P (destination-routed)
-    ├── InviteAnonymity.md       # destination-routed contact cards (invite anonymity)
-    ├── ServicePortal.md         # sign-in-with-key portal, payments, grants
-    ├── ServerServiceNode.md     # internal server ↔ service node API
-    ├── LargeFiles.md            # large-message blob storage over I2P
-    ├── Calls.md                 # call signaling and media tunnels
-    └── Storage.md               # storage backend interface
+docs-main/                       # this repository - canonical protocol specification
+|-- Architecture.md              # this file
+|-- Identity.md                  # keys, UIDs, certificates, contact card
+|-- Contacts.md                  # contact admission via one-time delivery tokens
+|-- DeviceSync.md                # multi-device enrollment and E2E state sync
+|-- Groups.md                    # group chats: client-side fan-out
+|-- Messages.md                  # two-layer message typing, content-type registry
+|-- Bots.md                      # bots & interactive messages
+|-- Errors.md                    # typed error registry
++-- api/
+    |-- ClientApi.md             # client <-> facade <-> {server, service node}
+    |-- Facade.md                # last-mile contract
+    |-- Federation.md            # server <-> server over I2P (destination-routed)
+    |-- InviteAnonymity.md       # destination-routed contact cards (invite anonymity)
+    |-- ServicePortal.md         # sign-in-with-key portal, payments, grants
+    |-- ServerServiceNode.md     # internal server <-> service node API
+    |-- LargeFiles.md            # large-message blob storage over I2P
+    |-- Calls.md                 # call signaling and media tunnels
+    +-- Storage.md               # storage backend interface
 
 common-cpp/ (dir: common/)      # shared C++ library: protocol types, OpenSSL wrappers, JSON helpers
 server-core/                     # messaging server daemon (I2P federation, destination-routed)
@@ -97,5 +97,4 @@ admin-panel/                     # fleet management / monitoring web panel (non-
 
 ## Open questions
 
-- **Group chats** — deferred until direct messaging works end to end; the architectural direction (client-side fan-out, group token pools, multi-admin roster, ≤ ~100 members) is fixed in `Groups.md` and v1 must not contradict it.
-- **Threat model document** — to be written once the skeleton stabilizes; `Contacts.md` and `DeviceSync.md` already carry honest accounting of residual metadata and the shared-identity-key risk.
+- **Threat model document** - to be written once the skeleton stabilizes; `Contacts.md` and `DeviceSync.md` already carry honest accounting of residual metadata and the shared-identity-key risk.

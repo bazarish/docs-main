@@ -6,7 +6,7 @@ Status: draft skeleton.
 
 - Every API-visible failure is a **typed error**: a stable machine-readable code plus a human-readable message. Clients branch on codes, never on messages.
 - No error hiding (codestyle). Server-side, an unhandled exception is acceptable where no meaningful handling exists; anything that crosses an API boundary must be typed.
-- Errors must not leak information that helps deanonymization (e.g., distinguishing "user unknown" from "not your contact" where it would reveal account existence — see open questions).
+- Errors must not leak information that helps deanonymization (e.g., distinguishing "user unknown" from "not your contact" where it would reveal account existence - see open questions).
 
 ## Envelope
 
@@ -33,10 +33,10 @@ HTTP transports map typed errors onto appropriate status codes; the JSON body is
 | `RECIPIENT_SERVER_UNREACHABLE` | Recipient's server could not be reached; message stays local on the client | server |
 | `DELIVERY_TIMEOUT` | Delivery attempt did not complete in time; the client may retry with the same messageId | server |
 | `ATTEMPT_UNKNOWN` | Polled send attempt is not known (state expired or server restarted); the client treats it as failure and resubmits | server |
-| `DELIVERY_REJECTED` | Delivery refused. Deliberately collapses "invalid/consumed token", "unknown mailbox", and "unsubscribed recipient" — externally indistinguishable (anti-enumeration, see `Contacts.md`). A tokenless contact request is the only alternative path | server |
+| `DELIVERY_REJECTED` | Delivery refused. Deliberately collapses "invalid/consumed token", "unknown mailbox", and "unsubscribed recipient" - externally indistinguishable (anti-enumeration, see `Contacts.md`). A tokenless contact request is the only alternative path | server |
 | `CONTACT_REQUEST_TOO_LARGE` | Attached contact-request message exceeds the limit (default 256 bytes, server-configurable) | server |
 | `ALIAS_TAKEN` | Requested alias is already registered | service node |
-| `ALIAS_UNKNOWN` | Alias resolution found no such alias (aliases are findable by design — explicit error, no anti-enumeration) | service node |
+| `ALIAS_UNKNOWN` | Alias resolution found no such alias (aliases are findable by design - explicit error, no anti-enumeration) | service node |
 | `CLIENT_UNREGISTERED` | Request carries a client ID that is not registered for this user (see `DeviceSync.md`) | server |
 | `SAM_UNAVAILABLE` | No SAM API found; direct contact (calls) impossible | client-side |
 
@@ -44,7 +44,7 @@ The registry grows as APIs are specified; codes are append-only and never reused
 
 ## Anti-enumeration policy
 
-Detailed mailbox-state errors (`QUOTA_EXCEEDED`, `STORAGE_FULL`) are returned **only after a valid delivery token has been presented** — so only actual contacts can learn anything about a mailbox. Everything else (bad token, no such mailbox, expired subscription) collapses into `DELIVERY_REJECTED`.
+Detailed mailbox-state errors (`QUOTA_EXCEEDED`, `STORAGE_FULL`) are returned **only after a valid delivery token has been presented** - so only actual contacts can learn anything about a mailbox. Everything else (bad token, no such mailbox, expired subscription) collapses into `DELIVERY_REJECTED`.
 
 ## Open questions
 

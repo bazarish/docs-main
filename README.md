@@ -13,24 +13,24 @@ component implements.
 
 ## Specification
 
-- [Architecture](Architecture.md) — components, topology, trust boundaries, key decisions
-- [Identity](Identity.md) — keys, UIDs, certificates, contact card, algorithms
-- [Contacts](Contacts.md) — contact admission via one-time delivery tokens
-- [Messages](Messages.md) — delivery class vs content type; the content-type registry
-- [Bots](Bots.md) — bots as ordinary identities; commands, inline keyboards, callbacks
-- [DeviceSync](DeviceSync.md) — multi-device enrollment and E2E state sync
-- [Groups](Groups.md) — group chats (client-side fan-out)
-- [Errors](Errors.md) — typed error registry
+- [Architecture](Architecture.md) - components, topology, trust boundaries, key decisions
+- [Identity](Identity.md) - keys, UIDs, certificates, contact card, algorithms
+- [Contacts](Contacts.md) - contact admission via one-time delivery tokens
+- [Messages](Messages.md) - delivery class vs content type; the content-type registry
+- [Bots](Bots.md) - bots as ordinary identities; commands, inline keyboards, callbacks
+- [DeviceSync](DeviceSync.md) - multi-device enrollment and E2E state sync
+- [Groups](Groups.md) - group chats (client-side fan-out)
+- [Errors](Errors.md) - typed error registry
 - API contracts:
-  - [ClientApi](api/ClientApi.md) — client ↔ facade ↔ {server, service node}
-  - [Facade](api/Facade.md) — the last-mile contract
-  - [Federation](api/Federation.md) — server ↔ server over I2P (destination-routed)
-  - [InviteAnonymity](api/InviteAnonymity.md) — destination-routed contact cards
-  - [ServicePortal](api/ServicePortal.md) — sign-in-with-key portal, payments, grants
-  - [ServerServiceNode](api/ServerServiceNode.md) — internal server ↔ service node API
-  - [LargeFiles](api/LargeFiles.md) — large-message blob storage over I2P
-  - [Storage](api/Storage.md) — pending-content storage backends
-  - [Calls](api/Calls.md) — audio/video calls
+  - [ClientApi](api/ClientApi.md) - client <-> facade <-> {server, service node}
+  - [Facade](api/Facade.md) - the last-mile contract
+  - [Federation](api/Federation.md) - server <-> server over I2P (destination-routed)
+  - [InviteAnonymity](api/InviteAnonymity.md) - destination-routed contact cards
+  - [ServicePortal](api/ServicePortal.md) - sign-in-with-key portal, payments, grants
+  - [ServerServiceNode](api/ServerServiceNode.md) - internal server <-> service node API
+  - [LargeFiles](api/LargeFiles.md) - large-message blob storage over I2P
+  - [Storage](api/Storage.md) - pending-content storage backends
+  - [Calls](api/Calls.md) - audio/video calls
 
 ## Components
 
@@ -52,3 +52,33 @@ One repository per component, developed side by side:
 Identity is a mandatory post-quantum hybrid (ECDSA P-256 + ML-DSA-65); every
 identity statement is dual-signed. Containers are OpenSSL-native standards
 (PEM, DER, CMS). No custom cryptographic constructions.
+
+## Status and near-term plan
+
+The protocol is implemented across all components, with unit tests green and the
+core flows live-validated over real I2P: E2EE first contact, destination-routed
+federation, the central alias resolver (claim -> resolve -> card fetch ->
+conversation) including its offline-key serving-dest hot-swap, large-file blob
+transfer, group chats with per-sender signing, bots and interactive messages,
+message editing and read receipts, multiple accounts, and at-rest encryption of
+all local state.
+
+Near-term work (not yet done):
+
+- **Calls (audio/video)** - signalling types and UI are drafted (`api/Calls.md`);
+  media capture/playback (Qt Multimedia) and transport-independent media
+  protection are not implemented.
+- **Incoming QR scan** - showing/sharing a QR works; decoding a scanned QR on the
+  client is not yet wired (paste-link is the fallback).
+- **Service-portal inline QR** - the pay page is JS-free with a refresh fallback;
+  an inline payment QR is still planned (`api/ServicePortal.md`).
+- **Replay hardening** - a nonce cache narrowing the client-API freshness window
+  to exactly-once is future hardening (`api/ClientApi.md`).
+- **Resolver deployment** - baking the resolver coordinate into the shipped client
+  (`defaultResolverCoordinate`) is an ops step once a resolver is deployed; the
+  seamless offline-key hot-swap requires i2pd >= 2.61.0.
+
+Out of scope for v1 (tracked as future concepts): large broadcast channels
+(`Groups.md`), per-device identity keys (`DeviceSync.md`), post-quantum sealing
+via ML-KEM (`Identity.md`), a standalone threat-model document, and the fleet
+management/monitoring `admin-panel`.

@@ -1,17 +1,17 @@
-# Server ↔ Service Node API
+# Server <-> Service Node API
 
 Status: draft skeleton.
 
-Internal API over the operator private channel. The service node owns per-operator user-management state (subscriptions); the server owns content and delivery, and consults the service node to make admission decisions. The global **username** namespace is **not** here — it is a separate central service (`api/AliasResolver.md`), not the operator service node.
+Internal API over the operator private channel. The service node owns per-operator user-management state (subscriptions); the server owns content and delivery, and consults the service node to make admission decisions. The global **username** namespace is **not** here - it is a separate central service (`api/AliasResolver.md`), not the operator service node.
 
-## Server → Service node (draft)
+## Server -> Service node (draft)
 
 | Request | Purpose |
 |---|---|
 | `subscription-status` | Is user U actively subscribed? Returns expiry and quota (MB) |
-| `get-card` | fingerprint → the user's subscription certificate (its **contact card**: prekey + destination + serving sealing key). Backs the federation `card` request — the first-contact card fetch (`api/FederatedResolve.md`). Realized as an account-API lookup by fingerprint |
+| `get-card` | fingerprint -> the user's subscription certificate (its **contact card**: prekey + destination + serving sealing key). Backs the federation `card` request - the first-contact card fetch (`api/FederatedResolve.md`). Realized as an account-API lookup by fingerprint |
 
-## Service node → Server (draft)
+## Service node -> Server (draft)
 
 | Event | Purpose |
 |---|---|

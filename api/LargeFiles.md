@@ -2,7 +2,7 @@
 
 Status: design (2026-06-16).
 
-Any message whose serialized blob exceeds **512 KB** (text, attachments —
+Any message whose serialized blob exceeds **512 KB** (text, attachments -
 content-agnostic) is not delivered through the mailbox. Instead the **client**
 encrypts the whole message blob, uploads the ciphertext to a **blob storage**
 service, and sends only a small *pointer* through normal delivery. The recipient
@@ -16,21 +16,21 @@ arbitrarily large content without it ever touching their mailbox.
 
 ```
  sender Client                     blob-storage                 recipient Client
- ──────────────                    ────────────                 ────────────────
+ --------------                    ------------                 ----------------
  blob > 512 KB                                                  
-   │ encrypt (CMS PWRI / AES-256-CBC, per-blob key)
-   │ PUT ciphertext + retention  ─────────►  store, assign dest+id
-   │ ◄───────────────────────────────────   return i2p URL + delete-token
-   │ build pointer {url,id,key,sha256,size,meta}
-   │ seal pointer to recipient
-   ▼
- server-core delivery (small pointer) ──────────────────────►  mailbox
-                                                                   │ read pointer
-                                       GET (authless capability)   │ direct SAM, or
-                            ◄──────────────────────────────────────┤ proxy via own server
-                                       ciphertext (range/resume)    │
-                                                                   │ verify sha256, decrypt
-                            ◄─── POST confirm {id} (no self-id) ────┤
+   | encrypt (CMS PWRI / AES-256-CBC, per-blob key)
+   | PUT ciphertext + retention  --------->  store, assign dest+id
+   | <-----------------------------------   return i2p URL + delete-token
+   | build pointer {url,id,key,sha256,size,meta}
+   | seal pointer to recipient
+   v
+ server-core delivery (small pointer) ---------------------->  mailbox
+                                                                   | read pointer
+                                       GET (authless capability)   | direct SAM, or
+                            <--------------------------------------| proxy via own server
+                                       ciphertext (range/resume)    |
+                                                                   | verify sha256, decrypt
+                            <--- POST confirm {id} (no self-id) ----|
                             decrement / delete
 ```
 
@@ -42,7 +42,7 @@ arbitrarily large content without it ever touching their mailbox.
 - Packing happens **entirely on the client**:
   1. Serialize the message; if `> 512 KB`, generate a per-blob symmetric key and
      encrypt the whole blob (CMS password-based envelope, RFC 3211 PWRI, with
-     AES-256-CBC content encryption — the per-blob key is the password; standard
+     AES-256-CBC content encryption - the per-blob key is the password; standard
      primitives only, no custom containers).
   2. `PUT` the ciphertext to a blob storage and receive its download URL.
   3. Replace the message with a **pointer** carrying the metadata needed for a
@@ -55,7 +55,7 @@ arbitrarily large content without it ever touching their mailbox.
 
 ```
 {
-  "blobUrl":  "<i2p download URL — authless capability>",
+  "blobUrl":  "<i2p download URL - authless capability>",
   "blobId":   "<high-entropy capability id>",
   "fileKey":  "<per-blob symmetric key>",
   "sha256":   "<ciphertext or plaintext digest for integrity>",
@@ -75,7 +75,7 @@ A deliberately simple, standalone role with no messaging logic. It can run
 bundled with a messaging server (default deployment) or on a separate cheap box,
 including a third-party operator. Three faces:
 
-1. **Upload — through the facade, authenticated, quota-gated.** The client `PUT`s
+1. **Upload - through the facade, authenticated, quota-gated.** The client `PUT`s
    ciphertext plus a **retention policy**, streamed and signed over the body digest
    (see Streaming). Storage assigns a `blobId` and an I2P
    download dest, records `owner` (for quota accounting and `DELETE`), and returns
@@ -84,11 +84,11 @@ including a third-party operator. Three faces:
    message and free its own storage. Per-user quota is controlled by the
    **service node** (the same storage-grant machinery as messaging; the service
    node pushes the effective quota the same way it does to `server-core`).
-2. **Download — direct over I2P, authless capability.** `GET` by `blobId` returns
+2. **Download - direct over I2P, authless capability.** `GET` by `blobId` returns
    the ciphertext, with HTTP range support for resume. Anyone holding the link can
    fetch, but it is ciphertext and the key is only in the sealed pointer.
-3. **Confirm-receipt — authless, no self-identification.** After a successful,
-   hash-validated download the recipient `POST`s `confirm {blobId}` — carrying the
+3. **Confirm-receipt - authless, no self-identification.** After a successful,
+   hash-validated download the recipient `POST`s `confirm {blobId}` - carrying the
    `blobId` only, never who. This is the signal that the blob was fully and
    correctly received and drives count-based reclamation.
 
@@ -102,20 +102,20 @@ intended client has received the blob, delete it; never keep ciphertext longer
 than necessary.
 
 By default a blob carries only a **TTL of 7 days** (the backstop). The **sender**
-may additionally set an explicit **download-count** to reclaim sooner — the moment
+may additionally set an explicit **download-count** to reclaim sooner - the moment
 all recipients have it:
 
-- `count = 1` — delete after the first confirmed download. Ephemeral 1:1 delivery
+- `count = 1` - delete after the first confirmed download. Ephemeral 1:1 delivery
   with a near-zero standing quota footprint.
-- `count = N` — a group of N recipients; reclaimed after N confirmations.
-- There is **no default count** — only the sender may set it, since only the
+- `count = N` - a group of N recipients; reclaimed after N confirmations.
+- There is **no default count** - only the sender may set it, since only the
   sender knows the intended audience. Without it, reclamation is by TTL alone.
 - **TTL is always the backstop**, even for count-based blobs: if the expected
   confirmations never arrive, the blob is swept by time.
 
 Defaults (configurable): `ttl = 7 days`; no default count.
 
-Reclamation counts **confirmations, not `GET`s** — a partial or failed download
+Reclamation counts **confirmations, not `GET`s** - a partial or failed download
 never burns a slot. Abuse note: only a party holding the `blobId` (a participant
 in the conversation) can confirm; a malicious group member can burn at most one
 of N slots, and TTL plus owner `DELETE` (unsend, via the delete-token) remain as
@@ -130,7 +130,7 @@ large transfer frees almost immediately after delivery.
 Blob storage does **not** serve from a single stable address. It maintains a pool
 of public I2P destinations (default **10**), all forwarding to the same backing
 web server, and rotates them continuously so the set of public addresses keeps
-drifting — a slow, low-load churn that resists long-term surveillance and
+drifting - a slow, low-load churn that resists long-term surveillance and
 blocklisting and unlinks blobs that happened to share a dest.
 
 State per dest: a count of **active links** (blobs whose download URL is pinned to
@@ -155,7 +155,7 @@ lifetime; the dest pinned at upload outlives it.
 Because constructing a SAM `STREAM` session blocks on tunnel build (tens of
 seconds), the replacement dest is **warmed in the background** before the drained
 dest is torn down, so the pool stays ready without a noticeable spike. Each pool
-dest is one `SamSession` (`common`’s SAM wrapper) running an accept loop that
+dest is one `SamSession` (`common`'s SAM wrapper) running an accept loop that
 forwards to the single local web server; create/destroy a dest = construct/destroy
 its session.
 
@@ -165,20 +165,20 @@ Defaults (configurable): `poolSize = 10`, `linkLimitPerDest = 10`.
 
 Every pooled destination publishes an **encrypted LeaseSet2** (`i2cp.leaseSetType=5`,
 no per-client auth), never a standard/cleartext leaseset. A standard leaseset is
-stored in the netdb at floodfills in the clear, so a floodfill — or anyone passively
-monitoring floodfills — can enumerate the destination and its current tunnel
+stored in the netdb at floodfills in the clear, so a floodfill - or anyone passively
+monitoring floodfills - can enumerate the destination and its current tunnel
 endpoints. An encrypted LS2 stores the leases encrypted under a key derived from the
 blinded address, so floodfills hold opaque data and cannot be queried without the
 blinded key. This is a **project-wide invariant**: all Bazarish I2P destinations
 (federation, per-user, pool, blob storage) use encrypted leasesets.
 
 The shareable address of an encrypted leaseset is the **blinded b32** (its "b33"),
-derived from the destination's signing key — *not* `base32(sha256(destination))`
+derived from the destination's signing key - *not* `base32(sha256(destination))`
 (the standard-LS form). For an Ed25519 destination (sig type 7, blinded sig type 11
 = RedDSA-Ed25519), with signing public key `A` (32 bytes):
 
 ```
-addr[0]      = flags            // 0 (0x04 would mark per-client auth — not used)
+addr[0]      = flags            // 0 (0x04 would mark per-client auth - not used)
 addr[1]      = sigType          // 1 byte  (7)
 addr[2]      = blindedSigType   // 1 byte  (11)
 addr[3..34]  = A                // 32-byte signing public key
@@ -191,13 +191,13 @@ host = b33 + ".b32.i2p"
 (Per I2P proposals 123/149; matches i2pd's `BlindedPublicKey::ToB33`.) SAM
 `NAMING LOOKUP ME` returns the raw destination, not the blinded address, so the
 store derives the b33 itself from the session's signing key. It is computed
-directly (I2P-base64 decode → Ed25519 signing key → CRC-32 prefix → base32), with
+directly (I2P-base64 decode -> Ed25519 signing key -> CRC-32 prefix -> base32), with
 no libi2pd dependency, and is verified byte-for-byte against an i2pd-produced golden
 vector (`i2pd-tools keyinfo -b`). Recipients reach it with SAM
 `STREAM CONNECT <host>`; the router performs the blinded lookup and decrypts the
 leaseset.
 
-**Strict rule — blob storage emits `.b32.i2p` download links only, with no
+**Strict rule - blob storage emits `.b32.i2p` download links only, with no
 alternative.** There is no clearnet, LAN, or direct-host fallback for a download URL.
 The sole way to fetch a blob is over I2P, so a client (or a careless tool) that
 fetches a link directly can never leak its IP. The store has no non-I2P serving
@@ -205,11 +205,11 @@ mode.
 
 ## Fetch: direct (preferred) or proxied (fallback)
 
-The download is a generic authless I2P `GET` — **federation is not involved**; the
+The download is a generic authless I2P `GET` - **federation is not involved**; the
 recipient does not need to know "whose" server hosts the blob, only the URL.
 
 - **Direct fetch (a SAM bridge is reachable).** The recipient's client opens its
-  own I2P stream and `GET`s the blob itself — its server is not involved at all
+  own I2P stream and `GET`s the blob itself - its server is not involved at all
   (no bandwidth, no knowledge of the pull). The client uses a **transient SAM
   destination** (a throwaway dest) so the store cannot link downloads to each
   other or to a messaging identity. This is the preferred path.
@@ -217,48 +217,48 @@ recipient does not need to know "whose" server hosts the blob, only the URL.
   their own facade (mobile, restricted networks), the client asks its **own
   server** to proxy: the server opens the I2P stream, range-`GET`s, and streams the
   ciphertext back. The blob store is a neutral dumb destination, not a foreign
-  messaging facade, so this does not breach facade-locality — the client still
+  messaging facade, so this does not breach facade-locality - the client still
   never connects to a foreign facade.
 
 Both paths run the **same** I2P-fetch logic (range `GET` of ciphertext); only the
 call site differs (client-side vs server-side). Direct-SAM availability here means
-a router with a SAM bridge is reachable — independent of the trimmed `libi2pd`
+a router with a SAM bridge is reachable - independent of the trimmed `libi2pd`
 already vendored in the client (that is for key generation / offline keys, not a
 full router).
 
 There is **no recipient-side re-hosting**: the sender serves the file, so the
-recipient never copies the ciphertext into its own storage — re-hosting would only
+recipient never copies the ciphertext into its own storage - re-hosting would only
 load the recipient's quota for something the sender already provides. This follows
-the project's storage principle — **keep the minimum**: a blob lives only until the
+the project's storage principle - **keep the minimum**: a blob lives only until the
 intended clients have received it (count) or its TTL elapses, then it is gone.
 
 ## Streaming: the blob is never held whole in memory
 
-The whole large-file path is **streamed end to end** — sender, facade, storage and
+The whole large-file path is **streamed end to end** - sender, facade, storage and
 recipient each spool the blob to disk and pass it on in bounded chunks, so no node
 ever holds the blob in RAM. This lets a client on a memory-constrained device send
 or receive a file far larger than its available memory.
 
 ```
  sender                facade                 blob-storage            recipient
- ──────                ──────                  ────────────            ─────────
- encrypt file ─► temp  PUT ─► spool ─► temp    PUT ─► temp ─►(rename)  GET ─► temp
- streamed PUT  ─────►  stream on ────────►     stored ciphertext       verify ─► decrypt
-   (no RAM)             (no RAM)                 (no RAM)               file→file (no RAM)
+ ------                ------                  ------------            ---------
+ encrypt file -> temp  PUT -> spool -> temp    PUT -> temp ->(rename)  GET -> temp
+ streamed PUT  ----->  stream on -------->     stored ciphertext       verify -> decrypt
+   (no RAM)             (no RAM)                 (no RAM)               file->file (no RAM)
 ```
 
 - **Sender.** The client encrypts the file straight to a temp ciphertext file
   (streaming CMS), hashes it from disk, and `PUT`s it through an HTTP content
-  provider — neither the plaintext nor the ciphertext is ever materialized in
+  provider - neither the plaintext nor the ciphertext is ever materialized in
   memory.
 - **Facade.** The upload `PUT` is read through a content reader, spooled to a temp
   file on the facade, then streamed on to the storage backend through a content
-  provider. The facade never buffers the blob — and since an upload **always**
+  provider. The facade never buffers the blob - and since an upload **always**
   traverses the facade (it is not an optional path like the download proxy), this
   matters on every large send.
 - **Storage.** The backend receives the `PUT` through a content reader, writes the
   body straight to a temp file while hashing it, and on success moves it into the
-  store with an **atomic rename** — never reading it back through memory.
+  store with an **atomic rename** - never reading it back through memory.
 - **Recipient.** The download is streamed to a temp file (with range/resume); its
   digest is verified **before** decryption, then it is decrypted **file-to-file**
   into the destination. A tampered or truncated transfer is rejected before any
@@ -269,7 +269,7 @@ or receive a file far larger than its available memory.
 An authenticated `PUT` is signed over the **digest** of the body
 (`hex(sha256(body))`), never the raw bytes, so a multi-gigabyte upload can be
 signed and streamed without ever materializing it. The storage backend hashes the
-body as it streams in and verifies the signature against *that* digest — which both
+body as it streams in and verifies the signature against *that* digest - which both
 authenticates the caller and **binds the stored bytes to what was signed**: a body
 that does not match its signed digest is rejected.
 
@@ -282,11 +282,11 @@ on the path is bounded by a fixed chunk buffer.
 
 - Per-blob random symmetric key; ciphertext is a CMS password-based envelope
   (RFC 3211 PWRI, AES-256-CBC content) via OpenSSL, with the per-blob key as the
-  password — standard primitives only. Integrity is the whole-blob `sha256` in the
+  password - standard primitives only. Integrity is the whole-blob `sha256` in the
   pointer (verify-then-decrypt), not an AEAD tag.
 - Whole-blob `sha256` in the pointer for integrity; resume via HTTP range over the
   ciphertext bytes. The digest is computed by streaming the assembled ciphertext
-  from disk and is verified **before** decryption (verify-then-decrypt — see
+  from disk and is verified **before** decryption (verify-then-decrypt - see
   Streaming), so a tampered or truncated transfer never yields cleartext. Chunked
   AEAD with a manifest (incremental verification, random access) is a later
   optimization, not v1.
@@ -303,5 +303,5 @@ on the path is bounded by a fixed chunk buffer.
 | `client-qt6` | 512 KB detection, encrypt/pack **streamed to a temp file**, **streamed** upload, build+seal pointer; keep delete-token with meta; on receive: fetch **streamed to disk** (direct/proxy), validate, confirm, decrypt **file-to-file** |
 | `blob-storage` | upload (authed, quota-gated, **streamed to disk**) / authless capability download / anonymous confirm; retention (TTL or count); dest pool + rotation; rate-limit |
 | `service-node` | controls blob-storage per-user quota (storage grant + quota push, extending the existing publisher to a second target) |
-| `facade-http` | fronts blob-storage uploads, **streamed (spooled) — never buffers the blob** |
-| `server-core` | untouched — only ever delivers the small pointer |
+| `facade-http` | fronts blob-storage uploads, **streamed (spooled) - never buffers the blob** |
+| `server-core` | untouched - only ever delivers the small pointer |
