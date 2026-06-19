@@ -84,13 +84,26 @@ member spends one token from the **recipient's** pool, per recipient.
 - **Refill.** As in direct messaging (`Contacts.md`), a member whose issued pool
   is running low broadcasts a fresh `group.tokens`.
 
+### Sender authenticity
+
+A shared pool means the delivery token no longer identifies the sender (unlike a
+one-to-one stash), so each group **content** message carries a per-message hybrid
+signature, `gsig`. The sender signs `{type, id, from, groupId, sentAt, text}` with
+their identity key (`cms::signJsonHybrid` — the same self-contained hybrid-PQ
+signature the roster uses, which yields the signer's identity fingerprint). On
+receipt the recipient verifies it and takes the signature's **identity
+fingerprint as the authoritative sender**, requiring that it equals the message's
+`from`, matches the signed identifying/content fields, and — for a group it
+already knows — is a current member. Anything unsigned, malformed,
+field-mismatched, or from a non-member is **dropped, never surfaced**, so a member
+cannot forge another member's `from`. (A message that arrives before its roster
+defers only the membership check; the signature's from-authenticity is still
+enforced.) `gsig` rides inside the E2E-sealed content, so it is invisible to
+servers. The roster (membership/governance) keeps its own admin signature; this
+is the message-level counterpart.
+
 ### Known limits (v1)
 
-- **Sender authenticity.** Because a pool is shared across the group, the delivery
-  token no longer identifies the sender the way a one-to-one stash does; the
-  `from` field is claimed, not signed. A hostile member could spoof another
-  member's `from`. Per-message identity signing is the planned hardening; v1
-  treats members as mutually trusted for authorship.
 - **Ordering** is best-effort by `sentAt` plus local arrival; there is no global
   order.
 - **Attachment fan-out** costs ×N uplink (one blob-storage upload, N pointers —
