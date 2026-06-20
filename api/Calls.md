@@ -16,12 +16,13 @@ per-packet source (so an audio frame stays small) and no I2P-layer
 authentication - the call layer authenticates every datagram itself (see Media
 encryption).
 
-The call's media destination publishes a **standard LeaseSet** (a plain b32),
-not the project-wide encrypted LeaseSet2 (b33): SAM datagrams are routed by the
-destination's identity hash, and an encrypted leaseset is keyed by its blinded
-key and so cannot be reached by ident hash. The b32 routing address is shared
-only with the peer, inside the E2E-encrypted invite, and the destination is
-one-time and ephemeral - so this never exposes a raw destination publicly.
+The call's media destination publishes an **encrypted LeaseSet2 (b33)**, like
+every other Bazarish destination. This requires a SAM bridge that routes
+datagrams to blinded (b33) addresses: stock i2pd routes SAM datagrams only by
+identity hash, so datagram-to-b33 is an i2pd change (submitted upstream).
+Without it the media never arrives. The destination is one-time and torn down
+with the call, and its b33 routing address is shared only with the peer inside
+the E2E-encrypted invite.
 
 A SAM STREAM channel may be added later for in-call service messages; the audio
 itself stays on datagrams.
@@ -58,8 +59,8 @@ Server-side components see only opaque blobs of a generic message.
 
 | Type | Direction | Payload |
 |---|---|---|
-| `call.invite` | caller -> callee | `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b32 routing address), `key` (base64 per-call media key) |
-| `call.accept` | callee -> caller | `callId`, `dest` (the callee's media b32 routing address) |
+| `call.invite` | caller -> callee | `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b33 routing address), `key` (base64 per-call media key) |
+| `call.accept` | callee -> caller | `callId`, `dest` (the callee's media b33 routing address) |
 | `call.decline` | callee -> caller | `callId`, `reason` (`declined` / `busy`) |
 | `call.end` | either | `callId` |
 
@@ -69,14 +70,14 @@ Adding or evolving a call signal is a client-only change.
 
 1. **Caller** builds a one-time RAW datagram destination via the SAM bridge
    (strict: no bridge -> `SAM_UNAVAILABLE`), generates a per-call AES key, and
-   sends a `call.invite` carrying its media b32 and the key over the normal E2E
+   sends a `call.invite` carrying its media b33 and the key over the normal E2E
    delivery path.
 2. **Callee** receives the invite (on sync) and rings. On accept it builds its
    own RAW datagram destination and replies with `call.accept` carrying its
-   media b32.
+   media b33.
 3. Both sides now know each other's media destination and the shared key. Each
    captures the microphone, encodes Opus, AES-256-GCM-seals it and sends
-   datagrams to the peer's b32; received datagrams are opened, decoded and
+   datagrams to the peer's b33; received datagrams are opened, decoded and
    played. Mute simply stops transmitting.
 4. Either side hangs up with `call.end`; the media engine and the one-time
    datagram destination are torn down.
@@ -99,7 +100,9 @@ destinations. The codec round trip, the AES-256-GCM seal/open (including
 tamper/wrong-key rejection), and the full media pipeline over an in-memory
 loopback are covered by unit tests.
 
-Needs i2pd with a SAM bridge and its datagram UDP port (default 7655) reachable.
+Needs i2pd with a SAM bridge, its datagram UDP port (default 7655) reachable,
+and SAM datagram-to-b33 routing (an i2pd change submitted upstream; until it is
+released the local router must carry the patch).
 
 ## Open / not done
 
