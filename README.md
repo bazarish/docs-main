@@ -61,15 +61,13 @@ federation, the central alias resolver (claim -> resolve -> card fetch ->
 conversation) including its offline-key serving-dest hot-swap, large-file blob
 transfer, group chats with per-sender signing, bots and interactive messages,
 message editing and read receipts, multiple accounts, at-rest encryption of all
-local state, and client-to-client audio calls (Opus media over SAM datagrams to
-b33 destinations, per-call AES-256-GCM, strict SAM requirement; needs an i2pd
-with SAM datagram-to-b33 routing, submitted upstream).
+local state, and client-to-client audio and video calls (Opus and VP8 media over
+SAM datagrams to b33 destinations, per-call AES-256-GCM, minimal-length media
+tunnels, strict SAM requirement; needs an i2pd with SAM datagram-to-b33 routing,
+submitted upstream).
 
 Near-term work (not yet done):
 
-- **Video calls** - audio calls are implemented (`api/Calls.md`); the signaling
-  negotiates `media`, but only `audio` is wired today. Video capture/encode and a
-  deeper adaptive jitter buffer are the next step.
 - **Incoming QR scan** - showing/sharing a QR works; decoding a scanned QR on the
   client is not yet wired (paste-link is the fallback).
 - **Service-portal inline QR** - the pay page is JS-free with a refresh fallback;
