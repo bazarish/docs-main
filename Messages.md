@@ -87,6 +87,10 @@ versioned envelope:
 | `group.tokens` | contact | A member's one-time token pool for a group: `groupId`, `tokens`. Tokenless distribution. See `Groups.md`. |
 | `group.roster` | contact | A signed roster update (membership/admin/epoch). Sent over the tokenless contact class so a critical update never fails on a drained pool. See `Groups.md`. |
 | `group.leave` | contact | The sender is leaving a group: `groupId`. See `Groups.md`. |
+| `call.invite` | content | Places an audio call: `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b32), `key` (base64 per-call media key). See `api/Calls.md`. |
+| `call.accept` | content | Accepts a call: `callId`, `dest` (the callee's media b32). See `api/Calls.md`. |
+| `call.decline` | content | Rejects a call: `callId`, `reason`. See `api/Calls.md`. |
+| `call.end` | content | Hangs up / cancels a call: `callId`. See `api/Calls.md`. |
 
 A content message of any group type **and** any ordinary content type (`text`,
 `file`, ...) may additionally carry a `"group": { "id": <groupId> }` field - it

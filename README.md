@@ -60,14 +60,15 @@ core flows live-validated over real I2P: E2EE first contact, destination-routed
 federation, the central alias resolver (claim -> resolve -> card fetch ->
 conversation) including its offline-key serving-dest hot-swap, large-file blob
 transfer, group chats with per-sender signing, bots and interactive messages,
-message editing and read receipts, multiple accounts, and at-rest encryption of
-all local state.
+message editing and read receipts, multiple accounts, at-rest encryption of all
+local state, and client-to-client audio calls (Opus media over SAM datagrams,
+per-call AES-256-GCM, strict SAM requirement).
 
 Near-term work (not yet done):
 
-- **Calls (audio/video)** - signalling types and UI are drafted (`api/Calls.md`);
-  media capture/playback (Qt Multimedia) and transport-independent media
-  protection are not implemented.
+- **Video calls** - audio calls are implemented (`api/Calls.md`); the signaling
+  negotiates `media`, but only `audio` is wired today. Video capture/encode and a
+  deeper adaptive jitter buffer are the next step.
 - **Incoming QR scan** - showing/sharing a QR works; decoding a scanned QR on the
   client is not yet wired (paste-link is the fallback).
 - **Service-portal inline QR** - the pay page is JS-free with a refresh fallback;
