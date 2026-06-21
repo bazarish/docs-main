@@ -72,8 +72,6 @@ Near-term work (not yet done):
   client is not yet wired (paste-link is the fallback).
 - **Service-portal inline QR** - the pay page is JS-free with a refresh fallback;
   an inline payment QR is still planned (`api/ServicePortal.md`).
-- **Replay hardening** - a nonce cache narrowing the client-API freshness window
-  to exactly-once is future hardening (`api/ClientApi.md`).
 - **Resolver deployment** - baking the resolver coordinate into the shipped client
   (`defaultResolverCoordinate`) is an ops step once a resolver is deployed; the
   seamless offline-key hot-swap requires i2pd >= 2.61.0.
