@@ -31,6 +31,7 @@ component implements.
   - [LargeFiles](api/LargeFiles.md) - large-message blob storage over I2P
   - [Storage](api/Storage.md) - pending-content storage backends
   - [Calls](api/Calls.md) - audio/video calls
+  - [AdminPanel](api/AdminPanel.md) - fleet status + management web panel (sign-in-with-key)
 
 ## Components
 
@@ -44,7 +45,7 @@ One repository per component, developed side by side:
 | HTTP facade (last mile) | [facade-http](https://github.com/bazarish/facade-http) |
 | Client (core, CLI, Qt6 GUI) | [client-qt6](https://github.com/bazarish/client-qt6) |
 | Large-message blob store (encrypted-LeaseSet hosts over I2P) | [blob-storage](https://github.com/bazarish/blob-storage) |
-| Fleet management / monitoring panel (non-priority) | [admin-panel](https://github.com/bazarish/admin-panel) |
+| Fleet status + management panel (sign-in-with-key) | [admin-panel](https://github.com/bazarish/admin-panel) |
 | Specification | this repository |
 
 ## Cryptography
@@ -76,7 +77,15 @@ Near-term work (not yet done):
   (`defaultResolverCoordinate`) is an ops step once a resolver is deployed; the
   seamless offline-key hot-swap requires i2pd >= 2.61.0.
 
+The `admin-panel` provides one web interface to monitor and manage the fleet:
+every service exposes a signed `GET /healthz` (name, version, uptime, current and
+peak RAM) and the panel drives the operator endpoints (per-user quota, per-user
+I2P destination). Operator-internal calls are authenticated by hybrid signature -
+the caller signs the request with its identity and the service authorises that
+fingerprint - so there is no shared operator secret. Panel sign-in is
+sign-in-with-key, verified locally against the configured admin identity with no
+backend online (`api/AdminPanel.md`).
+
 Out of scope for v1 (tracked as future concepts): large broadcast channels
 (`Groups.md`), per-device identity keys (`DeviceSync.md`), post-quantum sealing
-via ML-KEM (`Identity.md`), a standalone threat-model document, and the fleet
-management/monitoring `admin-panel`.
+via ML-KEM (`Identity.md`), and a standalone threat-model document.

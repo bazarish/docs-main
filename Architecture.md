@@ -36,7 +36,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 
 ## Key decisions
 
-1. **Repository scope** - one repository per component: `server-core`, `service-node`, `facade-http`, `client-qt6`, `common-cpp` (shared C++ library), `blob-storage` (large-message store, rotating encrypted-LeaseSet hosts over I2P), `admin-panel` (fleet management/monitoring - non-priority), and `docs-main` (this repository - the canonical protocol specification all components implement). Repositories are developed side by side in a single workspace.
+1. **Repository scope** - one repository per component: `server-core`, `service-node`, `facade-http`, `client-qt6`, `common-cpp` (shared C++ library), `blob-storage` (large-message store, rotating encrypted-LeaseSet hosts over I2P), `admin-panel` (fleet status + management web panel), and `docs-main` (this repository - the canonical protocol specification all components implement). Repositories are developed side by side in a single workspace.
 2. **Service node is a separate process** with its own API, keeping messaging logic and user management separated.
 3. **Facade <-> server transport** - operator private channel, not a hidden network hop.
 4. **Wire format** - JSON for control messages, raw HTTP bodies for binary content (no base64 overhead). E2E-encrypted payloads are opaque blobs to all server-side components.
@@ -92,7 +92,7 @@ service-node/                    # service node daemon (subscriptions, aliases, 
 facade-http/                     # HTTP facade daemon
 client-qt6/                      # client core + CLI + Qt6 GUI
 blob-storage/                    # large-message store: rotating encrypted-LeaseSet hosts over I2P
-admin-panel/                     # fleet management / monitoring web panel (non-priority)
+admin-panel/                     # fleet status + management web panel (sign-in-with-key)
 ```
 
 ## Open questions
