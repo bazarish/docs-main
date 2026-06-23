@@ -87,12 +87,15 @@ So a user can add a server with no manual entry, its whole configuration rides i
 one link (also rendered as a QR):
 
 ```
-bazarish://server/<base64url(JSON)>
+bazarish://server?v=1&fp=<server fingerprint>&facade=<facade URL>[&facade=<facade URL>...]
 ```
 
-where the JSON payload is `{ "v": 1, "fp": <server fingerprint>, "facades":
-[<facade URL>, ...] }`. The fingerprint is the trust anchor; everything the server
-signs is verified against it as usual.
+Every field is human-readable (no base64): the fingerprint is the trust anchor
+(everything the server signs is verified against it as usual) and each `facade`
+parameter is one facade URL, in client failover order. The service node renders
+this exact string in the user's cabinet after sign-in, so a client reads back
+precisely what the server published. Facade URLs ride verbatim, so they must not
+contain `&`.
 
 This is the **only** artifact that carries facade URLs, and it has a single,
 narrow purpose: configuring **your own** server. Its audience is the prospective
@@ -103,7 +106,7 @@ facades. To avoid that confusion the two shareable artifacts are kept distinct:
 
 | Artifact | Carries | Audience | Facade? |
 |---|---|---|---|
-| `bazarish://server/...` | server fingerprint + facade URLs | prospective clients of **this** server | **yes** - own server only |
+| `bazarish://server?...` | server fingerprint + facade URLs | prospective clients of **this** server | **yes** - own server only |
 | `bazarish://invite?...` (descriptor) | fingerprint + serving destination + serving sealing key (`fp:b33` + `srv_key`) | anyone, to add **you** as a contact | no |
 
 The descriptor carries no facade URL; the contact card it points at is fetched
