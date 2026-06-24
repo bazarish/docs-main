@@ -42,6 +42,17 @@ A is not B's contact and B is not A's - the first exchange must bootstrap both d
 
 Contact requests are the only tokenless path into a mailbox; they get a separate small quota and per-origin-server rate limiting.
 
+## First-contact discovery and co-location
+
+Before A can send the contact request above it must learn B's routing (`{ sealing prekey, dest, servingKey }`). Two discovery paths exist:
+
+- **Invite / alias** - A holds a self-verifying descriptor (fingerprint + serving destination + serving key) and fetches B's user-signed card **over I2P federation**, dialing B's serving destination directly. The card is verified against the fingerprint, so no server is trusted (see `api/FederatedResolve.md`).
+- **By fingerprint** - A asks **its own server's facade** for B's routing (`GET /v1/account/contact`). This only works for a peer already known to be on A's own server and trusts that server for the routing.
+
+**Co-location rule (mandatory).** When two clients of the same server have *different* I2P destinations (the default - the pool hands out distinct destinations, and a personal destination is always distinct), first-contact discovery **MUST** go over I2P (the invite/alias card fetch), **never** the facade contact lookup. A facade lookup tells the shared server "client A is asking for client B"; combined with both resolving to that server, it discloses that A and B are **co-located on it**. Routing discovery through I2P makes A's lookup of B indistinguishable from any other federation fetch, so the server cannot infer co-location. The facade by-fingerprint path is therefore only for cases where same-server membership is already not secret, or where the two share the *same* destination (a shared pool address), where co-location cannot be inferred from the destinations anyway.
+
+For the same reason the contact request **delivery** is routed by destination over federation (I2P), with a local store short-circuit **only** when the recipient's destination is identical to the sender's own (the same shared pool address) - never inferred from the server knowing it happens to operate both distinct destinations. See `api/Federation.md`.
+
 ## What the server still learns (honest accounting)
 
 - **Set size** ~= contacts x stash size - a degree estimate. Mitigation: clients may pad with dummy hashes.
