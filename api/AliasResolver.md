@@ -120,7 +120,7 @@ can never be confused.
   only asynchronous payment step is top-up). The buyer submits an **alias
   certificate** (user-signed `{alias, user: fp}`, `Identity.md`) plus their
   **descriptor** (`{fp, srv, srv_key}`; `srv`/`srv_key` come from the buyer's home
-  server). The client produces both with `bazarish-client alias-cert <state>
+  server). The client produces both with `bazarish-client alias-cert <profile>
   <alias>` (the signing key never leaves the client) and the portal `POST
   /portal/buy` is driven with that JSON. The resolver verifies the cert (signer ==
   fp), claims the name, and stores `alias -> descriptor`.

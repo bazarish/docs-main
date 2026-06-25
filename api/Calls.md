@@ -135,7 +135,7 @@ Adding or evolving a call signal is a client-only change.
   loss); and the call signaling + state machine on `Session` (`startAudioCall` /
   `startVideoCall` / `acceptCall` / `declineCall` / `endCall` / `setCallMuted` /
   `setCameraEnabled` / `currentCall`).
-- **CLI**: `bazarish-client call <state> <peer> [seconds] [video]` and
+- **CLI**: `bazarish-client call <profile> <peer> [seconds] [video]` and
   `call-answer` (drive the signaling loop; with the synthetic backends they give
   a headless end-to-end media path for integration testing).
 - **GUI**: `CallScreen.qml` (remote video filling the surface, local camera
