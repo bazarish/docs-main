@@ -79,7 +79,7 @@ versioned envelope:
 | `audio` / `voice` | content | Same shape as `file`, plus optional `duration`. |
 | `call.invite` | content | Contact type (audio/video), one-time tunnel destination + credentials (`api/Calls.md`). |
 | `call.accept` / `call.decline` / `call.end` | content | Call control (`api/Calls.md`). |
-| `receipt` | content | `ref` (the acknowledged message's `id`). The recipient's client sends it to confirm receipt - the "green" delivery state below. Optional/toggleable. |
+| `receipt` | content | `ref` (the read message's `id`). A **read** receipt - the recipient's client sends it only on a genuine read (the chat is open, the app window focused, and the message scrolled into the visible area), confirming the "green" delivery state below. `ref` is the newest read incoming id, so it acknowledges that message and every earlier one (a read high-water). Optional/toggleable. |
 | `bot.command` | content | A command invocation aimed at a bot: `command` (name, no leading slash), `args` (raw argument string). See *Bots & interactive messages*. |
 | `bot.callback` | content | An inline-keyboard button press: `data` (the button's payload), `ref` (the `id` of the keyboard message). See *Bots & interactive messages*. |
 | `edit` | content | An in-place edit of a message the sender previously sent: `ref` (the target message's `id`), `text` (new text), `keyboard` (new inline keyboard, `[]` to clear). The recipient replaces its copy. Applied only to a message `from` actually sent. See *Editing messages*. |
@@ -175,15 +175,17 @@ actually travelled:
 
 | Tick | State | Source |
 |---|---|---|
-| **grey** (single) | Accepted by the **sender's own server** (it took the sealed envelope into its outbound buffer). | The sender's client, when its `submit` is accepted (local knowledge). |
-| **yellow** (double) | Accepted by the **recipient's server** (handed off from the sender's server buffer into the recipient's mailbox). | The sender's server, reported as the send-attempt result. |
-| **green** (double) | Received by the **recipient's client**, which explicitly returned a `receipt`. | The recipient's client (a `receipt` content message). Toggleable - a client may decline to send receipts. |
+| **grey** (single) | Accepted by the **sender's own server** (it took the sealed envelope into its outbound buffer). | The sender's client, when its `submit` is accepted (local knowledge). Instant on the LAN facade - the submit never blocks on federation. |
+| **yellow** (double) | Stored by the **recipient's server** (handed into the recipient's mailbox). | The recipient's server, via a **signed `delivered-ack`** it federates back to the sender's server (`api/Federation.md`); the sender's client learns it by polling the send attempt. |
+| **green** (double) | **Read** by the recipient - the chat is open, focused and the message scrolled into view. | The recipient's client (a read `receipt` content message). Toggleable - a client may decline to send receipts. |
 
-The first two are transport facts the sender learns without any cooperation
-from the recipient; only the green state requires the recipient's client to
-opt in. The receipt carries the original message's `id`, so the sender matches
-it back to the sent message. A failed delivery surfaces as a distinct failed
-state, not a tick.
+Grey and yellow are transport facts the sender learns without the recipient's
+client cooperating (yellow is the recipient *server's* authenticated confirmation,
+not the recipient *user*); only green requires the recipient's client to opt in
+and reflects an actual read, not mere arrival. The read receipt carries the newest
+read message's `id`, so the sender greens that message and every earlier one it
+sent that peer. A failed delivery surfaces as a distinct failed state, not a tick;
+a delivery the sender's server cannot confirm stays grey (never a false failure).
 
 ## Media: blob-storage pointers
 

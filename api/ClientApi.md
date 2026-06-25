@@ -32,14 +32,14 @@ Implemented in the `service-node` repository (`SubscriptionStore`, `AccountApi`;
 
 ### Sending: submit + poll
 
-Delivery over I2P can take tens of seconds, so sending is asynchronous at the API level while the server keeps **no persistent outbound state** (attempt state is in-memory only):
+Delivery over I2P can take tens of seconds, so sending is asynchronous at the API level while the server keeps **no persistent outbound state** (attempt state is in-memory only). The submit returns immediately (so the sender's "grey" tick is instant on the LAN facade); the delivered outcome arrives later via the recipient's signed `delivered-ack` (`Federation.md`):
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /v1/messaging/send` | Submit a delivery envelope (see `Federation.md`; kinds: `message`, `contact-request`). Early validation (subscription, size), then returns an `attemptId` immediately |
-| `GET /v1/messaging/send/{attemptId}` | Poll the attempt: `pending` / `delivered` / `failed` + typed error. Optional `wait` parameter for long-polling. Completed attempts are kept briefly, then dropped |
+| `POST /v1/messaging/send` | Submit a delivery envelope (see `Federation.md`; kinds: `message`, `contact-request`). The body also carries the `messageId` in the clear so the server can correlate the recipient's `delivered-ack` to this attempt. Early validation (subscription, size), then returns an `attemptId` immediately |
+| `GET /v1/messaging/send/{attemptId}` | Poll the attempt: `pending` / `delivered` / `unconfirmed` / `failed` + typed error. `delivered` is set by the recipient's verified `delivered-ack` (the yellow tick); `unconfirmed` means the server exhausted retries without a confirmation - **not** a failure (the message may have been stored, only the ack lost), so the client keeps it grey. Optional `wait` parameter for long-polling. Completed attempts are kept briefly, then dropped |
 
-- Unknown `attemptId` (server restarted, state expired) -> the client treats it as failure and resubmits with the **same messageId**; the recipient's server dedups, so retries are idempotent and never consume a second token.
+- Unknown `attemptId` (server restarted, state expired) -> the client stops tracking it (the message stays grey, resendable); a manual resend reuses the **same messageId**, so the recipient's server dedups and never consumes a second token.
 - On failure the message stays only on the client; the server holds no outbound queue.
 - A contact accept is not a separate endpoint: it is an ordinary `message` send using a token received in the request (see `../Contacts.md`). Declining a request sends nothing.
 

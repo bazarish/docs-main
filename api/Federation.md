@@ -5,9 +5,11 @@ Status: draft skeleton.
 ## Transport
 
 - Delivery is **I2P-only**: the messaging server requires `--i2p` (there is no
-  non-I2P transport; the earlier plain-TCP federation was removed). Each server
-  runs an I2P **STREAM** session via the SAM v3 bridge. The destination is
-  persisted (`<state>/i2p-dest.key`) so the address is stable across restarts.
+  non-I2P transport; the earlier plain-TCP federation was removed). I2P is provided
+  by an **embedded i2pd router** (no external SAM bridge). The server has no single
+  federation destination - each user's serving destination (pool/per-user) runs its
+  own STREAM accept loop and is persisted so addresses are stable across restarts;
+  the home destination (`<state>/i2p-dest.key`) is used for discovery only.
 - Every routing/connection target is a full **`.b32.i2p`** address - a
   cryptographic destination address, never an addressbook name (poisonable) and
   never a raw base64 destination. This is enforced in code (`common`
@@ -29,10 +31,18 @@ Over the connected stream, one delivery is:
 
 ```
 request:  {"op":"deliver","sealed":<base64>,"len":<N>}\n   then N raw payload bytes
-response: {"delivered":<bool>,"errorCode":...,"errorMessage":...}\n
+response: {"delivered":<bool>,"errorCode":...,"errorMessage":...}\n   (best-effort)
 ```
 
-Length-prefixed both ways - no half-close (SAM propagates a SHUT_WR as a full stream teardown). The recipient runs the same delivery pipeline as a local send (dedup -> token -> size/quota -> store), so local and federated deliveries share one code path.
+The recipient runs the same delivery pipeline as a local send (dedup -> token -> size/quota -> store), so local and federated deliveries share one code path.
+
+The synchronous `response` is **best-effort**: its return leg over the recipient's *accepted* stream is unreliable (and on a single server it would require the sender's home endpoint to dial its own address). The **authoritative** confirmation is a separate, reverse **`delivered-ack`** the recipient sends once it has stored the message:
+
+```
+delivered-ack:  {"op":"delivered-ack","messageId":<id>,"signerPub":<base64>,"sig":<base64>}\n
+```
+
+The recipient opens a **fresh outbound connection from the serving destination that received the delivery** back to the sender's serving destination, and signs `messageId` with the server's identity key (`signerPub` carries the public half). The sender verifies the signature and that the `messageId` matches a pending send attempt - and since `messageId` is sealed inside the envelope, only a server that actually unsealed it can know it, so the ack doubles as a capability. On a verified ack the attempt is marked **delivered** (the yellow tick, `../Messages.md`) and the delivery job stops retrying. A `delivered-ack` gets no reply; the side that sent it keeps the connection open until the receiver closes, so the single line flushes before teardown.
 
 Operational note: a freshly created destination must publish its leaseset before peers can reach it; the first connect after startup may return `CANT_REACH_PEER` ("LeaseSet not found") and should be retried with backoff. Verified end to end against a live i2pd (`i2p-federation-smoke`, and the full cross-server `demo-federation-i2p.sh`).
 
@@ -42,11 +52,23 @@ Routing is **by destination**, not by server fingerprint. The recipient's
 serving destination (its b33) travels end to end in the recipient's contact card
 (`../Identity.md`), so the sender's server **dials that destination directly**
 over I2P. There is no fingerprint->endpoint resolver and no `peers.json` - a
-destination is self-routing. A delivery whose `toDest` is one of the sender's
-server's own destinations is stored locally **only when it equals the sender's
-own destination** (same destination); a co-located recipient on a *different*
-destination is still federated (self-dialled) so delivery latency cannot reveal
-co-location (`InviteAnonymity.md`).
+destination is self-routing.
+
+**A server has no single, shared federation destination** (fundamental rule). Each
+user is served by their own serving destination (a pool dest shared only within a
+k-anonymity set, or a personal per-user dest - see `InviteAnonymity.md`), and *all*
+that user's federation flows over it: inbound delivery is served on it, and an
+outbound delivery dials the recipient **from the sender's own serving destination**
+- never from a server-wide "home" address. The home destination (persisted at
+`<state>/i2p-dest.key`) serves **discovery only** (the `card` request below), never
+user delivery or acks.
+
+A delivery whose `toDest` equals the **sender's own** serving destination (the two
+parties already share it) is stored locally; any other destination - including a
+co-located recipient the same server hosts on a *different* serving dest - is
+federated (the sender's serving dest dials the recipient's serving dest, two
+distinct destinations) so delivery latency cannot reveal co-location
+(`InviteAnonymity.md`).
 
 ## Delivery envelope
 
@@ -81,22 +103,24 @@ DeliveryEnvelope:
 
 ## Message delivery flow
 
-1. Sender's client -> own server: `send` with the envelope. The server accepts it **in memory only** (no outbound persistence, no outbound queue) and returns an attempt id; the client polls for the outcome (see `ClientApi.md`).
-2. Sender's server -> recipient's server over I2P: `deliver` with the envelope.
+1. Sender's client -> own server: `send` with the envelope (the client also passes the `messageId` in the clear so the server can correlate the recipient's later `delivered-ack` to this attempt). The server accepts it **in memory only** (no outbound persistence, no outbound queue) and returns an attempt id at once; the client polls for the outcome (see `ClientApi.md`). The submit never blocks on federation, so the sender's "grey" tick is instant.
+2. Sender's server -> recipient's server over I2P: `deliver` with the envelope, **dialled from the sender's own serving destination**.
 3. Recipient's server unseals and processes in strict order:
    1. **messageId dedup** - if the `messageId` is still pending in the mailbox, or is in the retained **seen-messageId set** (every admitted id, kept independently of the blob until the TTL sweep ages it out), respond success *without* consuming a token. This makes client retries idempotent and blocks replays of an already-delivered envelope - including tokenless `contact` requests that have since been fetched, acked and swept;
    2. **token check** - hash the presented token, look it up in the mailbox's registered set (`../Contacts.md`); no match -> `DELIVERY_REJECTED`;
    3. **size/quota checks** - explicit typed errors (`QUOTA_EXCEEDED`, `STORAGE_FULL`), revealed only past a valid token;
    4. **store** as pending content; the token is consumed atomically with the store, and the `messageId` is added to the seen set.
-4. The outcome propagates back to the sender's client via polling. On failure the message stays **only on the client**, which may retry with the same messageId; the sender's server drops its in-memory copy as soon as the attempt concludes.
+4. Recipient's server -> sender's server: a signed **`delivered-ack`** for the stored `messageId` (see *Delivery framing*), dialled from the recipient's serving dest back to the sender's serving dest. The sender verifies it and marks the attempt **delivered**; the client sees this on its next poll (the yellow tick).
+5. The outcome propagates to the sender's client via polling. A definite rejection (token/size) is a **failed** state; an unconfirmed delivery (no ack, recipient unreachable) **stays grey** rather than reporting a false failure - the envelope may have been stored while only its ack was lost. On failure the message stays **only on the client**, which may retry with the same messageId; the sender's server drops its in-memory copy as soon as the attempt concludes.
 
-`contact-request` deliveries skip the token check, are capped in payload size (default 256 bytes, server-configurable), and are subject to a separate quota and per-origin-server rate limiting.
+`contact-request` deliveries skip the token check, are capped in payload size (default 8192 bytes, server-configurable - large enough for the bootstrap prekey + a full reply-token batch), and are subject to a separate quota and per-origin-server rate limiting.
 
 ## Requests (draft)
 
 | Request | Purpose |
 |---|---|
 | `deliver` | Deliver an envelope (message or contact request) for a local mailbox |
+| `delivered-ack` | Signed confirmation, sent back to the sender's serving dest, that a delivered `messageId` was stored (drives the yellow tick) |
 | `card` | Return a local user's contact card for a sealed fingerprint query - the first-contact card fetch (`FederatedResolve.md`) |
 
 Username resolution (`alias` -> descriptor) is **not** an operator-to-operator

@@ -115,11 +115,13 @@ server fingerprint, not stronger.
 A server may short-circuit delivery (store straight into the local mailbox
 instead of dialling out over I2P) **only when the sender and the recipient are
 on the same destination** - i.e. `toDest` equals the **sender's own** assigned
-destination. In every other case, including a recipient who is a local user but
-on a *different* destination the same server operates (e.g. a pool sender to a
-home-destination recipient, or any two users the server hosts on distinct
-destinations), the server **must federate** - dial `toDest` over I2P, even
-though it is one of its own destinations (a self-dial).
+destination. In every other case, including any two local users the server hosts
+on *distinct* serving destinations (e.g. two free users on different pool dests,
+or a pool user and a personal-dest user), the server **must federate** - dial
+`toDest` over I2P **from the sender's own serving destination**. The two endpoints
+are distinct destinations on the one router; this is not a single dest dialling
+itself. (The server has no shared "home" federation address to fall back on - see
+the fundamental rule below.)
 
 Rationale: if the server delivered cross-destination recipients locally (fast)
 but remote recipients over I2P (slow), the **delivery latency** would reveal
@@ -136,6 +138,15 @@ destination-surfacing step below) - never from a value the sender supplies, so a
 sender cannot force a revealing short-circuit.
 
 ## The destination knob (`dest_U`)
+
+**Fundamental rule: a server has no single, shared federation destination.** Every
+user is served by `dest_U` (a pool dest within a k-anonymity set, or a personal
+per-user dest), and *all* of that user's federation rides over it - inbound
+delivery, outbound delivery (dialled **from** `dest_U`), and the signed
+`delivered-ack` (`Federation.md`). A server-wide "home" address is never used for
+user traffic (it serves only first-contact card discovery); a shared federation
+source would both leak a common address and, when sender and recipient share a
+server, force the home endpoint to dial itself.
 
 - **Free tier** - `dest_U` is one of the server's **address-pool** destinations
   (encrypted-LeaseSet b33; `server-core` `FederationPool`). Free users are
