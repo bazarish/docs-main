@@ -63,9 +63,9 @@ conversation) including its offline-key serving-dest hot-swap, large-file blob
 transfer, group chats with per-sender signing, bots and interactive messages,
 message editing and read receipts, multiple accounts, at-rest encryption of all
 local state, and client-to-client audio and video calls (Opus and VP8 media over
-SAM datagrams to b33 destinations, per-call AES-256-GCM, minimal-length media
-tunnels, strict SAM requirement; needs an i2pd with SAM datagram-to-b33 routing,
-submitted upstream).
+I2P RAW datagrams to b33 destinations, per-call AES-256-GCM, minimal-length media
+tunnels, strict I2P requirement; the embedded `libi2pd_bazarish` carries the
+datagram-to-b33 routing in-process).
 
 Near-term work (not yet done):
 

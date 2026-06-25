@@ -38,7 +38,7 @@ HTTP transports map typed errors onto appropriate status codes; the JSON body is
 | `ALIAS_TAKEN` | Requested alias is already registered | service node |
 | `ALIAS_UNKNOWN` | Alias resolution found no such alias (aliases are findable by design - explicit error, no anti-enumeration) | service node |
 | `CLIENT_UNREGISTERED` | Request carries a client ID that is not registered for this user (see `DeviceSync.md`) | server |
-| `SAM_UNAVAILABLE` | No SAM API found; direct contact (calls) impossible | client-side |
+| `I2P_UNAVAILABLE` | The embedded I2P router is not available; direct I2P (e.g. placing/accepting a call) is impossible | client-side |
 
 The registry grows as APIs are specified; codes are append-only and never reused.
 

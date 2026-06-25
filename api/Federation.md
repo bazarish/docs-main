@@ -154,12 +154,13 @@ summary:
 - A **descriptor** (`fp:b33` plus the serving sealing key, shared as a QR or link)
   carries the fingerprint and route directly. The client fetches the user-signed
   contact card for that fingerprint over I2P - the `card` request above, with the
-  fingerprint sealed to the serving sealing key - direct transient-SAM preferred,
-  own-server proxy fallback, and verifies the card against the fingerprint. `fp`
+  fingerprint sealed to the serving sealing key - a direct fetch over a transient
+  I2P destination preferred, own-server proxy fallback, and verifies the card
+  against the fingerprint. `fp`
   anchors integrity; the relay learns neither the fingerprint (sealed) nor the
   result.
 - A **username** resolves to a descriptor at the central resolver
-  (`AliasResolver.md`), which returns a signed self-verifying record over its SAM
+  (`AliasResolver.md`), which returns a signed self-verifying record over its I2P
   endpoint; the client then runs the card fetch above.
 
 **Implementation status.** The facade-locality and `.b32.i2p` address invariants

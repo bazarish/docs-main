@@ -26,7 +26,7 @@ arbitrarily large content without it ever touching their mailbox.
    v
  server-core delivery (small pointer) ---------------------->  mailbox
                                                                    | read pointer
-                                       GET (authless capability)   | direct SAM, or
+                                       GET (authless capability)   | direct I2P, or
                             <--------------------------------------| proxy via own server
                                        ciphertext (range/resume)    |
                                                                    | verify sha256, decrypt
@@ -152,10 +152,10 @@ that dest).
 invalidates a live download URL.** A blob's URL stays valid for the blob's whole
 lifetime; the dest pinned at upload outlives it.
 
-Because constructing a SAM `STREAM` session blocks on tunnel build (tens of
+Because constructing an I2P `STREAM` session blocks on tunnel build (tens of
 seconds), the replacement dest is **warmed in the background** before the drained
 dest is torn down, so the pool stays ready without a noticeable spike. Each pool
-dest is one `SamSession` (`common`'s SAM wrapper) running an accept loop that
+dest is one `bazarish::i2p::Endpoint` (the embedded I2P router's STREAM accept) running an accept loop that
 forwards to the single local web server; create/destroy a dest = construct/destroy
 its session.
 
@@ -188,12 +188,12 @@ b33  = base32_rfc4648_lower_nopad(addr[0..34])   // 56 chars
 host = b33 + ".b32.i2p"
 ```
 
-(Per I2P proposals 123/149; matches i2pd's `BlindedPublicKey::ToB33`.) SAM
-`NAMING LOOKUP ME` returns the raw destination, not the blinded address, so the
+(Per I2P proposals 123/149; matches i2pd's `BlindedPublicKey::ToB33`.) The embedded I2P router
+exposes the raw destination, not the blinded address, so the
 store derives the b33 itself from the session's signing key. It is computed
 directly (I2P-base64 decode -> Ed25519 signing key -> CRC-32 prefix -> base32), with
 no libi2pd dependency, and is verified byte-for-byte against an i2pd-produced golden
-vector (`i2pd-tools keyinfo -b`). Recipients reach it with SAM
+vector (`i2pd-tools keyinfo -b`). Recipients reach it with the embedded I2P router
 `STREAM CONNECT <host>`; the router performs the blinded lookup and decrypts the
 leaseset.
 
@@ -208,12 +208,12 @@ mode.
 The download is a generic authless I2P `GET` - **federation is not involved**; the
 recipient does not need to know "whose" server hosts the blob, only the URL.
 
-- **Direct fetch (a SAM bridge is reachable).** The recipient's client opens its
+- **Direct fetch (the embedded I2P router is up).** The recipient's client opens its
   own I2P stream and `GET`s the blob itself - its server is not involved at all
-  (no bandwidth, no knowledge of the pull). The client uses a **transient SAM
+  (no bandwidth, no knowledge of the pull). The client uses a **transient I2P
   destination** (a throwaway dest) so the store cannot link downloads to each
   other or to a messaging identity. This is the preferred path.
-- **Proxy fetch (no direct SAM access).** For environments that can only reach
+- **Proxy fetch (no direct I2P access).** For environments that can only reach
   their own facade (mobile, restricted networks), the client asks its **own
   server** to proxy: the server opens the I2P stream, range-`GET`s, and streams the
   ciphertext back. The blob store is a neutral dumb destination, not a foreign
@@ -221,10 +221,9 @@ recipient does not need to know "whose" server hosts the blob, only the URL.
   never connects to a foreign facade.
 
 Both paths run the **same** I2P-fetch logic (range `GET` of ciphertext); only the
-call site differs (client-side vs server-side). Direct-SAM availability here means
-a router with a SAM bridge is reachable - independent of the trimmed `libi2pd`
-already vendored in the client (that is for key generation / offline keys, not a
-full router).
+call site differs (client-side vs server-side). Direct-I2P availability here means
+the client's own embedded I2P router is up; if it is not, the client falls back to
+the own-server proxy fetch.
 
 There is **no recipient-side re-hosting**: the sender serves the file, so the
 recipient never copies the ciphertext into its own storage - re-hosting would only

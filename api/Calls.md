@@ -10,8 +10,8 @@ one-time hidden-network tunnel, so no server or facade ever sees call traffic.
 
 ## Transport
 
-All media - audio and video - rides **SAM v3 RAW datagrams** (UDP-like, low
-overhead) over I2P, one short-lived destination per call, torn down when the
+All media - audio and video - rides **I2P RAW datagrams** (UDP-like, low
+overhead) over the embedded i2pd router, one short-lived destination per call, torn down when the
 call ends. RAW carries no per-packet source (so a frame stays small) and no
 I2P-layer authentication - the call layer authenticates every datagram itself
 (see Media encryption). Datagrams are the right fit for realtime media: a
@@ -36,14 +36,14 @@ cannot jump mid-call.
 ### Encrypted LeaseSet (b33)
 
 The call's media destination publishes an **encrypted LeaseSet2 (b33)**, like
-every other Bazarish destination. This requires a SAM bridge that routes
-datagrams to blinded (b33) addresses: stock i2pd routes SAM datagrams only by
-identity hash, so datagram-to-b33 is an i2pd change (submitted upstream).
-Without it the media never arrives. The destination is one-time and torn down
-with the call, and its b33 routing address is shared only with the peer inside
-the E2E-encrypted invite.
+every other Bazarish destination. This requires routing RAW datagrams to blinded
+(b33) addresses: stock i2pd routes datagrams only by identity hash, so the
+datagram-to-b33 routing is a patch carried in the **embedded `libi2pd_bazarish`**
+(in-process; no external router). Without it the media never arrives. The
+destination is one-time and torn down with the call, and its b33 routing address
+is shared only with the peer inside the E2E-encrypted invite.
 
-A SAM STREAM channel may be added later for in-call service messages; the media
+An I2P STREAM channel may be added later for in-call service messages; the media
 itself stays on datagrams.
 
 ## Codecs
@@ -79,12 +79,12 @@ fragmentation header is inside the sealed, authenticated plaintext). The control
 payload is a one-byte opcode (currently: request keyframe). A forged, replayed or
 wrong-key datagram fails to open and is silently dropped.
 
-## Strict SAM requirement
+## Strict I2P requirement
 
-A call is impossible without a local I2P SAM bridge. Placing a call
-(startAudioCall) or accepting one (acceptCall) probes the bridge first and, if
-none is reachable, fails immediately with the typed, readable error
-`SAM_UNAVAILABLE` - no call is placed and nothing half-starts.
+A call is impossible without the embedded I2P router. Placing a call
+(startAudioCall) or accepting one (acceptCall) brings the router up first and, if
+I2P is unavailable, fails immediately with the typed, readable error
+`I2P_UNAVAILABLE` - no call is placed and nothing half-starts.
 
 ## Signaling message types
 
@@ -107,8 +107,8 @@ Adding or evolving a call signal is a client-only change.
 
 ## Flow (I2P)
 
-1. **Caller** builds a one-time RAW datagram destination via the SAM bridge
-   (strict: no bridge -> `SAM_UNAVAILABLE`), generates a per-call AES key, and
+1. **Caller** builds a one-time RAW datagram destination on the embedded router
+   (strict: I2P unavailable -> `I2P_UNAVAILABLE`), generates a per-call AES key, and
    sends a `call.invite` carrying its media b33 and the key over the normal E2E
    delivery path.
 2. **Callee** receives the invite (on sync) and rings. On accept it builds its
@@ -125,9 +125,10 @@ Adding or evolving a call signal is a client-only change.
 
 ## Implementation
 
-- **common**: `SamDatagramSession` (SAM v3 RAW datagram transport) and
-  `aeadSeal`/`aeadOpen` (AES-256-GCM).
-- **client lib**: `AudioCodec` (Opus) and `VideoCodec` (VP8); `AudioIo` and
+- **common**: the embedded I2P RAW datagram endpoint (`bazarish::i2p::Endpoint`,
+  embedded `libi2pd_bazarish`) and `aeadSeal`/`aeadOpen` (AES-256-GCM).
+- **client lib**: `I2pCallTransport` (the per-call RAW datagram transport over the
+  embedded endpoint); `AudioCodec` (Opus) and `VideoCodec` (VP8); `AudioIo` and
   `VideoIo` (device interfaces + synthetic backends for headless tests);
   `CallMedia` (the media engine: audio capture, video capture, and one receive
   thread that demultiplexes by track, reassembles video and requests keyframes on
@@ -142,15 +143,15 @@ Adding or evolving a call signal is a client-only change.
   `QAudioSource`/`QAudioSink` for audio and `QCamera`/`QVideoSink` for video,
   with worker-thread frames marshalled to a GUI-thread presenter.
 
-Live-validated: SAM RAW datagrams round-trip over real I2P between two
+Live-validated: I2P RAW datagrams round-trip over real I2P between two
 destinations (b32 and b33). The audio and video codec round trips, the
 AES-256-GCM seal/open (including tamper/wrong-key rejection), and the full
 audio+video pipeline (fragmentation, reassembly, decode, render) over an
 in-memory loopback are covered by unit tests.
 
-Needs i2pd with a SAM bridge, its datagram UDP port (default 7655) reachable,
-and SAM datagram-to-b33 routing (an i2pd change submitted upstream; until it is
-released the local router must carry the patch).
+The embedded `libi2pd_bazarish` provides RAW datagrams and the datagram-to-b33
+routing patch in-process - no external i2pd, no SAM bridge, and no datagram UDP
+port are involved.
 
 ## Open / not done
 

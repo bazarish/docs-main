@@ -266,7 +266,7 @@ byte-identical root-signed card) is gone.
 1. **common** - the contact-card / extended subscription-cert format: `dest`
    and `servingSealingKey` in the user-signed body (`TestCertificates`). Plus
    `encryptedLeaseSetHost()` (b33), `standardLeaseSetHost()` (standard b32) and
-   `SamSession::routingAddress()` so a destination is addressed by its b33
+   `routingHost()` so a destination is addressed by its b33
    (encrypted LeaseSet2) or its standard b32 (standard LeaseSet2, offline-key
    per-user) - always a `.b32.i2p` host, never the raw destination
    (`isB32I2pHost`/`validateB32I2pHost`; `TestI2pAddress`).

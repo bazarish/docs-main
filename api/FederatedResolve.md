@@ -54,14 +54,14 @@ even though v1 runs one resolver (`AliasResolver.md`).
 
 Mirrors the blob-storage download model.
 
-- **Direct (preferred; client has a SAM bridge).** The client dials `srv` (card
+- **Direct (preferred; the client's embedded I2P router is up).** The client dials `srv` (card
   fetch) or the resolver's b32 (alias resolve) itself over a **fresh transient
-  SAM session**. I2P encrypts the stream end-to-end to the destination and the
+  I2P destination**. I2P encrypts the stream end-to-end to the destination and the
   `.b32.i2p` address *is* a commitment to the destination key, so the relay is
   bypassed entirely - **no relay-MITM, no relay metadata, no extra key needed**,
   and the target sees only an unlinkable transient. This is why a `.b32.i2p` host
   (not a facade) is the unit of cross-server reachability (`Facade.md`).
-- **Proxy (fallback; thin client, no SAM bridge).** The client submits the sealed
+- **Proxy (fallback; thin client whose embedded I2P router is not up).** The client submits the sealed
   query to its **own** server, which relays opaque bytes over I2P and returns the
   opaque response. The client did all sealing/verification; the relay moves bytes.
   Here the relay could in principle MITM the *transport*, so integrity must come
@@ -76,7 +76,7 @@ facade - direct b33 dials are already used for blob fetch).
 ```
 client has descriptor {fp, srv, srv_key}
   query   = seal({ v, fp, responseKey: <ephemeral SPKI> }, srv_key)   # only srv can open
-  -> dial srv (direct transient-SAM) or relay via own server
+  -> dial srv (direct dial over a transient I2P destination) or relay via own server
   srv unseals, looks up the card for fp, returns:
   response = seal({ v, subscriptionCert: <b64 DER> }, responseKey)    # only the client can open
   client: verify card signature; assert card.user == fp and card.dest is .b32.i2p
@@ -90,7 +90,7 @@ always the `fp` anchor.
 
 ## Alias-resolve protocol (`username` -> descriptor)
 
-The full **signed** resolve is served over the resolver's SAM/I2P endpoint only,
+The full **signed** resolve is served over the resolver's I2P endpoint only,
 for uniform client automation (`AliasResolver.md`). The resolver returns a
 **self-verifying signed record**:
 
@@ -140,7 +140,7 @@ Namespace anti-enumeration is out of scope (resolve is unauthenticated by design
    the response key) and the proxy relay (`POST /v1/messaging/fetch`, op `card`
    and `resolve`, `.b32.i2p`-validated `toDest`) that moves opaque sealed bytes.
 3. **client** - *done.* Descriptor handling, a fetch transport that prefers a
-   direct transient-SAM dial and falls back to the own-server proxy (a served
+   direct fetch over a transient I2P destination and falls back to the own-server proxy (a served
    `CARD_UNKNOWN` / `ALIAS_UNKNOWN` is authoritative and does not fall back),
    ephemeral seal/verify, address parsing (`fp:b33` vs `<alias>`), `addByUsername`
    routed to the resolver (record chain verified against the hardcoded root,
@@ -150,17 +150,17 @@ Namespace anti-enumeration is out of scope (resolve is unauthenticated by design
    tests drive resolve/card over an injected transport (happy path, unknown name,
    wrong root, alias mismatch).
 4. **alias-resolver** - *implemented* (`AliasResolver.md`): registry + lifecycle,
-   signed resolve over SAM (live-validated on i2pd), portal/payments (sign-in-with-key,
+   signed resolve over I2P (live-validated on i2pd), portal/payments (sign-in-with-key,
    atomic balance-only purchase, balance/top-up, manage), delegation-cert signing,
    hourly lifecycle scheduler, and **offline-key destination custody + hot-swap
    rotation** - the master is offline, the daemon runs a short transient, and a
-   rotation serves at the same b32 while the old session drains (live-validated
+   rotation serves at the same b32 while the old destination drains (live-validated
    over real I2P). The seamless transient hot-swap requires **i2pd >= 2.61.0**
-   (the upstream offline-transient refresh + SAM teardown fixes). Once deployed,
+   (the upstream offline-transient refresh + I2P destination teardown fixes). Once deployed,
    its root fingerprint + destination + serving key are baked into the client
    (`defaultResolverCoordinate`), enabling the `<alias>` path in production.
 5. **docs + live** - cross-I2P validation. Both the card-fetch (`fp:b33`) path
-   and the full `<alias>` path (add-user -> SAM resolve -> fp:b33 card fetch ->
+   and the full `<alias>` path (add-user -> I2P resolve -> fp:b33 card fetch ->
    conversation) are live-validated over real I2P; production use waits only on
    the resolver deployment (baking the coordinate into the client).
 

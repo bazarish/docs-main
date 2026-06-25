@@ -59,8 +59,9 @@ Consequences for first contact (`Contacts.md`, `Federation.md`):
   `fp:b33`) - carries the contact's fingerprint, serving destination and the
   server's serving sealing key. The client fetches the user-signed contact card
   for that fingerprint over I2P and verifies it against the fingerprint
-  (`FederatedResolve.md`) - direct transient-SAM preferred, the requester's
-  **own** server as a proxy fallback, never the foreign facade. The contact
+  (`FederatedResolve.md`) - a direct fetch over a transient I2P destination
+  preferred, the requester's **own** server as a proxy fallback, never the foreign
+  facade. The contact
   request bootstrap carries the sender's own routing (prekey + destination +
   serving sealing key), so the reply path is equally facade-free.
 - **By `<alias>`** - resolved at the **central resolver** over its I2P endpoint

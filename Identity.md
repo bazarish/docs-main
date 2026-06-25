@@ -87,8 +87,8 @@ verifies the user-signed **contact card** for that fingerprint. Two trust layers
    key) - is **user-signed and verified against the fingerprint**, so no
    intermediary can forge it.
 
-The lookup travels over I2P (direct transient-SAM, or sealed via the client's own
-server), so the requester's own server never learns which name was looked up
+The lookup travels over I2P (a direct fetch over a transient I2P destination, or
+sealed via the client's own server), so the requester's own server never learns which name was looked up
 (`api/FederatedResolve.md`).
 
 ### Out-of-band invites (the descriptor)
@@ -107,7 +107,7 @@ Trust ladder for adding a contact, strongest first:
 
 - **By descriptor / fingerprint** (`fp:b33`, a QR or link) - the contact card is
   fetched and verified against the fingerprint, so a server cannot forge, only
-  withhold; on a direct transient-SAM fetch it cannot even observe the lookup.
+  withhold; on a direct fetch over a transient I2P destination it cannot even observe the lookup.
 - **By username (alias)** - the central resolver maps the human-readable name to a
   fingerprint. Convenient, but the **alias->fingerprint mapping is trusted**: a
   hostile resolver could return an attacker's fingerprint, so the UI surfaces the

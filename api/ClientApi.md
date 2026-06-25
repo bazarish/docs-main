@@ -53,7 +53,7 @@ Delivery over I2P can take tens of seconds, so sending is asynchronous at the AP
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /v1/messaging/fetch` | Relay a sealed fetch frame (`{op, sealed}`; `op` is `card` or `resolve`) to a target destination over I2P and return the sealed reply synchronously (see `Federation.md`, `FederatedResolve.md`). This is the own-server proxy fallback for clients with no local SAM bridge; the preferred path is a direct transient-SAM fetch |
+| `POST /v1/messaging/fetch` | Relay a sealed fetch frame (`{op, sealed}`; `op` is `card` or `resolve`) to a target destination over I2P and return the sealed reply synchronously (see `Federation.md`, `FederatedResolve.md`). This is the own-server proxy fallback for clients whose embedded I2P router is not up; the preferred path is a direct fetch over a transient I2P destination |
 
 ### Receiving
 
@@ -72,7 +72,7 @@ message carries only a small sealed pointer; the recipient fetches it over I2P.
 | Endpoint | Purpose |
 |---|---|
 | `PUT /v1/storage/blob` | Upload blob ciphertext (authed; forwarded by the facade to the blob store). Returns `{blobUrl, blobId, deleteToken}`. Retention rides in `X-Blob-Ttl`/`X-Blob-Count`/`X-Blob-Sha256` headers |
-| `GET /v1/messaging/blob-proxy?host=&path=` | Own-server I2P proxy fetch of a blob's `.b32.i2p` host+path, for clients without a local SAM bridge (the direct path is a transient SAM session straight to the blob's b33) |
+| `GET /v1/messaging/blob-proxy?host=&path=` | Own-server I2P proxy fetch of a blob's `.b32.i2p` host+path, for clients whose embedded I2P router is not up (the direct path is a transient I2P destination straight to the blob's b33) |
 
 ### Delivery tokens (see `../Contacts.md`)
 

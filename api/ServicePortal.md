@@ -159,7 +159,7 @@ On install/enable the client also sends the master to its **other devices** as a
 delivered tokenlessly to the account's own destination - so every device adopts
 the same master (preserving the b32) and can re-issue transients.
 
-The server provisions/serves the personal destination over SAM
+The server provisions/serves the personal destination on its embedded I2P router
 (`POST /v1/account/i2p-dest` -> the messaging server's operator-internal
 per-user-destination endpoint), reports its state on `GET /v1/messaging/destination`
 (`building` -> `active` -> `expired`), and falls a free user back to a fixed

@@ -13,9 +13,9 @@ rotation and payments.
 
 Built and unit-tested (`AliasRegistry`, `ResolveResponder`/`ResolveServer`,
 `Lifecycle`, `PortalApi`), and **live-validated over real I2P end to end**: the
-daemon builds its standard-LeaseSet2 destination via SAM and serves the
+daemon builds its standard-LeaseSet2 destination on its embedded I2P router and serves the
 signed-resolve loop, a client claims a name through the portal, and another
-client's `add-user <alias>` resolves it over a transient SAM session, fetches the
+client's `add-user <alias>` resolves it over a transient I2P destination, fetches the
 owner's contact card (fp:b33) and opens a conversation - the resolved fingerprint
 matching the owner's real identity. What is done:
 
@@ -23,7 +23,7 @@ matching the owner's real identity. What is done:
   anti-hijack grace) -> free`, state a pure function of term + clock; atomic claim,
   yearly renew, owner-only redeem, server-migration descriptor update, post-grace
   release.
-- **Signed resolve over SAM** - query opened with the serving key, a self-verifying
+- **Signed resolve over I2P** - query opened with the serving key, a self-verifying
   record signed by the delegated key + delegation cert, sealed to the response key;
   verified end to end against the client's `verifyResolveRecord` and over the wire.
 - **Web portal** - sign-in-with-key, display-only search, atomic balance-only
@@ -39,7 +39,7 @@ matching the owner's real identity. What is done:
   buying/renewing), and **key rotation** (below).
 - **Key rotation (operator-driven, hot)** - the admin uploads new signing material
   (delegated key PEM + delegation cert), validated against the root anchor and
-  hot-swapped **immediately**, or a new I2P destination key, where a new SAM tunnel
+  hot-swapped **immediately**, or a new I2P destination key, where a new I2P tunnel
   is built and serves **at once** while the old one is **drained**. The root
   fingerprint stays constant; with an offline-key transient of the same master the
   b32 stays constant too.
@@ -52,21 +52,21 @@ matching the owner's real identity. What is done:
   `--dest-transient <file>` and holds only the transient - a compromise leaks at most
   an expiring transient, never the master - and writes **no key to disk**. Every
   transient shares the master's b32, so the hardcoded resolver address is stable and a
-  rotation is a seamless hot-swap (admin upload -> new SAM tunnel + drain of the old).
+  rotation is a seamless hot-swap (admin upload -> new I2P tunnel + drain of the old).
   The `libi2pd` key material is vendored into the offline tool only; the daemon stays
-  a pure SAM consumer of the blob. Without `--dest-transient` the daemon falls back to
+  a pure I2P consumer of the blob. Without `--dest-transient` the daemon falls back to
   a self-generated *persisted* key - a dev convenience for demos, not production
   custody. Live-validated over real I2P: a daemon started on a transient serves the
   master's exact b32, with no key persisted; and the **two-session hot-swap** runs
   end to end - the admin rotates the serving destination to a second transient of the
-  same master, the new SAM session comes up and serves at the **identical b32** while
+  same master, the new I2P destination comes up and serves at the **identical b32** while
   the old one drains, and a fresh client's resolve still reaches the owner over I2P
   (b32 stable across the swap, resolve continuous). The seamless transient hot-swap
   (adopting a newer transient of the same master on the live destination, rather
   than rebuilding it) requires **i2pd >= 2.61.0**: earlier routers dedup the
   re-presented transient and keep signing leasesets with the old one, so the
   destination would go offline at the old transient's expiry. The fix (refresh the
-  offline-signed transient on destination re-create) and a related SAM
+  offline-signed transient on destination re-create) and a related I2P
   session-teardown crash-fix are upstream in i2pd 2.61.0.
 
 This service is intentionally **centralized**: a globally-unique sellable name
@@ -88,7 +88,7 @@ Two faces, one daemon:
    to **i2p (i2pd server tunnel) + clearnet (TLS) + tor (onion)** with their own
    infrastructure; the daemon itself knows nothing about multi-network exposure.
    The portal is the human-facing surface (search, buy, balance, manage).
-2. **Signed resolve API - over SAM/I2P only.** The daemon owns its own I2P
+2. **Signed resolve API - over I2P only.** The daemon owns its own I2P
    destination (offline-key-delegated, see *Key rotation*), whose **b32** is the
    hardcoded resolver address in every client. The full **signed** resolve
    (`FederatedResolve.md`) is served **only here**, for uniformity of client
@@ -97,7 +97,7 @@ Two faces, one daemon:
    contact from.
 
 The registry store and the payment module sit behind the localhost web server;
-SAM is used **only** for the external signed-resolve API.
+the embedded I2P router is used **only** for the external signed-resolve API.
 
 ## Alias syntax
 
@@ -112,7 +112,7 @@ can never be confused.
 
 - **Username search.** Look up a `username`: shows the bound **descriptor**
   (`{fp, srv, srv_key}`, the normal form) if taken, or "free" if available.
-  Display only - the authoritative signed resolve is the SAM path.
+  Display only - the authoritative signed resolve is the I2P path.
 - **Atomic purchase of a free name.** Claim a free `username` -> debit balance ->
   bind to the signed-in account (its `fp`), all under one lock/transaction so two
   buyers cannot race the same name. Purchase is **balance-only**: the buyer must
@@ -196,10 +196,10 @@ length-tier price. There is no per-purchase invoice: the only asynchronous
 payment step is **top-up** (monero invoice -> confirmed -> balance credited);
 purchase and renewal are instant balance debits.
 
-## Signed resolve (SAM-only)
+## Signed resolve (I2P-only)
 
 A client resolves `username` by dialling the resolver's hardcoded b32 over I2P
-(direct transient-SAM preferred; own-server proxy fallback - `FederatedResolve.md`)
+(a direct fetch over a transient I2P destination preferred; own-server proxy fallback - `FederatedResolve.md`)
 and receives a **signed descriptor record**:
 
 ```
@@ -226,7 +226,7 @@ for what is wired today.
 - **I2P destination - I2P offline keys.** The master destination key is offline;
   the **b32 is derived from the master and is stable forever**. Production serves
   with short-lived transients delegated offline by the master. Rotation is a
-  **hot-swap with overlap**: bring up a new SAM session on the next transient (same
+  **hot-swap with overlap**: bring up a new I2P destination on the next transient (same
   master => same b32) -> wait for its leaseset to publish -> switch new accepts over ->
   drain and close the old session. The b32 never changes => **zero downtime, no
   client-visible change**. (Offline-key destinations publish a standard LeaseSet2,
@@ -265,5 +265,5 @@ nodes sell **storage** and **i2pDest** only; subscription is free, captcha-gated
 ## Open / to confirm
 
 - Whether the human web search is rate-limited / captcha-gated against namespace
-  enumeration (the SAM signed path is the automation interface; the web search is
+  enumeration (the I2P signed path is the automation interface; the web search is
   a convenience and may warrant abuse controls).

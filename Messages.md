@@ -205,7 +205,7 @@ design in `api/LargeFiles.md`):
 3. The sender's message (`type: "file"` etc.) carries `{ ptr: base64(sealed
    BlobPointer), size, mime, name }` - all end-to-end encrypted. The pointer
    holds the download URL, the decryption key and the integrity digest.
-4. The recipient fetches the ciphertext over I2P (a transient SAM session
+4. The recipient fetches the ciphertext over I2P (a transient I2P destination
    straight to the blob's b33, or its own server's proxy fetch), verifies the
    digest and decrypts. The store never sees the key and cannot read the content.
 

@@ -12,7 +12,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 | **Service node** | separate daemon (C++) | User management: subscriptions, aliases. Isolated from messaging logic |
 | **Facade** | daemon (C++) | "Last mile" between client and server infrastructure. First implementation: HTTP REST behind a reverse proxy at a secret URI |
 | **Client** | separate repository | Qt6 desktop app (and future bots) |
-| **I2P router** | external dependency | Accessed via SAM API; transport for federation and calls |
+| **I2P router** | embedded, in-process (`libi2pd_bazarish`) | Transport for federation and calls; no external i2pd or SAM bridge |
 | **Storage** | disk or S3-compatible object storage | Pending encrypted content |
 
 ## Topology
@@ -25,9 +25,8 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
                              |             |                   +-> [Service    |
                              |             |                        node]      |
                              |             +.......................|..........+
-                             |                                  [SAM API]
                              |                                      |
-                             |                                 [I2P router] <======> other servers (federation)
+                             |                          [embedded i2pd router] <======> other servers (federation)
 ```
 
 - The server has **no public IP interfaces**. Its only public presence is in hidden networks (I2P first).
