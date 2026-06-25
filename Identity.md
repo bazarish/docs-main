@@ -35,6 +35,17 @@ Status: draft skeleton.
   (recipient, token, messageId) is sealed to the serving sealing key of the
   recipient's destination, whose private half the recipient's server holds. There
   is no single server-wide delivery sealing key (`InviteAnonymity.md`).
+- **Federation signing is per-destination too.** Each serving destination also
+  has its **own signing keypair**, stored bound to that destination together with
+  its serving sealing key - a `(destination, signing key, serving sealing key)`
+  group that is never reused on another destination. It is the only key that signs
+  live federation traffic (the `delivered-ack`, `api/Federation.md`). The server
+  **root identity** (the server card above) signs only **outside** federation -
+  the `bazarish://server` configuration link (`api/Facade.md`) and the
+  service-node binding - so two users one server hosts on different destinations
+  share no signer and cannot be clustered by a common server fingerprint; users
+  sharing a destination share its signing key, which is the same k-anonymity set
+  that already shares the destination (`InviteAnonymity.md`).
 
 ## Certificates
 

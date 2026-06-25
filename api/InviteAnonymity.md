@@ -180,6 +180,27 @@ destinations' serving sealing keys.
 This replaces the single server sealing key carried in the server card; the
 value is no longer shared server-wide.
 
+## Per-destination signing key
+
+The same per-destination binding applies to the key that **signs** live
+federation traffic (the `delivered-ack`, `Federation.md`). Each serving
+destination carries its own signing keypair, stored bound to the destination
+alongside its serving sealing key - a `(destination, signing key, serving sealing
+key)` group, never reused on another destination:
+
+- A **personal** dest has its own signing key (effectively per-user).
+- A **pool** dest has one signing key shared by the free users on that dest - the
+  same k-anonymity set as the dest and its serving sealing key.
+
+This closes the last server-wide signer. A single server-identity ack key would
+let two users the same server hosts on **different** destinations observe the same
+signature key and cluster as co-located - re-introducing exactly the shared-server
+fingerprint this model removes. Binding the signer to the destination means two
+users share an ack key **iff** they already share a destination (and thus a
+k-anonymity set), so it leaks nothing new. The server **root identity** signs only
+outside federation (the server card / `bazarish://server` link, `Facade.md`),
+never a federated message.
+
 ## Subscription certificate vs contact card
 
 The subscription certificate serves two roles today: (a) the lifecycle anchor
@@ -248,7 +269,9 @@ mapping.
   routes, but the target model routes purely by destination.
 - **Accountability** stays per-connecting-destination (`FederationRateLimiter`,
   implemented). The server root key **never** signs live federation traffic;
-  destinations are self-standing and the root only certifies offline.
+  destinations are self-standing and the root only certifies offline. Each
+  destination signs its own `delivered-ack`s with its own per-destination signing
+  key (above), so the signer is never server-wide.
 
 ## Honest accounting (what still leaks)
 
@@ -259,7 +282,8 @@ mapping.
 - Paid personal dests have no co-location signal.
 
 The strongest cross-user clustering field (the shared server fingerprint and the
-byte-identical root-signed card) is gone.
+byte-identical root-signed card) is gone, and live federation now carries no
+server-wide signer either (the `delivered-ack` is signed per destination).
 
 ## Implementation (all phases done)
 

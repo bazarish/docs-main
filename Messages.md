@@ -61,7 +61,7 @@ versioned envelope:
   "type": <content-type string>,
   "id":   <client message id>,
   "from": <sender fingerprint>,
-  "sentAt": <unix seconds>,
+  "sentAt": <unix milliseconds>,   // client send clock; drives ordering and the displayed time
   "replyTo": <id>,            // optional
   ... type-specific fields ...
 }
@@ -167,6 +167,43 @@ itself; unknown `type` within a known `v` is a soft, recoverable condition.
 Namespacing is dotted (`call.invite`, not `call-invite`) so related signals
 group and a client can pattern-match a family (`call.*`) it partially supports.
 
+### Ordering and timestamps
+
+Every content envelope carries `sentAt` as a **unix millisecond** timestamp,
+stamped by the sending client from its own clock at send time. It is the single
+source of truth for both the message's displayed time and its position in the
+conversation: the recipient shows `sentAt`, never the moment the message was
+received. Because sending is asynchronous and store-and-forwarded
+(`api/Federation.md`), several messages written in quick succession can arrive in
+a different order than they were sent; ordering by `sentAt` rather than by arrival
+repairs that.
+
+Placement on arrival of a message with timestamp `t`, where `T` is the
+recipient's local clock at the moment it is received, follows one rule:
+
+- **Recent (`T - t <= 5000` ms)** - place the message in `sentAt` order. This is
+  the common case (a burst of messages whose hops scrambled their arrival), and
+  reordering then only touches the last few lines, which are already in view, so
+  nothing shifts outside the user's viewport.
+- **Late (`T - t > 5000` ms)** - **append** the message at the end as a fresh
+  arrival; do **not** reposition it by `sentAt`. Its displayed time is still its
+  own (older) `sentAt`, so the user still sees when it was written, but it lands at
+  the bottom where an arrival is expected. A long-delayed message (the sender was
+  offline, a slow relay) must not silently insert itself up in the history, above
+  the fold, where a reader with the chat open would never notice it appear.
+
+Concretely each message gets a stable **order key**: its `sentAt` for a recent
+arrival, the local arrival time `T` for a late one. The conversation is kept
+sorted by the order key, which makes the two cases compose without conflict: a
+genuinely new message (order key ~= its `sentAt`, i.e. ~= now) always sorts after
+a late message anchored at its earlier arrival time, and the late message never
+jumps ahead of newer traffic. The 5 s window is precisely what stops the
+"don't reorder old arrivals" rule from disturbing the live ordering of new ones -
+old arrivals are pinned at the bottom, recent ones are sorted among themselves.
+
+Group messages order the same way (`Groups.md`); with multiple senders it is
+best-effort, since each `sentAt` is its own sender's clock.
+
 ## Delivery status
 
 An outgoing message advances through three observable states, each from a
@@ -176,7 +213,7 @@ actually travelled:
 | Tick | State | Source |
 |---|---|---|
 | **grey** (single) | Accepted by the **sender's own server** (it took the sealed envelope into its outbound buffer). | The sender's client, when its `submit` is accepted (local knowledge). Instant on the LAN facade - the submit never blocks on federation. |
-| **yellow** (double) | Stored by the **recipient's server** (handed into the recipient's mailbox). | The recipient's server, via a **signed `delivered-ack`** it federates back to the sender's server (`api/Federation.md`); the sender's client learns it by polling the send attempt. |
+| **yellow** (double) | Stored by the **recipient's server** (handed into the recipient's mailbox). | The recipient's server, via a **signed `delivered-ack`** it federates back to the sender's server (`api/Federation.md`); the sender's client learns it by polling the send attempt. When the recipient shares the sender's own destination the store is local and this is set **synchronously**, with no federated ack. |
 | **green** (double) | **Read** by the recipient - the chat is open, focused and the message scrolled into view. | The recipient's client (a read `receipt` content message). Toggleable - a client may decline to send receipts. |
 
 Grey and yellow are transport facts the sender learns without the recipient's

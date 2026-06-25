@@ -104,8 +104,10 @@ is the message-level counterpart.
 
 ### Known limits (v1)
 
-- **Ordering** is best-effort by `sentAt` plus local arrival; there is no global
-  order.
+- **Ordering** follows the same `sentAt` (unix ms) rule as one-to-one chats
+  (`Messages.md`): recent arrivals are sorted by `sentAt`, late ones are appended.
+  With multiple senders it stays best-effort - each `sentAt` is its own sender's
+  clock - so there is no global order.
 - **Attachment fan-out** costs xN uplink (one blob-storage upload, N pointers -
   the sealed blob pointer rides each member's sealed message). Mitigations deferred.
 - **Scale** <= ~100 members (see *Decided direction*). Larger broadcast is a

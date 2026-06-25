@@ -42,7 +42,7 @@ The synchronous `response` is **best-effort**: its return leg over the recipient
 delivered-ack:  {"op":"delivered-ack","messageId":<id>,"signerPub":<base64>,"sig":<base64>}\n
 ```
 
-The recipient opens a **fresh outbound connection from the serving destination that received the delivery** back to the sender's serving destination, and signs `messageId` with the server's identity key (`signerPub` carries the public half). The sender verifies the signature and that the `messageId` matches a pending send attempt - and since `messageId` is sealed inside the envelope, only a server that actually unsealed it can know it, so the ack doubles as a capability. On a verified ack the attempt is marked **delivered** (the yellow tick, `../Messages.md`) and the delivery job stops retrying. A `delivered-ack` gets no reply; the side that sent it keeps the connection open until the receiver closes, so the single line flushes before teardown.
+The recipient opens a **fresh outbound connection from the serving destination that received the delivery** back to the sender's serving destination, and signs `messageId` with that **serving destination's own per-destination signing key** (`signerPub` carries the public half; see *Authentication*) - never the server's root identity. The sender verifies the signature and that the `messageId` matches a pending send attempt - and since `messageId` is sealed inside the envelope, only a server that actually unsealed it can know it, so the ack doubles as a capability. On a verified ack the attempt is marked **delivered** (the yellow tick, `../Messages.md`) and the delivery job stops retrying. A `delivered-ack` gets no reply; the side that sent it keeps the connection open until the receiver closes, so the single line flushes before teardown.
 
 Operational note: a freshly created destination must publish its leaseset before peers can reach it; the first connect after startup may return `CANT_REACH_PEER` ("LeaseSet not found") and should be retried with backoff. Verified end to end against a live i2pd (`i2p-federation-smoke`, and the full cross-server `demo-federation-i2p.sh`).
 
@@ -69,6 +69,15 @@ co-located recipient the same server hosts on a *different* serving dest - is
 federated (the sender's serving dest dials the recipient's serving dest, two
 distinct destinations) so delivery latency cannot reveal co-location
 (`InviteAnonymity.md`).
+
+For that shared-destination case the confirmation is also **synchronous and
+local**: the server marks the attempt **delivered** the instant it stores the
+message, with **no** federated `delivered-ack` (the yellow tick is immediate, no
+I2P round-trip). An ack here would be both pointless - the two parties share the
+destination by construction, so there is no co-location timing channel to mask -
+and impossible, since it would require the destination to dial itself. The
+federated `delivered-ack` below is therefore only for delivery to a *different*
+destination.
 
 ## Delivery envelope
 
@@ -176,6 +185,20 @@ coordinate into the client) remains.
   implemented). The server root key **never** signs live federation traffic -
   destinations are self-standing and the root only certifies offline; this keeps
   the connection origin from being a server-identifying signal.
+- The only key that signs live federation traffic is the **per-destination
+  signing key**: every serving destination (home, each pool dest, each personal
+  dest) carries its own signing keypair, persisted **bound to the destination**
+  together with its serving sealing key - a `(destination, signing key, serving
+  sealing key)` group, never reused on another destination. It signs that
+  destination's `delivered-ack`s and nothing else. The **server root identity** is
+  a separate crypto-identity used only **outside** federation - the server card /
+  `bazarish://server` configuration link (`Facade.md`) and the service-node
+  binding - and never signs a federated message. Consequently two users the same
+  server hosts on **different** destinations share no signing key and no
+  fingerprint, so there is no server-wide signer to cluster them as co-located;
+  users on **one** destination (a pool's k-anonymity set, `InviteAnonymity.md`)
+  share that destination's signing key, which reveals nothing beyond the
+  destination - and its serving sealing key - they already share.
 
 ## Open questions
 

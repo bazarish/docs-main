@@ -32,7 +32,7 @@ sealed end-to-end like any message.
 ### `bot.command` - a command invocation
 
 ```
-{ "v": 1, "type": "bot.command", "id": <id>, "from": <fp>, "sentAt": <unix>,
+{ "v": 1, "type": "bot.command", "id": <id>, "from": <fp>, "sentAt": <unix ms>,
   "command": "help",        // command name, without a leading slash
   "args": "extra arguments" // raw argument string (may be empty)
 }
@@ -50,7 +50,7 @@ buttons rendered under the message. The field is purely additive - a client that
 does not understand keyboards still renders the message body.
 
 ```
-{ "v": 1, "type": "text", "id": <id>, "from": <fp>, "sentAt": <unix>,
+{ "v": 1, "type": "text", "id": <id>, "from": <fp>, "sentAt": <unix ms>,
   "text": "Pick one:",
   "keyboard": [
     [ { "text": "Ping", "data": "ping" }, { "text": "Time", "data": "time" } ],
@@ -73,7 +73,7 @@ content type of its own and never appears in Layer 1.
 ### `bot.callback` - a button press
 
 ```
-{ "v": 1, "type": "bot.callback", "id": <id>, "from": <fp>, "sentAt": <unix>,
+{ "v": 1, "type": "bot.callback", "id": <id>, "from": <fp>, "sentAt": <unix ms>,
   "data": "ping",     // the tapped button's payload
   "ref": <keyboard message id>  // which message's keyboard was tapped
 }
