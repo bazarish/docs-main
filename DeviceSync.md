@@ -49,6 +49,15 @@ Two devices may race to spend the same token from the shared per-contact stash. 
 - Any device can retire a client ID (lost/stolen device included). The server immediately **re-evaluates ack-completeness** of pending content: blobs that were waiting only on the retired client are deleted.
 - **Honest limitation:** with a shared identity key, a stolen device keeps the identity forever - retirement stops deliveries to it but cannot revoke the key. A token epoch reset limits mailbox abuse; the identity itself is unrecoverable. Per-device keys with cross-signing are the known evolution path if this risk proves unacceptable in practice.
 
+## Profile sync (avatar & contact names)
+
+Two pieces of profile state propagate to the user's other devices as dedicated **self-messages** - sealed to the user's own key and delivered to their own destination - independent of the journal above:
+
+- `device.avatar` - the user's own avatar, re-sent whenever it changes.
+- `device.contact-name` - a local contact rename, carrying `peer` (fingerprint) and the new `name`.
+
+Both are local-only facts that must never reach a contact, so they travel the self-channel exclusively. The routing-key sibling `device.i2p-master` (preserving the user's I2P address across devices, see `Identity.md`) uses the same mechanism. Wire shapes are in `Messages.md`.
+
 ## Quota interplay
 
 `message-echo` with attachments doubles outgoing traffic and transiently occupies the user's own quota: echo blobs live only until all registered clients fetch them, so with normally-online devices the pressure is brief. An offline device accumulates echoes up to the retention period - heavy attachment use on the free tier (10 MB) will hit the quota; this is an accepted tradeoff, to be revisited if practice shows pain.

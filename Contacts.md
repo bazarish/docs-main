@@ -42,6 +42,12 @@ A is not B's contact and B is not A's - the first exchange must bootstrap both d
 
 Contact requests are the only tokenless path into a mailbox; they get a separate small quota and per-origin-server rate limiting.
 
+## Display names and avatars
+
+A contact's **display name** is a local label, captured once at add time - from the invite descriptor's optional `name` or from the alias used - and never transmitted to, or refreshed from, the peer. A later rename is local, mirrored only to the user's own devices (`DeviceSync.md`).
+
+A user's **avatar** (square, compressed client-side to <= 500 KB) is exchanged only **after the dialog is mutually established**: the accepting reply carries the accepter's avatar, and the requester sends theirs on receiving that acceptance. A bare contact request neither carries an avatar nor triggers an automatic avatar reply, so nothing of a user's picture leaks to a party who has not yet been accepted. Both ride the silent `avatar` (and self-channel `device.*`) content types in `Messages.md`.
+
 ## First-contact discovery and co-location
 
 Before A can send the contact request above it must learn B's routing (`{ sealing prekey, dest, servingKey }`). Two discovery paths exist:

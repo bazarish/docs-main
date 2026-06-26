@@ -11,12 +11,16 @@ transport in `Federation.md`.
 
 - **Descriptor** - a small, single-QR pointer:
   ```
-  bazarish://invite?v=1&fp=<52-char base32 fingerprint>&srv=<b33>.b32.i2p&srv_key=<base64 SPKI>
+  bazarish://invite?v=1&fp=<52-char base32 fingerprint>&srv=<b33>.b32.i2p&srv_key=<base64 SPKI>[&name=<percent-encoded>]
   ```
   identity (`fp`) + route to the user's server (`srv`, a `.b32.i2p` host) + that
-  server's serving/resolve sealing key (`srv_key`). Rendered for humans as
-  `fp:b33` (the `:` distinguishes it from an alias); the full link/QR also carries
-  `srv_key`. It does **not** contain the contact card - it points at one.
+  server's serving/resolve sealing key (`srv_key`), plus an optional `name` the
+  inviter advertises (percent-encoded). The recipient adopts `name` as the
+  contact's local display name at add time - a one-time static label, never
+  re-fetched or transmitted afterwards (`Messages.md`). Older invites omit it.
+  Rendered for humans as `fp:b33` (the `:` distinguishes it from an alias); the
+  full link/QR also carries `srv_key`. It does **not** contain the contact card -
+  it points at one.
 - **Contact card** - the user-signed subscription certificate (`prekey`, `dest`,
   `servingSealingKey`; ~= 8 KB), fetched live and verified against `fp`
   (`../Identity.md`).

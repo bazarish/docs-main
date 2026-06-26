@@ -82,7 +82,12 @@ versioned envelope:
 | `receipt` | content | `ref` (the read message's `id`). A **read** receipt - the recipient's client sends it only on a genuine read (the chat is open, the app window focused, and the message scrolled into the visible area), confirming the "green" delivery state below. `ref` is the newest read incoming id, so it acknowledges that message and every earlier one (a read high-water). Optional/toggleable. |
 | `bot.command` | content | A command invocation aimed at a bot: `command` (name, no leading slash), `args` (raw argument string). See *Bots & interactive messages*. |
 | `bot.callback` | content | An inline-keyboard button press: `data` (the button's payload), `ref` (the `id` of the keyboard message). See *Bots & interactive messages*. |
-| `edit` | content | An in-place edit of a message the sender previously sent: `ref` (the target message's `id`), `text` (new text), `keyboard` (new inline keyboard, `[]` to clear). The recipient replaces its copy. Applied only to a message `from` actually sent. See *Editing messages*. |
+| `edit` | content | An in-place edit of a message the sender previously sent: `ref` (the target message's `id`), `text` (new text), `keyboard` (new inline keyboard, `[]` to clear). The recipient replaces its copy. Applied only to a message `from` actually sent. See *Editing and deleting messages*. |
+| `delete` | content | A delete-for-everyone of a message the sender previously sent: `ref` (the target message's `id`). The recipient removes its copy with **no tombstone** left behind. Scoped, like `edit`, to a message `from` actually sent. See *Editing and deleting messages*. |
+| `avatar` | content | The sender's profile photo pushed to a contact: `avatar` = `{ mime, data }`, `data` being base64 of a square PNG/JPEG compressed client-side to at most **500 KB**. A silent service message - stored as that contact's picture, never shown as a chat bubble. Sent once the dialog is mutually established and re-sent to every contact when the avatar changes. See *Avatars and display names* and `Contacts.md`. |
+| `device.avatar` | contact | Self-sync of the user's own avatar to their other devices: the same `avatar` block, sealed to the user's own key and delivered to their own destination. See `DeviceSync.md`. |
+| `device.contact-name` | contact | Self-sync of a local contact rename to the user's other devices: `peer` (fingerprint), `name`. A purely local label, never sent to the contact. See `DeviceSync.md`. |
+| `device.i2p-master` | contact | Self-sync of the user's own I2P master key to their other devices: `i2pMaster` (base64), sealed to the user's own key and delivered to their own destination, so every device keeps the same personal address. Applied only when `from` is the user themselves. See `DeviceSync.md`, `Identity.md`. |
 | `group.invite` | content | Adds a recipient to a group: `groupId`, `name`, `roster` (b64 signed roster). See `Groups.md`. |
 | `group.tokens` | contact | A member's one-time token pool for a group: `groupId`, `tokens`. Tokenless distribution. See `Groups.md`. |
 | `group.roster` | contact | A signed roster update (membership/admin/epoch). Sent over the tokenless contact class so a critical update never fails on a drained pool. See `Groups.md`. |
@@ -138,7 +143,7 @@ Because all three are `content`-class deliveries, the server, facades,
 federation and storage are unchanged and never learn that a conversation
 involved a bot. The full model and the reference bot runtime are in `Bots.md`.
 
-### Editing messages
+### Editing and deleting messages
 
 A sender can revise a message it already sent with an `edit` (above): the
 recipient finds the message whose `id` equals `ref` and replaces its `text` and
@@ -150,11 +155,50 @@ recipient finds the message whose `id` equals `ref` and replaces its `text` and
 - **Users** edit their own line: the client updates its local copy and sends an
   `edit` so the peer updates theirs.
 
-A client applies an `edit` **only** to a message the `from` party actually sent
-(for a recipient, an incoming message from that peer); it must not let a peer
-rewrite messages it did not author. There is no separate "delete"; an edit to
-empty text is the closest equivalent. History of prior revisions is not
-retained by the protocol (a client may keep its own).
+A `delete` is the sibling primitive: the recipient removes the message whose `id`
+equals `ref` outright, leaving **no tombstone** (a true delete-for-everyone, not
+an empty edit). The client always removes its own copy; for a one-to-one message
+it sends the `delete` so the peer removes theirs too.
+
+A client applies an `edit` or a `delete` **only** to a message the `from` party
+actually sent (for a recipient, an incoming message from that peer); it must not
+let a peer rewrite or remove messages it did not author. History of prior
+revisions is not retained by the protocol (a client may keep its own).
+
+### Avatars and display names
+
+A contact's **display name** and **avatar** are local, recipient-side facts.
+Neither is part of the live message stream, and a peer is never an authority on
+how you label or picture them.
+
+**Display name.** A name is captured **once, at add time** and kept as a local
+label:
+
+- From an **invite**, the descriptor carries an optional `name` (percent-encoded,
+  `api/FederatedResolve.md`) the inviter advertises; the adder adopts it.
+- From an **alias**, the alias the user typed becomes the name.
+
+Thereafter the name is **static**: it is never re-fetched and never transmitted to
+the peer - there is no "my name changed" message. The user may rename a contact
+at any time, but that rename is **local only**, mirrored to the user's *own* other
+devices via a `device.contact-name` self-message (`DeviceSync.md`) and to no one
+else.
+
+**Avatar.** A user's own avatar is chosen locally, cropped **square** and
+compressed (PNG/JPEG) to at most **500 KB** before it leaves the device (the
+protocol rejects a larger one). It travels as a silent `avatar` service message -
+stored as the sender's picture, never rendered as a chat bubble:
+
+- **On establishing a dialog** - exchanged symmetrically the moment the dialog is
+  mutually established: the reply that accepts a contact request carries the
+  accepter's avatar, and the original requester sends theirs on receiving that
+  acceptance. A bare `contact.request` never carries an avatar and never triggers
+  an automatic avatar reply, so nothing of a user's picture reaches a party who
+  has not yet been accepted (`Contacts.md`).
+- **On change** - re-sent to every established contact, best-effort, with no
+  user-visible send error.
+- **To the user's own devices** - via a `device.avatar` self-message
+  (`DeviceSync.md`).
 
 ### Forward compatibility
 

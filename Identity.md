@@ -105,8 +105,10 @@ sealed via the client's own server), so the requester's own server never learns 
 ### Out-of-band invites (the descriptor)
 
 A contact is shared out of band as a small **descriptor** - `<fingerprint>:<b33>`,
-or the link `bazarish://invite?fp=...&srv=...&srv_key=...`: identity + serving
-destination + the server's serving sealing key. It fits a single QR. The recipient
+or the link `bazarish://invite?fp=...&srv=...&srv_key=...[&name=...]`: identity +
+serving destination + the server's serving sealing key, plus an optional advertised
+display name the recipient adopts at add time (static thereafter; see `Messages.md`).
+It fits a single QR. The recipient
 fetches the user-signed **contact card** for that fingerprint from the destination
 and verifies it against the fingerprint, so the binding is cryptographic and
 intermediaries are trusted for availability only. This replaces the earlier
