@@ -186,7 +186,7 @@ source feeding both the discovery advertisement and the buy endpoints (see
 {
   "gateway": { "type": "monerod", "params": { "url": "...", "user": "...", "password": "...", "minconf": "10", "callback_secret": "..." } },
   "settlementCurrency": "XMR",
-  "freeStorageBytes": 10485760,
+  "freeStorageBytes": 52428800,
   "services": {
     "i2pDest":  { "enabled": true, "priceAtomic": "...", "periodDays": 30 },
     "storage":  { "enabled": true, "priceAtomic": "...", "periodDays": 30, "quotaBytes": ... }
