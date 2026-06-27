@@ -93,7 +93,7 @@ versioned envelope:
 | `group.invite` | content | Adds a recipient to a group: `groupId`, `name`, `roster` (b64 signed roster). See `Groups.md`. |
 | `group.tokens` | contact | A member's one-time token pool for a group: `groupId`, `tokens`. Tokenless distribution. See `Groups.md`. |
 | `group.roster` | contact | A signed roster update (membership/admin/epoch). Sent over the tokenless contact class so a critical update never fails on a drained pool. See `Groups.md`. |
-| `group.leave` | contact | The sender is leaving a group: `groupId`. See `Groups.md`. |
+| `group.leave` | contact | The sender is leaving a group: `groupId`, plus a `gsig` signing `{type, groupId, from}`. Self-service (any member, no admin): the recipient removes **only the signer**, so a member cannot forge another member's removal. See `Groups.md`. |
 | `group.avatar` | content | Sets the group photo (**admin only**): `avatar` = `{ mime, data }` (same 500 KB square cap as `avatar`), carried as a signed group message. Recipients store it as the group's picture **and** show a "set the group photo" bubble from the setter. Dropped if the signer is not a current admin. See `Groups.md`. |
 | `group.rename` | content | A group rename notice (**admin only**): `text` = the new name, as a signed group message. The authoritative name is carried by the roster (`group.roster`); this is the highlighted "changed the group name" bubble. Dropped if the signer is not a current admin. See `Groups.md`. |
 | `call.invite` | content | Places an audio call: `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b32), `key` (base64 per-call media key). See `api/Calls.md`. |

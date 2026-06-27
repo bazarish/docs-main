@@ -36,11 +36,26 @@ identity fingerprint on verification):
 Each member entry carries everything needed to deliver to that member (their user
 sealing key, their serving destination, and that destination's serving sealing
 key), so a member learns how to reach **every** other member from the roster
-alone - no per-member contact lookup. A recipient **verifies** the embedded signature, checks the signer's
-fingerprint is in `admins`, and only then trusts the body. The trust anchor for a
-fresh member is the inviter (a known contact) who signed/forwarded the first
-roster; later rosters are accepted when signed by any listed admin and carrying a
-**higher `epoch`**.
+alone - no per-member contact lookup.
+
+**Admin authority is anchored, never self-asserted.** A recipient verifies the
+embedded signature and then decides whether to trust the body as follows:
+
+- For a group it **already holds**, the signer must be an admin the recipient
+  **already recognizes** (an admin in the recipient's current roster). The
+  incoming roster's own `admins` array is **not** consulted for this decision -
+  consulting it would be circular: any member could sign a roster that lists
+  themselves as admin and take the group over. This is the critical rule that
+  makes "only an admin may change the name/photo/membership" a **cryptographic**
+  guarantee, not a UI restriction. A roster signed by a non-admin (even one that
+  names itself admin) is rejected.
+- Only the **first** roster a member ever sees for a group - delivered as a
+  `group.invite` (trust on first use, via the inviting contact) - may establish
+  the initial admin set from its own `admins`. A `group.roster` for a group the
+  recipient does not hold is rejected (it cannot bootstrap an admin set).
+
+Later rosters must also carry a `epoch` **>=** the one held (a lower epoch is
+stale and ignored), so a captured older roster cannot roll membership back.
 
 ### Token pools, distributed tokenless
 
@@ -59,7 +74,7 @@ member spends one token from the **recipient's** pool, per recipient.
 | `group.invite` | content | Bootstrap to a new member: `groupId`, `name`, `roster` (b64 signed roster). Sent by an admin over an established contact. |
 | `group.tokens` | contact | A member's pool for the group: `groupId`, `tokens` (b64 one-time tokens). Tokenless distribution to each member. |
 | `group.roster` | contact | A roster update (membership/admin/epoch change), `roster` (b64 signed). Broadcast to all members over the tokenless contact class, so a critical update is not lost to a drained pool. |
-| `group.leave` | contact | The sender is leaving: `groupId`. |
+| `group.leave` | contact | The sender is leaving: `groupId`, plus a `gsig` over `{type, groupId, from}`. The recipient removes **only the signer** (the signed `from` must equal the verified signer), so a member can remove themselves but cannot forge another member's removal. |
 | `group.avatar` | content | **Admin only.** Sets the group photo: `avatar` = `{ mime, data }` (square PNG/JPEG, <= 500 KB). A signed group message: recipients store it as the group's picture **and** surface a "set the group photo" bubble from the setter. Dropped if the signer is not a current admin. |
 | `group.rename` | content | **Admin only.** A rename notice: `text` = the new name. A signed group message that surfaces a "changed the group name" bubble. The **authoritative** name is the one in the roster (`group.roster`, epoch-protected); this is the highlighted notice only. Dropped if the signer is not a current admin. |
 | `group` field | - | Any content message (`text`, `file`, ...) may carry `"group": { "id": <groupId> }`. It rides the existing type; the recipient files it under that group. Not a type of its own. |
@@ -80,23 +95,31 @@ name) and a `replyTo` field (`Messages.md`). `dn` is inside the signed body
 - **Send.** For each member != self, seal the inner payload (with the `group`
   field) to that member and deliver `content`-class with one of *their* pool
   tokens - N-1 individual sends, the client's own pacing/jitter (no batch API).
-- **Remove.** An admin signs a new roster (without the member, `epoch+1`) and
-  broadcasts a `group.roster`; every member revokes the pool tokens it issued
-  (deletes the hashes at its server) and broadcasts a **fresh** `group.tokens` to
-  the remaining members. The removed member's stale tokens stop working at the
-  servers, so it can no longer deliver into the group.
+- **Remove (admin action).** Removing *another* member is an admin privilege: an
+  admin signs a new roster (without the member, `epoch+1`) and broadcasts a
+  `group.roster`. Recipients apply it only because the signer is an admin they
+  already recognize (see *Signed roster*); a non-admin's removal attempt is
+  rejected. Every member then revokes the pool tokens it issued (deletes the
+  hashes at its server) and broadcasts a **fresh** `group.tokens` to the remaining
+  members, so the removed member's stale tokens stop working at the servers and it
+  can no longer deliver into the group. (Removing *oneself* is **Leave**, below,
+  and needs no admin.)
 - **Rename / set photo.** An **admin** renames the group or sets its photo. A
   rename bumps the epoch and broadcasts a fresh `group.roster` (the authoritative
   name) plus a `group.rename` notice; a photo broadcasts a `group.avatar`. Both
   are signed group messages; recipients drop one whose signer is not a current
   admin. The photo is **not** in the roster, so a member added later does not
   receive an existing photo until it is next set.
-- **Leave.** A member sends `group.leave`, revokes the pool it issued (so no
-  member can deliver to it in this group again), erases its local group state and
-  transcript, and **tombstones** the `groupId`. A tombstoned id is never
-  re-created from a late item (a stray roster/token/content message a member sent
-  before the revocation reached them is dropped on sync), so the deleted chat
-  cannot reappear. A genuine re-`group.invite` lifts the tombstone.
+- **Leave (self-service).** **Any** member can leave on their own, with no admin
+  involvement: it sends a **signed** `group.leave`, revokes the pool it issued (so
+  no member can deliver to it in this group again), erases its local group state
+  and transcript, and **tombstones** the `groupId`. Each recipient verifies the
+  signature and removes exactly the signer (a member cannot forge another's
+  leave). A tombstoned id is never re-created from a late item (a stray
+  roster/token/content message a member sent before the revocation reached them is
+  dropped on sync), so the deleted chat cannot reappear. A genuine re-`group.invite`
+  lifts the tombstone. Admins later fold the departure into the next roster; until
+  then, current members already stop addressing the departed member.
 - **Refill.** As in direct messaging (`Contacts.md`), a member whose issued pool
   is running low broadcasts a fresh `group.tokens`.
 
