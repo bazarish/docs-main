@@ -110,6 +110,11 @@ name) and a `replyTo` field (`Messages.md`). `dn` is inside the signed body
   are signed group messages; recipients drop one whose signer is not a current
   admin. The photo is **not** in the roster, so a member added later does not
   receive an existing photo until it is next set.
+- **Promote / demote admin.** An admin grants or revokes another member's admin
+  flag: it bumps the epoch and broadcasts a fresh `group.roster`. Recipients apply
+  it because the signer is an admin they already recognize; a newly-promoted member
+  becomes a recognized admin for subsequent updates. This is the multi-admin
+  governance that lets a group survive the creator's account loss.
 - **Leave (self-service).** **Any** member can leave on their own, with no admin
   involvement: it sends a **signed** `group.leave`, revokes the pool it issued (so
   no member can deliver to it in this group again), erases its local group state
