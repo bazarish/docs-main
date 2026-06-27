@@ -60,7 +60,13 @@ member spends one token from the **recipient's** pool, per recipient.
 | `group.tokens` | contact | A member's pool for the group: `groupId`, `tokens` (b64 one-time tokens). Tokenless distribution to each member. |
 | `group.roster` | contact | A roster update (membership/admin/epoch change), `roster` (b64 signed). Broadcast to all members over the tokenless contact class, so a critical update is not lost to a drained pool. |
 | `group.leave` | contact | The sender is leaving: `groupId`. |
+| `group.avatar` | content | **Admin only.** Sets the group photo: `avatar` = `{ mime, data }` (square PNG/JPEG, <= 500 KB). A signed group message: recipients store it as the group's picture **and** surface a "set the group photo" bubble from the setter. Dropped if the signer is not a current admin. |
+| `group.rename` | content | **Admin only.** A rename notice: `text` = the new name. A signed group message that surfaces a "changed the group name" bubble. The **authoritative** name is the one in the roster (`group.roster`, epoch-protected); this is the highlighted notice only. Dropped if the signer is not a current admin. |
 | `group` field | - | Any content message (`text`, `file`, ...) may carry `"group": { "id": <groupId> }`. It rides the existing type; the recipient files it under that group. Not a type of its own. |
+
+A group content message may also carry a `dn` field (the sender's own display
+name) and a `replyTo` field (`Messages.md`). `dn` is inside the signed body
+(below), so it cannot be spoofed onto another member.
 
 ### Lifecycle
 
@@ -79,8 +85,18 @@ member spends one token from the **recipient's** pool, per recipient.
   (deletes the hashes at its server) and broadcasts a **fresh** `group.tokens` to
   the remaining members. The removed member's stale tokens stop working at the
   servers, so it can no longer deliver into the group.
-- **Leave.** A member sends `group.leave` and drops its state; admins fold the
-  departure into the next roster.
+- **Rename / set photo.** An **admin** renames the group or sets its photo. A
+  rename bumps the epoch and broadcasts a fresh `group.roster` (the authoritative
+  name) plus a `group.rename` notice; a photo broadcasts a `group.avatar`. Both
+  are signed group messages; recipients drop one whose signer is not a current
+  admin. The photo is **not** in the roster, so a member added later does not
+  receive an existing photo until it is next set.
+- **Leave.** A member sends `group.leave`, revokes the pool it issued (so no
+  member can deliver to it in this group again), erases its local group state and
+  transcript, and **tombstones** the `groupId`. A tombstoned id is never
+  re-created from a late item (a stray roster/token/content message a member sent
+  before the revocation reached them is dropped on sync), so the deleted chat
+  cannot reappear. A genuine re-`group.invite` lifts the tombstone.
 - **Refill.** As in direct messaging (`Contacts.md`), a member whose issued pool
   is running low broadcasts a fresh `group.tokens`.
 
@@ -90,17 +106,43 @@ A shared pool means the delivery token no longer identifies the sender (unlike a
 one-to-one stash), so each group **content** message carries a per-message hybrid
 signature, `gsig`. The sender signs `{type, id, from, groupId, sentAt, text}` with
 their identity key (`cms::signJsonHybrid` - the same self-contained hybrid-PQ
-signature the roster uses, which yields the signer's identity fingerprint). On
-receipt the recipient verifies it and takes the signature's **identity
-fingerprint as the authoritative sender**, requiring that it equals the message's
-`from`, matches the signed identifying/content fields, and - for a group it
-already knows - is a current member. Anything unsigned, malformed,
+signature the roster uses, which yields the signer's identity fingerprint). The
+signed body also includes the sender's own display name `dn`, so a member cannot
+put a different self-name on another member's message; `edit`/`group.rename`
+likewise sign their `ref`/name. On receipt the recipient verifies it and takes
+the signature's **identity fingerprint as the authoritative sender**, requiring
+that it equals the message's `from`, matches the signed identifying/content
+fields, and - for a group it already knows - is a current member. For the
+admin-only `group.avatar` and `group.rename`, the recipient additionally requires
+the verified signer to be a current **admin**. Anything unsigned, malformed,
 field-mismatched, or from a non-member is **dropped, never surfaced**, so a member
 cannot forge another member's `from`. (A message that arrives before its roster
 defers only the membership check; the signature's from-authenticity is still
 enforced.) `gsig` rides inside the E2E-sealed content, so it is invisible to
 servers. The roster (membership/governance) keeps its own admin signature; this
 is the message-level counterpart.
+
+### Member display names
+
+A group message carries the sender's own display name in `dn` (signed, above). A
+reader shows a member by the **local contact name** they keep for them, if any;
+otherwise by that `dn` (the member's self-chosen name, rendered in a distinct
+colour as unverified) with the short fingerprint beneath it; otherwise by the
+short fingerprint alone. `dn` is learned and cached per member as their messages
+arrive; the fingerprint, shown for any non-contact, stays the ground truth.
+
+### Adding a member as a contact
+
+A member can add another member as a one-to-one contact straight from the roster,
+without an invite link or alias. The routing comes from the (admin-signed)
+roster, but the contact **card is fetched and verified end-to-end against the
+fingerprint** (`Contacts.md`) - so a hostile admin who forged a member's routing
+can only make the add **fail**, never substitute a key. The request is a direct,
+E2E-sealed `contact.request` to that member **only** - it is never a group
+message, so no other member sees it, and the two parties exchange nothing else
+until the member agrees (the standard request -> `contact.accept` handshake in
+`Contacts.md`). The group roster is unchanged; the new contact and its chat are
+private to the two parties.
 
 ### Known limits (v1)
 

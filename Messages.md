@@ -73,6 +73,7 @@ versioned envelope:
 |---|---|---|
 | `text` | content | `text` - a plain text line. |
 | `contact.request` | contact | Carries a `bootstrap` block (`sealing` prekey, `dest`, `servingKey`, `replyTokens`) plus `text`. The first message; see `Contacts.md`. |
+| `contact.accept` | content | Agreeing to a received `contact.request`: an empty-bodied message whose first-reply `bootstrap` hands the requester our descriptor + reply tokens, making the pair mutual contacts. The requester's client auto-completes the add and surfaces a note. See `Contacts.md`. |
 | `token-refill` | content | `replyTokens` - a fresh stash when the peer's drops low (`Contacts.md`). |
 | `file` | content | A sealed blob-storage pointer `ptr` (base64) - the encrypted blob lives in blob storage, fetched over I2P. See *Media* below and `api/LargeFiles.md`. |
 | `photo` | content | Same shape as `file`, plus optional `width`, `height`. |
@@ -84,6 +85,7 @@ versioned envelope:
 | `bot.callback` | content | An inline-keyboard button press: `data` (the button's payload), `ref` (the `id` of the keyboard message). See *Bots & interactive messages*. |
 | `edit` | content | An in-place edit of a message the sender previously sent: `ref` (the target message's `id`), `text` (new text), `keyboard` (new inline keyboard, `[]` to clear). The recipient replaces its copy. Applied only to a message `from` actually sent. See *Editing and deleting messages*. |
 | `delete` | content | A delete-for-everyone of a message the sender previously sent: `ref` (the target message's `id`). The recipient removes its copy with **no tombstone** left behind. Scoped, like `edit`, to a message `from` actually sent. See *Editing and deleting messages*. |
+| `chat.clear` | content | Asks the peer to clear the **whole** one-to-one conversation with the sender (no `ref`). The recipient's client wipes its transcript with `from` and leaves a single "cleared the chat" notice. The chat itself remains. The "clear for everyone" choice in the chat-info panel. |
 | `avatar` | content | The sender's profile photo pushed to a contact: `avatar` = `{ mime, data }`, `data` being base64 of a square PNG/JPEG compressed client-side to at most **500 KB**. A silent service message - stored as that contact's picture, never shown as a chat bubble. Sent once the dialog is mutually established and re-sent to every contact when the avatar changes. See *Avatars and display names* and `Contacts.md`. |
 | `device.avatar` | contact | Self-sync of the user's own avatar to their other devices: the same `avatar` block, sealed to the user's own key and delivered to their own destination. See `DeviceSync.md`. |
 | `device.contact-name` | contact | Self-sync of a local contact rename to the user's other devices: `peer` (fingerprint), `name`. A purely local label, never sent to the contact. See `DeviceSync.md`. |
@@ -92,6 +94,8 @@ versioned envelope:
 | `group.tokens` | contact | A member's one-time token pool for a group: `groupId`, `tokens`. Tokenless distribution. See `Groups.md`. |
 | `group.roster` | contact | A signed roster update (membership/admin/epoch). Sent over the tokenless contact class so a critical update never fails on a drained pool. See `Groups.md`. |
 | `group.leave` | contact | The sender is leaving a group: `groupId`. See `Groups.md`. |
+| `group.avatar` | content | Sets the group photo (**admin only**): `avatar` = `{ mime, data }` (same 500 KB square cap as `avatar`), carried as a signed group message. Recipients store it as the group's picture **and** show a "set the group photo" bubble from the setter. Dropped if the signer is not a current admin. See `Groups.md`. |
+| `group.rename` | content | A group rename notice (**admin only**): `text` = the new name, as a signed group message. The authoritative name is carried by the roster (`group.roster`); this is the highlighted "changed the group name" bubble. Dropped if the signer is not a current admin. See `Groups.md`. |
 | `call.invite` | content | Places an audio call: `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b32), `key` (base64 per-call media key). See `api/Calls.md`. |
 | `call.accept` | content | Accepts a call: `callId`, `dest` (the callee's media b32). See `api/Calls.md`. |
 | `call.decline` | content | Rejects a call: `callId`, `reason`. See `api/Calls.md`. |
@@ -102,6 +106,16 @@ A content message of any group type **and** any ordinary content type (`text`,
 files the message under that group conversation instead of the one-to-one thread.
 The group is invisible to the server: group messages are ordinary `content`
 deliveries fanned out to each member client-side (`Groups.md`).
+
+Two further fields are additive and may ride on any content message:
+
+- **`replyTo`** - the `id` of the message this one replies to. The recipient
+  renders a quote of that message and, when it holds the original locally, a
+  click jumps to it. A dead reference (the original was never received or was
+  deleted) renders as a non-clickable quote. See *Replies*.
+- **`dn`** - the sender's own current display name, carried on **group** messages
+  inside the signed body (`Groups.md`), so a member who is not in the reader's
+  contacts is shown by their self-chosen name instead of a raw fingerprint.
 
 The registry is **open**: new rows are added here and implemented in clients.
 No server, facade, federation or storage change accompanies a new row.
@@ -164,6 +178,35 @@ A client applies an `edit` or a `delete` **only** to a message the `from` party
 actually sent (for a recipient, an incoming message from that peer); it must not
 let a peer rewrite or remove messages it did not author. History of prior
 revisions is not retained by the protocol (a client may keep its own).
+
+Editing and deleting work the same way inside a **group**: the `edit` (or
+`delete`) is fanned out to every member as a signed group message, and each
+recipient scopes it to a message the **same authoring member** sent (matched by
+`from` + the original `id`). A member cannot edit or delete another member's
+line.
+
+### Replies
+
+Any content message may carry a `replyTo` field naming the `id` of the message it
+answers. It is a soft reference: the body is not duplicated. The recipient
+resolves `replyTo` against its own transcript for that conversation and, if the
+original is present, renders a clickable quote (author + a one-line preview) that
+jumps to it; if absent, a static "(original message unavailable)" quote. Replies
+work identically in one-to-one and group conversations (the `id` is the shared
+message id, so it resolves on every member). `replyTo` is protected only by the
+end-to-end seal of the message that carries it - it is not separately signed,
+because each recipient receives its own sealed copy.
+
+### Clearing a conversation
+
+A user may clear a one-to-one conversation in two ways. **Only for me** wipes the
+local transcript and leaves the chat row in place. **For everyone** additionally
+sends a `chat.clear` to the peer; the peer's client honours it, wiping its own
+transcript and leaving a single "cleared the chat" notice. This is a cooperative
+request (the peer's client chooses to honour it), distinct from `delete`, which
+removes a single message. Deleting a **contact** is a separate, local-only,
+irreversible action: it removes the contact and the whole conversation from the
+deleting device (the peer is not told).
 
 ### Avatars and display names
 
