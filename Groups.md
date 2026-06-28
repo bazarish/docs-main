@@ -77,6 +77,8 @@ member spends one token from the **recipient's** pool, per recipient.
 | `group.leave` | contact | The sender is leaving: `groupId`, plus a `gsig` over `{type, groupId, from}`. The recipient removes **only the signer** (the signed `from` must equal the verified signer), so a member can remove themselves but cannot forge another member's removal. |
 | `group.avatar` | content | **Admin only.** Sets the group photo: `avatar` = `{ mime, data }` (square PNG/JPEG, <= 500 KB). A signed group message: recipients store it as the group's picture **and** surface a "set the group photo" bubble from the setter. Dropped if the signer is not a current admin. |
 | `group.rename` | content | **Admin only.** A rename notice: `text` = the new name. A signed group message that surfaces a "changed the group name" bubble. The **authoritative** name is the one in the roster (`group.roster`, epoch-protected); this is the highlighted notice only. Dropped if the signer is not a current admin. |
+| `reaction` | content | A member's reaction to a group message: `ref` (target id), `text` (emoji; empty removes it), plus a `gsig`. Fanned out to every member, so everyone sees who reacted. One per member per message; a new emoji overwrites the old. See `Messages.md`. |
+| `receipt` | content | A group **read** receipt: `ref` (the read message's id), plus a `gsig`. Sent to the read message's **author only** (never fanned out), so the author records the verified viewer and the message turns green on the first read. Opt-in (the local read-receipts setting). See `Messages.md`. |
 | `group` field | - | Any content message (`text`, `file`, ...) may carry `"group": { "id": <groupId> }`. It rides the existing type; the recipient files it under that group. Not a type of its own. |
 
 A group content message may also carry a `dn` field (the sender's own display
@@ -132,12 +134,14 @@ name) and a `replyTo` field (`Messages.md`). `dn` is inside the signed body
 
 A shared pool means the delivery token no longer identifies the sender (unlike a
 one-to-one stash), so each group **content** message carries a per-message hybrid
-signature, `gsig`. The sender signs `{type, id, from, groupId, sentAt, text}` with
-their identity key (`cms::signJsonHybrid` - the same self-contained hybrid-PQ
+signature, `gsig`. The sender signs `{type, id, from, groupId, sentAt, text, ref}`
+with their identity key (`cms::signJsonHybrid` - the same self-contained hybrid-PQ
 signature the roster uses, which yields the signer's identity fingerprint). The
 signed body also includes the sender's own display name `dn`, so a member cannot
-put a different self-name on another member's message; `edit`/`group.rename`
-likewise sign their `ref`/name. On receipt the recipient verifies it and takes
+put a different self-name on another member's message. The signed `ref` binds the
+target of an `edit`, `reaction` or `receipt`, so a member can neither forge another
+member's reaction/receipt nor re-point a signed one at a different message;
+`group.rename` likewise signs its new name. On receipt the recipient verifies it and takes
 the signature's **identity fingerprint as the authoritative sender**, requiring
 that it equals the message's `from`, matches the signed identifying/content
 fields, and - for a group it already knows - is a current member. For the

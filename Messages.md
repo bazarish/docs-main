@@ -80,7 +80,8 @@ versioned envelope:
 | `audio` / `voice` | content | Same shape as `file`, plus optional `duration`. |
 | `call.invite` | content | Contact type (audio/video), one-time tunnel destination + credentials (`api/Calls.md`). |
 | `call.accept` / `call.decline` / `call.end` | content | Call control (`api/Calls.md`). |
-| `receipt` | content | `ref` (the read message's `id`). A **read** receipt - the recipient's client sends it only on a genuine read (the chat is open, the app window focused, and the message scrolled into the visible area), confirming the "green" delivery state below. `ref` is the newest read incoming id, so it acknowledges that message and every earlier one (a read high-water). Optional/toggleable. |
+| `receipt` | content | `ref` (the read message's `id`). A **read** receipt - the recipient's client sends it only on a genuine read (the chat is open, the app window focused, and the message scrolled into the visible area), confirming the "green" delivery state below. `ref` is the newest read incoming id, so it acknowledges that message and every earlier one (a read high-water). Optional/toggleable. In a **group** it additionally rides a `group` field and a `gsig`, is sent to the read message's **author only** (never fanned out), and records that signed viewer - see `Groups.md`. |
+| `reaction` | content | A reaction to a message: `ref` (the target message's `id`), `text` (a single emoji; **empty removes** the reactor's reaction). One reaction per user per message - a new one overwrites the old at every recipient. In a **group** it is fanned out to every member and `gsig`-signed (the signature binds `ref` + emoji to the reactor, so a reaction cannot be forged onto another member or moved to a different message); in a 1:1 chat it is a single sealed delivery to the peer. Never a chat bubble - clients render it as a chip on the target message. See *Reactions and read receipts*. |
 | `bot.command` | content | A command invocation aimed at a bot: `command` (name, no leading slash), `args` (raw argument string). See *Bots & interactive messages*. |
 | `bot.callback` | content | An inline-keyboard button press: `data` (the button's payload), `ref` (the `id` of the keyboard message). See *Bots & interactive messages*. |
 | `edit` | content | An in-place edit of a message the sender previously sent: `ref` (the target message's `id`), `text` (new text), `keyboard` (new inline keyboard, `[]` to clear). The recipient replaces its copy. Applied only to a message `from` actually sent. See *Editing and deleting messages*. |
@@ -196,6 +197,30 @@ work identically in one-to-one and group conversations (the `id` is the shared
 message id, so it resolves on every member). `replyTo` is protected only by the
 end-to-end seal of the message that carries it - it is not separately signed,
 because each recipient receives its own sealed copy.
+
+### Reactions and read receipts
+
+**Reactions.** A `reaction` sets the sender's emoji on a target message (`ref`).
+Each user has at most one reaction per message: a new emoji overwrites their
+previous one, and an **empty** emoji removes it (clients implement tapping the
+emoji you already set as a toggle-off). Reactions are state, not history -
+recipients store them keyed by `(conversation, target, reactor)` and render them
+as chips on the target bubble, never as a chat line. In a group a reaction is
+fanned out to every member (so everyone sees who reacted) and `gsig`-signed; the
+signature binds the `ref` and emoji to the reactor, so a member can neither forge
+another member's reaction nor move a signed reaction onto a different message. A
+right-click "Reactions & views" detail (group chats only - a 1:1 chat has a single
+peer) lists who reacted with what.
+
+**Group read receipts.** Read receipts also exist in groups, gated by the same
+local "send read receipts" option. When a member genuinely reads a group message
+(chat open, focused, scrolled into view), their client sends a `receipt` - carrying
+the group field and a `gsig` - to that message's **author only**, never fanned out.
+The author records the signed viewer; the "Reactions & views" detail's *Viewers*
+tab lists them (meaningful only for one's own messages, since receipts go to the
+author). A group message a member sends has no single recipient to ack it, so it
+shows the amber "handed over" state until the **first** read receipt arrives, which
+turns it **green** (read). See `Groups.md` for the group authenticity model.
 
 ### Clearing a conversation
 

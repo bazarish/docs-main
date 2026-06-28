@@ -48,6 +48,7 @@ Delivery over I2P can take tens of seconds, so sending is asynchronous at the AP
 | Endpoint | Purpose |
 |---|---|
 | `GET /v1/messaging/destination` | Returns the caller's assigned `{dest, servingKey, state}` - the serving destination this server routes to the user (its b32; a paid offline-key personal destination is a standard-LeaseSet2 b32), the public serving sealing key for it, and the serving `state` (`home` / `pool` / for a personal destination `building` -> `active` -> `expired`) so the client only publishes a personal address once it is `active`. The client folds dest+key into its self-signed subscription certificate (its contact card) |
+| `GET /v1/messaging/storage-usage` | The authenticated caller's own mailbox storage: `{usedBytes, quotaBytes}` - bytes of pending content currently held, and the effective quota (the user's override, else the server default). Read-only; the client shows it as used/free/total in per-profile settings. (The blob store reports its own half separately, below.) |
 
 ### Federation fetch relay
 
@@ -72,6 +73,7 @@ message carries only a small sealed pointer; the recipient fetches it over I2P.
 | Endpoint | Purpose |
 |---|---|
 | `PUT /v1/storage/blob` | Upload blob ciphertext (authed; forwarded by the facade to the blob store). Returns `{blobUrl, blobId, deleteToken}`. Retention rides in `X-Blob-Ttl`/`X-Blob-Count`/`X-Blob-Sha256` headers |
+| `GET /v1/storage/usage` | The authenticated caller's own blob storage: `{usedBytes, quotaBytes}` - bytes currently held, and the effective quota (override else the free default). A signed user GET with no body. Pairs with `/v1/messaging/storage-usage` so per-profile settings can show both backends' used/free/total |
 | `GET /v1/messaging/blob-proxy?host=&path=` | Own-server I2P proxy fetch of a blob's `.b32.i2p` host+path, for clients whose embedded I2P router is not up (the direct path is a transient I2P destination straight to the blob's b33) |
 
 ### Delivery tokens (see `../Contacts.md`)
