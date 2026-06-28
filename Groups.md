@@ -97,6 +97,21 @@ name) and a `replyTo` field (`Messages.md`). `dn` is inside the signed body
 - **Send.** For each member != self, seal the inner payload (with the `group`
   field) to that member and deliver `content`-class with one of *their* pool
   tokens - N-1 individual sends, the client's own pacing/jitter (no batch API).
+- **Add (admin action).** Adding members is an admin privilege: an admin signs a
+  new roster (with the new members, `epoch+1`), sends each **new** member a
+  `group.invite` (their join bootstrap), broadcasts the updated `group.roster` to
+  the **existing** members, and broadcasts its pool to the new members. Each side
+  shows a service notice so the change is never silent: the admin sees an
+  optimistic "You added X" line, a new member sees "You were added to <group>"
+  (from the invite), and an existing member sees "X joined the group" - derived by
+  the recipient from diffing the applied roster against the one it held (the
+  members present now but not before), since the wire roster carries no per-member
+  display name. The notice names a joiner by the recipient's local contact name if
+  any, else a short fingerprint (the joiner's own name fills in once they first
+  send, per *Sender authenticity*). The diff is idempotent: a redelivered or
+  equal-epoch roster re-applies to the same membership and adds nobody, so no
+  duplicate notice. A roster that only removed members or changed admins adds
+  nobody and stays quiet.
 - **Remove (admin action).** Removing *another* member is an admin privilege: an
   admin signs a new roster (without the member, `epoch+1`) and broadcasts a
   `group.roster`. Recipients apply it only because the signer is an admin they
