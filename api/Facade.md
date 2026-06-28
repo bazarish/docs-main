@@ -10,7 +10,7 @@ The facade is the "last mile" between the client and the server infrastructure. 
 - A single catch-all handler relays every request **transparently** - method, headers, body and query string verbatim - to backends over the **operator private channel** (localhost/unix socket/VPN), routing by path prefix:
   - `/v1/messaging/*` -> messaging server
   - `/v1/account/*` -> service node
-  - `/v1/storage/blob` -> blob store (the only blob endpoint exposed; the operator quota endpoint and the I2P-only `/b/*` downloads are never forwarded)
+  - `/v1/storage/blob` and `/v1/storage/usage` -> blob store (the only blob endpoints exposed: the upload and the caller's own usage query; the operator quota endpoint `/v1/storage/quota` and the I2P-only `/b/*` downloads are never forwarded)
   - anything else -> 404 (never forwarded)
 - The large-blob upload `PUT` is **streamed, not buffered**: it is read through a content reader, spooled to a temp file on the facade, and streamed on to the blob store through a content provider, so the facade never holds the blob in memory (see `LargeFiles.md`).
 - Holds no keys, parses no content (the auth signature is verified by the backends, not the facade), stores nothing durably (a streamed blob upload is briefly spooled to a temp file, then removed). An unreachable backend yields a `FACADE_UPSTREAM` 502 - the facade is a dumb pipe.
