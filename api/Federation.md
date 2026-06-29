@@ -9,7 +9,17 @@ Status: draft skeleton.
   by an **embedded i2pd router** (no external SAM bridge). The server has no single
   federation destination - each user's serving destination (pool/per-user) runs its
   own STREAM accept loop and is persisted so addresses are stable across restarts;
-  the home destination (`<state>/i2p-dest.key`) is used for discovery only.
+  the home destination (`<state>/i2p-dest.key`) only *serves* discovery (inbound
+  `op:card`). Outbound discovery fetches (a `card`/`resolve` lookup) dial from a
+  **warm pool of single-use transient destinations** (`WarmDestPool`): each lookup
+  leaves from a fresh one-time dest that is **never reused** (so successive lookups
+  are unlinkable, and none is tied to the server's home identity), and the pool
+  keeps a few dests pre-built so the lookup pays no cold tunnel-build latency. The
+  pool size adapts from demand between a floor and `--warm-pool-max` (default 2..10;
+  `--warm-pool-max 0` disables it, falling back to the home dest); it is
+  best-effort, so an empty pool transparently falls back to the home dest. Delivery
+  still dials from the sender's own **serving** dest (the recipient acks back to it),
+  never a one-time dest.
 - Every routing/connection target is a full **`.b32.i2p`** address - a
   cryptographic destination address, never an addressbook name (poisonable) and
   never a raw base64 destination. This is enforced in code (`common`
