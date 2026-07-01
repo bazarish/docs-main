@@ -80,8 +80,8 @@ versioned envelope:
 | `audio` / `voice` | content | Same shape as `file`, plus optional `duration`. |
 | `call.invite` | content | Contact type (audio/video), one-time tunnel destination + credentials (`api/Calls.md`). |
 | `call.accept` / `call.decline` / `call.end` | content | Call control (`api/Calls.md`). |
-| `receipt` | content | `ref` (the read message's `id`). A **read** receipt - the recipient's client sends it only on a genuine read (the chat is open, the app window focused, and the message scrolled into the visible area), confirming the "green" delivery state below. `ref` is the newest read incoming id, so it acknowledges that message and every earlier one (a read high-water). Optional/toggleable. In a **group** it additionally rides a `group` field and a `gsig`, is sent to the read message's **author only** (never fanned out), and records that signed viewer - see `Groups.md`. |
-| `reaction` | content | A reaction to a message: `ref` (the target message's `id`), `text` (a single emoji; **empty removes** the reactor's reaction). One reaction per user per message - a new one overwrites the old at every recipient. In a **group** it is fanned out to every member and `gsig`-signed (the signature binds `ref` + emoji to the reactor, so a reaction cannot be forged onto another member or moved to a different message); in a 1:1 chat it is a single sealed delivery to the peer. Never a chat bubble - clients render it as a chip on the target message. See *Reactions and read receipts*. |
+| `receipt` | content | `ref` (the read message's `id`). A **read** receipt - the recipient's client sends it only on a genuine read (the chat is open, the app window focused, and the message scrolled into the visible area), confirming the "green" delivery state below. `ref` is the newest read incoming id, so it acknowledges that message and every earlier one (a read high-water). Optional/toggleable. |
+| `reaction` | content | A reaction to a message: `ref` (the target message's `id`), `text` (a single emoji; **empty removes** the reactor's reaction). One reaction per user per message - a new one overwrites the old at every recipient. A single sealed delivery to the peer. Never a chat bubble - clients render it as a chip on the target message. See *Reactions*. |
 | `bot.command` | content | A command invocation aimed at a bot: `command` (name, no leading slash), `args` (raw argument string). See *Bots & interactive messages*. |
 | `bot.callback` | content | An inline-keyboard button press: `data` (the button's payload), `ref` (the `id` of the keyboard message). See *Bots & interactive messages*. |
 | `edit` | content | An in-place edit of a message the sender previously sent: `ref` (the target message's `id`), `text` (new text), `keyboard` (new inline keyboard, `[]` to clear). The recipient replaces its copy. Applied only to a message `from` actually sent. See *Editing and deleting messages*. |
@@ -91,32 +91,17 @@ versioned envelope:
 | `device.avatar` | contact | Self-sync of the user's own avatar to their other devices: the same `avatar` block, sealed to the user's own key and delivered to their own destination. See `DeviceSync.md`. |
 | `device.contact-name` | contact | Self-sync of a local contact rename to the user's other devices: `peer` (fingerprint), `name`. A purely local label, never sent to the contact. See `DeviceSync.md`. |
 | `device.i2p-master` | contact | Self-sync of the user's own I2P master key to their other devices: `i2pMaster` (base64), sealed to the user's own key and delivered to their own destination, so every device keeps the same personal address. Applied only when `from` is the user themselves. See `DeviceSync.md`, `Identity.md`. |
-| `group.invite` | content | Adds a recipient to a group: `groupId`, `name`, `roster` (b64 signed roster). See `Groups.md`. |
-| `group.tokens` | contact | A member's one-time token pool for a group: `groupId`, `tokens`. Tokenless distribution. See `Groups.md`. |
-| `group.roster` | contact | A signed roster update (membership/admin/epoch). Sent over the tokenless contact class so a critical update never fails on a drained pool. See `Groups.md`. |
-| `group.leave` | contact | The sender is leaving a group: `groupId`, plus a `gsig` signing `{type, groupId, from}`. Self-service (any member, no admin): the recipient removes **only the signer**, so a member cannot forge another member's removal. See `Groups.md`. |
-| `group.avatar` | content | Sets the group photo (**admin only**): `avatar` = `{ mime, data }` (same 500 KB square cap as `avatar`), carried as a signed group message. Recipients store it as the group's picture **and** show a "set the group photo" bubble from the setter. Dropped if the signer is not a current admin. See `Groups.md`. |
-| `group.rename` | content | A group rename notice (**admin only**): `text` = the new name, as a signed group message. The authoritative name is carried by the roster (`group.roster`); this is the highlighted "changed the group name" bubble. Dropped if the signer is not a current admin. See `Groups.md`. |
 | `call.invite` | content | Places an audio call: `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b32), `key` (base64 per-call media key). See `api/Calls.md`. |
 | `call.accept` | content | Accepts a call: `callId`, `dest` (the callee's media b32). See `api/Calls.md`. |
 | `call.decline` | content | Rejects a call: `callId`, `reason`. See `api/Calls.md`. |
 | `call.end` | content | Hangs up / cancels a call: `callId`. See `api/Calls.md`. |
 
-A content message of any group type **and** any ordinary content type (`text`,
-`file`, ...) may additionally carry a `"group": { "id": <groupId> }` field - it
-files the message under that group conversation instead of the one-to-one thread.
-The group is invisible to the server: group messages are ordinary `content`
-deliveries fanned out to each member client-side (`Groups.md`).
-
-Two further fields are additive and may ride on any content message:
+One further field is additive and may ride on any content message:
 
 - **`replyTo`** - the `id` of the message this one replies to. The recipient
   renders a quote of that message and, when it holds the original locally, a
   click jumps to it. A dead reference (the original was never received or was
   deleted) renders as a non-clickable quote. See *Replies*.
-- **`dn`** - the sender's own current display name, carried on **group** messages
-  inside the signed body (`Groups.md`), so a member who is not in the reader's
-  contacts is shown by their self-chosen name instead of a raw fingerprint.
 
 The registry is **open**: new rows are added here and implemented in clients.
 No server, facade, federation or storage change accompanies a new row.
@@ -180,47 +165,26 @@ actually sent (for a recipient, an incoming message from that peer); it must not
 let a peer rewrite or remove messages it did not author. History of prior
 revisions is not retained by the protocol (a client may keep its own).
 
-Editing and deleting work the same way inside a **group**: the `edit` (or
-`delete`) is fanned out to every member as a signed group message, and each
-recipient scopes it to a message the **same authoring member** sent (matched by
-`from` + the original `id`). A member cannot edit or delete another member's
-line.
-
 ### Replies
 
 Any content message may carry a `replyTo` field naming the `id` of the message it
 answers. It is a soft reference: the body is not duplicated. The recipient
 resolves `replyTo` against its own transcript for that conversation and, if the
 original is present, renders a clickable quote (author + a one-line preview) that
-jumps to it; if absent, a static "(original message unavailable)" quote. Replies
-work identically in one-to-one and group conversations (the `id` is the shared
-message id, so it resolves on every member). `replyTo` is protected only by the
+jumps to it; if absent, a static "(original message unavailable)" quote.
+`replyTo` is protected only by the
 end-to-end seal of the message that carries it - it is not separately signed,
 because each recipient receives its own sealed copy.
 
-### Reactions and read receipts
+### Reactions
 
-**Reactions.** A `reaction` sets the sender's emoji on a target message (`ref`).
+A `reaction` sets the sender's emoji on a target message (`ref`).
 Each user has at most one reaction per message: a new emoji overwrites their
 previous one, and an **empty** emoji removes it (clients implement tapping the
 emoji you already set as a toggle-off). Reactions are state, not history -
 recipients store them keyed by `(conversation, target, reactor)` and render them
-as chips on the target bubble, never as a chat line. In a group a reaction is
-fanned out to every member (so everyone sees who reacted) and `gsig`-signed; the
-signature binds the `ref` and emoji to the reactor, so a member can neither forge
-another member's reaction nor move a signed reaction onto a different message. A
-right-click "Reactions & views" detail (group chats only - a 1:1 chat has a single
-peer) lists who reacted with what.
-
-**Group read receipts.** Read receipts also exist in groups, gated by the same
-local "send read receipts" option. When a member genuinely reads a group message
-(chat open, focused, scrolled into view), their client sends a `receipt` - carrying
-the group field and a `gsig` - to that message's **author only**, never fanned out.
-The author records the signed viewer; the "Reactions & views" detail's *Viewers*
-tab lists them (meaningful only for one's own messages, since receipts go to the
-author). A group message a member sends has no single recipient to ack it, so it
-shows the amber "handed over" state until the **first** read receipt arrives, which
-turns it **green** (read). See `Groups.md` for the group authenticity model.
+as chips on the target bubble, never as a chat line. A reaction is a single
+sealed delivery to the peer.
 
 ### Clearing a conversation
 
@@ -312,9 +276,6 @@ a late message anchored at its earlier arrival time, and the late message never
 jumps ahead of newer traffic. The 5 s window is precisely what stops the
 "don't reorder old arrivals" rule from disturbing the live ordering of new ones -
 old arrivals are pinned at the bottom, recent ones are sorted among themselves.
-
-Group messages order the same way (`Groups.md`); with multiple senders it is
-best-effort, since each `sentAt` is its own sender's clock.
 
 ## Delivery status
 

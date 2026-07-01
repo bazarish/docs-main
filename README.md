@@ -4,7 +4,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol
 blocking and to deanonymization of servers and users. All communication is
 end-to-end encrypted. Any possibility of collecting metadata about a user and
 their contacts is treated as a critical bug requiring architectural rework.
-Supported features: direct messages, group chats, calls and attachments of any
+Supported features: direct messages, calls and attachments of any
 type. The server-side principle is minimum code, minimum dependencies, simple
 deployment on any server.
 
@@ -19,7 +19,6 @@ component implements.
 - [Messages](Messages.md) - delivery class vs content type; the content-type registry
 - [Bots](Bots.md) - bots as ordinary identities; commands, inline keyboards, callbacks
 - [DeviceSync](DeviceSync.md) - multi-device enrollment and E2E state sync
-- [Groups](Groups.md) - group chats (client-side fan-out)
 - [Errors](Errors.md) - typed error registry
 - API contracts:
   - [ClientApi](api/ClientApi.md) - client <-> facade <-> {server, service node}
@@ -60,7 +59,7 @@ The protocol is implemented across all components, with unit tests green and the
 core flows live-validated over real I2P: E2EE first contact, destination-routed
 federation, the central alias resolver (claim -> resolve -> card fetch ->
 conversation) including its offline-key serving-dest hot-swap, large-file blob
-transfer, group chats with per-sender signing, bots and interactive messages,
+transfer, bots and interactive messages,
 message editing and read receipts, multiple accounts, at-rest encryption of all
 local state, and client-to-client audio and video calls (Opus and VP8 media over
 I2P RAW datagrams to b33 destinations, per-call AES-256-GCM, minimal-length media
@@ -86,6 +85,6 @@ fingerprint - so there is no shared operator secret. Panel sign-in is
 sign-in-with-key, verified locally against the configured admin identity with no
 backend online (`api/AdminPanel.md`).
 
-Out of scope for v1 (tracked as future concepts): large broadcast channels
-(`Groups.md`), per-device identity keys (`DeviceSync.md`), post-quantum sealing
-via ML-KEM (`Identity.md`), and a standalone threat-model document.
+Out of scope for v1 (tracked as future concepts): per-device identity keys
+(`DeviceSync.md`), post-quantum sealing via ML-KEM (`Identity.md`), and a
+standalone threat-model document.

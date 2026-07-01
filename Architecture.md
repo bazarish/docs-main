@@ -2,7 +2,7 @@
 
 Status: draft skeleton.
 
-Bazarish is a messenger whose architectural root is full resistance to protocol blocking and to deanonymization of servers and users. All communication is end-to-end encrypted. Any possibility of collecting metadata about a user and their contacts is a critical bug requiring architectural rework. Supported features: direct messages, group chats, calls, attachments of any type. Server-side implementation principle: minimum code, minimum dependencies, simple deployment on any server.
+Bazarish is a messenger whose architectural root is full resistance to protocol blocking and to deanonymization of servers and users. All communication is end-to-end encrypted. Any possibility of collecting metadata about a user and their contacts is a critical bug requiring architectural rework. Supported features: direct messages, calls, attachments of any type. Server-side implementation principle: minimum code, minimum dependencies, simple deployment on any server.
 
 ## Components
 
@@ -70,7 +70,6 @@ docs-main/                       # this repository - canonical protocol specific
 |-- Identity.md                  # keys, UIDs, certificates, contact card
 |-- Contacts.md                  # contact admission via one-time delivery tokens
 |-- DeviceSync.md                # multi-device enrollment and E2E state sync
-|-- Groups.md                    # group chats: client-side fan-out
 |-- Messages.md                  # two-layer message typing, content-type registry
 |-- Bots.md                      # bots & interactive messages
 |-- Errors.md                    # typed error registry

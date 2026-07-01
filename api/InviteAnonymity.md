@@ -247,8 +247,6 @@ mapping.
   a user whose dest it does not yet know. That server-level resolve key is the
   one residual server-scoped artifact, used only to bootstrap alias lookups, and
   is out of scope for the invite revision.
-- **Groups** (`../Groups.md`) - the signed roster carries each member's contact
-  card (dest + serving sealing key + prekey) instead of sub-cert + server card.
 - **Local contact state** - store `contact.dest` + `contact.servingSealingKey`
   in place of `contact.server` + server-card sealing key.
 
@@ -302,10 +300,10 @@ server-wide signer either (the `delivered-ack` is signed per destination).
    the b33); local short-circuit only on same-destination. TCP federation removed;
    `--i2p` mandatory.
 3. **client** - `createInvite` / `addByInvite` / contact-request bootstrap /
-   `addByUsername` / groups on the contact card and route-by-dest; `deliver`
+   `addByUsername` on the contact card and route-by-dest; `deliver`
    targets a destination; `Client::myDestination()` fetches the assigned routing.
 4. **docs** - folded into `../Identity.md`, `../Contacts.md`, `Facade.md`,
-   `Federation.md`, `Architecture.md`, `Messages.md`, `Groups.md`, `DeviceSync.md`,
+   `Federation.md`, `Architecture.md`, `Messages.md`, `DeviceSync.md`,
    `ClientApi.md`; the server card is retired from the invite/contact path.
 
 Live-validated end-to-end over real I2P (2026-06-17, vs i2pd 2.60.0): full

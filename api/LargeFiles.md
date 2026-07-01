@@ -107,7 +107,7 @@ all recipients have it:
 
 - `count = 1` - delete after the first confirmed download. Ephemeral 1:1 delivery
   with a near-zero standing quota footprint.
-- `count = N` - a group of N recipients; reclaimed after N confirmations.
+- `count = N` - N recipients; reclaimed after N confirmations.
 - There is **no default count** - only the sender may set it, since only the
   sender knows the intended audience. Without it, reclamation is by TTL alone.
 - **TTL is always the backstop**, even for count-based blobs: if the expected
@@ -117,7 +117,7 @@ Defaults (configurable): `ttl = 7 days`; no default count.
 
 Reclamation counts **confirmations, not `GET`s** - a partial or failed download
 never burns a slot. Abuse note: only a party holding the `blobId` (a participant
-in the conversation) can confirm; a malicious group member can burn at most one
+in the conversation) can confirm; a malicious recipient can burn at most one
 of N slots, and TTL plus owner `DELETE` (unsend, via the delete-token) remain as
 backstops.
 
