@@ -7,7 +7,7 @@ Status: draft skeleton.
 - Delivery is **I2P-only**: the messaging server requires `--i2p` (there is no
   non-I2P transport; the earlier plain-TCP federation was removed). I2P is provided
   by an **embedded i2pd router** (no external SAM bridge). The server has no single
-  federation destination - each user's serving destination (pool/per-user) runs its
+  federation destination - each user's serving destination runs its
   own STREAM accept loop and is persisted so addresses are stable across restarts;
   the home destination (`<state>/i2p-dest.key`) only *serves* discovery (inbound
   `op:card`). Outbound discovery fetches (a `card`/`resolve` lookup) dial from a
@@ -65,7 +65,7 @@ over I2P. There is no fingerprint->endpoint resolver and no `peers.json` - a
 destination is self-routing.
 
 **A server has no single, shared federation destination** (fundamental rule). Each
-user is served by their own serving destination (a pool dest shared only within a
+user is served by their own serving destination (never shared with another
 k-anonymity set, or a personal per-user dest - see `InviteAnonymity.md`), and *all*
 that user's federation flows over it: inbound delivery is served on it, and an
 outbound delivery dials the recipient **from the sender's own serving destination**
@@ -107,17 +107,13 @@ DeliveryEnvelope:
 ```
 
 - The sender's own server learns only "user U sent something to destination D"
-  (plus size and time) - never the recipient identity. For a free user D is a
-  shared address-pool destination (k-anonymity), assigned round-robin and fixed
-  per user (default pool size 10, `--pool-size`; the assignment is a stable hash,
-  so a user can neither pick nor enumerate it); for a paid user with the
-  **per-user i2p-dest** option on it is their own personal destination (an
-  offline-key master held by the client, see `ServicePortal.md`). Only one
-  destination serves a user at a time (no dual-dest, which would be a
-  deanonymisation surface): when a paid term lapses past its grace the personal
-  destination simply goes **offline** until the user tops up or turns the option
-  off (then they revert to their fixed pool address) - the server never silently
-  re-points a live, already-shared address.
+  (plus size and time) - never the recipient identity. D is always the user's
+  **own** destination: an offline-key master held by their client, delegated to
+  the server as a time-boxed transient. There is no shared address to fall back
+  on, because a shared one would make every user behind it provably co-located.
+  A user whose transient has lapsed - or whose account a moderated server has not
+  approved - simply has no destination and is not served; the server never
+  silently re-points a live, already-shared address.
 - The recipient's server learns only "something arrived from destination X into mailbox V with a valid token" - never the sender identity (see `../Contacts.md`).
 
 ## Message delivery flow
@@ -196,7 +192,7 @@ coordinate into the client) remains.
   destinations are self-standing and the root only certifies offline; this keeps
   the connection origin from being a server-identifying signal.
 - The only key that signs live federation traffic is the **per-destination
-  signing key**: every serving destination (home, each pool dest, each personal
+  signing key**: every serving destination (home, each personal
   dest) carries its own signing keypair, persisted **bound to the destination**
   together with its serving sealing key - a `(destination, signing key, serving
   sealing key)` group, never reused on another destination. It signs that
@@ -204,11 +200,9 @@ coordinate into the client) remains.
   a separate crypto-identity used only **outside** federation - the server card /
   `bazarish://server` configuration link (`Facade.md`) and the service-node
   binding - and never signs a federated message. Consequently two users the same
-  server hosts on **different** destinations share no signing key and no
-  fingerprint, so there is no server-wide signer to cluster them as co-located;
-  users on **one** destination (a pool's k-anonymity set, `InviteAnonymity.md`)
-  share that destination's signing key, which reveals nothing beyond the
-  destination - and its serving sealing key - they already share.
+  server hosts share no signing key and no fingerprint, so there is no
+  server-wide signer to cluster them as co-located. Since no two users ever share
+  a destination, no two users ever share a signer either.
 
 ## Open questions
 

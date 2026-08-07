@@ -1,6 +1,8 @@
-# Calls (Audio / Video)
+# Calls (audio)
 
-Status: audio and video calls implemented (client-to-client).
+Status: audio calls implemented (client-to-client). There is no video: it costs
+a codec, frame fragmentation and reassembly for a picture an I2P tunnel cannot
+carry anyway.
 
 ## Principle
 
@@ -10,19 +12,14 @@ one-time hidden-network tunnel, so no server or facade ever sees call traffic.
 
 ## Transport
 
-All media - audio and video - rides **I2P RAW datagrams** (UDP-like, low
+Media rides **I2P RAW datagrams** (UDP-like, low
 overhead) over the embedded i2pd router, one short-lived destination per call, torn down when the
 call ends. RAW carries no per-packet source (so a frame stays small) and no
 I2P-layer authentication - the call layer authenticates every datagram itself
 (see Media encryption). Datagrams are the right fit for realtime media: a
 reliable stream would retransmit, and a late retransmitted frame is useless.
 
-Audio and video share the one datagram destination and are demultiplexed by a
-track byte (see Media encryption). An audio frame fits in a single datagram; a
-video frame (especially a keyframe) does not, so video frames are fragmented
-across datagrams and reassembled by the receiver. A receiver that cannot
-reassemble a frame (a fragment was lost) asks the sender for a fresh keyframe via
-a small control datagram, rate-limited so a burst of loss does not flood.
+An audio frame always fits in a single datagram, so nothing is ever fragmented.
 
 ### Tunnels
 
@@ -51,12 +48,6 @@ itself stays on datagrams.
 Audio: **Opus**, 48 kHz mono, 20 ms frames (the standard VoIP trade-off). Lost
 frames are concealed by Opus; late or duplicate frames are dropped.
 
-Video: **VP8** (libvpx), low-resolution realtime (default 320x240 at 15 fps,
-target ~256 kbps), one-pass with error resilience and no auto alt-ref (one
-compressed frame per encode, lowest latency). The resolution and rate are
-deliberately modest: a datagram tunnel's throughput is bounded by its slowest
-relay hop, so a small, loss-tolerant stream is the realistic target. The first
-frame and any frame the peer requests after loss are keyframes.
 
 ## Media encryption
 
@@ -68,16 +59,12 @@ key never reaches any server. Each datagram is `nonce || AES-256-GCM(payload)`,
 where the 12-byte nonce is `role(1) || track(1) || 0 0 || sequence(8, big-endian)`:
 
 - **role** separates the two call directions (caller / callee).
-- **track** separates the streams: audio, video, or control. The receiver reads
+- **track** leaves room for a second stream alongside audio. The receiver reads
   it from the cleartext nonce to demultiplex; tampering with it fails the tag.
 - **sequence** is monotonic per (role, track), so a (key, nonce) pair is never
-  reused even though audio, video and control are sent concurrently.
+  reused.
 
-The audio payload is the Opus packet. The video payload is
-`frameId(4) || fragmentIndex(1) || fragmentCount(1) || fragment bytes` (the
-fragmentation header is inside the sealed, authenticated plaintext). The control
-payload is a one-byte opcode (currently: request keyframe). A forged, replayed or
-wrong-key datagram fails to open and is silently dropped.
+The audio payload is the Opus packet.
 
 ## Strict I2P requirement
 
@@ -94,14 +81,10 @@ Server-side components see only opaque blobs of a generic message.
 
 | Type | Direction | Payload |
 |---|---|---|
-| `call.invite` | caller -> callee | `callId`, `media` (`audio` / `video`), `codec` (`opus`), `video` (`vp8` on a video call), `dest` (the caller's media b33 routing address), `key` (base64 per-call media key) |
-| `call.accept` | callee -> caller | `callId`, `media` (`audio` / `video`, echoing the accepted call), `dest` (the callee's media b33 routing address) |
+| `call.invite` | caller -> callee | `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b33 routing address), `key` (base64 per-call media key) |
+| `call.accept` | callee -> caller | `callId`, `media` (`audio`), `dest` (the callee's media b33 routing address) |
 | `call.decline` | callee -> caller | `callId`, `reason` (`declined` / `busy`) |
 | `call.end` | either | `callId` |
-
-A video call is symmetric: `media: video` in the invite means both sides capture
-and render video (audio always runs too). In-call keyframe requests are not
-signalling messages - they ride the media transport as a control datagram.
 
 Adding or evolving a call signal is a client-only change.
 
@@ -115,11 +98,9 @@ Adding or evolving a call signal is a client-only change.
    own RAW datagram destination and replies with `call.accept` carrying its
    media b33.
 3. Both sides now know each other's media destination and the shared key. Each
-   captures the microphone (and, on a video call, the camera), encodes Opus and
-   VP8, AES-256-GCM-seals each datagram and sends to the peer's b33; received
-   datagrams are opened, demultiplexed by track, decoded and played/rendered.
-   Mute stops transmitting audio; turning the camera off stops transmitting video
-   (the peer's last frame freezes).
+   captures the microphone, encodes Opus, AES-256-GCM-seals each datagram and
+   sends it to the peer's b33; received datagrams are opened, decoded and played.
+   Mute keeps the capture loop running but transmits nothing.
 4. Either side hangs up with `call.end`; the media engine and the one-time
    datagram destination are torn down.
 
@@ -128,25 +109,21 @@ Adding or evolving a call signal is a client-only change.
 - **common**: the embedded I2P RAW datagram endpoint (`bazarish::i2p::Endpoint`,
   embedded `libi2pd_bazarish`) and `aeadSeal`/`aeadOpen` (AES-256-GCM).
 - **client lib**: `I2pCallTransport` (the per-call RAW datagram transport over the
-  embedded endpoint); `AudioCodec` (Opus) and `VideoCodec` (VP8); `AudioIo` and
-  `VideoIo` (device interfaces + synthetic backends for headless tests);
-  `CallMedia` (the media engine: audio capture, video capture, and one receive
-  thread that demultiplexes by track, reassembles video and requests keyframes on
-  loss); and the call signaling + state machine on `Session` (`startAudioCall` /
-  `startVideoCall` / `acceptCall` / `declineCall` / `endCall` / `setCallMuted` /
-  `setCameraEnabled` / `currentCall`).
-- **CLI**: `bazarish-client call <profile> <peer> [seconds] [video]` and
+  embedded endpoint); `AudioCodec` (Opus); `AudioIo` (device interfaces +
+  synthetic backends for headless tests); `CallMedia` (the media engine: one
+  capture thread and one receive thread); and the call signaling + state machine
+  on `Session` (`startAudioCall` / `acceptCall` / `declineCall` / `endCall` /
+  `setCallMuted` / `currentCall`).
+- **CLI**: `bazarish-client call <profile> <peer> [seconds]` and
   `call-answer` (drive the signaling loop; with the synthetic backends they give
   a headless end-to-end media path for integration testing).
-- **GUI**: `CallScreen.qml` (remote video filling the surface, local camera
-  picture-in-picture, mute / camera / end controls) plus Qt Multimedia backends -
-  `QAudioSource`/`QAudioSink` for audio and `QCamera`/`QVideoSink` for video,
-  with worker-thread frames marshalled to a GUI-thread presenter.
+- **GUI**: `CallScreen.qml` (peer, state, mute / end controls) plus the Qt
+  Multimedia audio backends `QAudioSource` / `QAudioSink`.
 
 Live-validated: I2P RAW datagrams round-trip over real I2P between two
-destinations (b32 and b33). The audio and video codec round trips, the
+destinations (b32 and b33). The audio codec round trip, the
 AES-256-GCM seal/open (including tamper/wrong-key rejection), and the full
-audio+video pipeline (fragmentation, reassembly, decode, render) over an
+audio pipeline over an
 in-memory loopback are covered by unit tests.
 
 The embedded `libi2pd_bazarish` provides RAW datagrams and the datagram-to-b33
@@ -155,12 +132,7 @@ port are involved.
 
 ## Open / not done
 
-- **Adaptive bitrate** - video encodes at a fixed target bitrate; reacting to
-  observed loss by lowering resolution/bitrate is a refinement.
 - **Jitter buffer** - playback is in-order with bounded packet-loss concealment;
   a deeper adaptive jitter buffer is a refinement.
-- **Asymmetric video** - a video call is symmetric (both sides send video). The
-  engine already supports send-only or receive-only, so one-way video is a small
-  negotiation change.
 - **Glare / busy** - a second incoming call while busy is auto-declined with
   `reason: busy`; richer call-waiting is future work.

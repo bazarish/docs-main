@@ -4,7 +4,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol
 blocking and to deanonymization of servers and users. All communication is
 end-to-end encrypted. Any possibility of collecting metadata about a user and
 their contacts is treated as a critical bug requiring architectural rework.
-Supported features: direct messages, calls and attachments of any
+Supported features: direct (1-1) messages, audio calls and attachments of any
 type. The server-side principle is minimum code, minimum dependencies, simple
 deployment on any server.
 
@@ -27,7 +27,7 @@ component implements.
   - [InviteAnonymity](api/InviteAnonymity.md) - destination-routed contact cards
   - [ServicePortal](api/ServicePortal.md) - sign-in-with-key portal, payments, grants
   - [ServerServiceNode](api/ServerServiceNode.md) - internal server <-> service node API
-  - [LargeFiles](api/LargeFiles.md) - large-message blob storage over I2P
+  - [FileTransfer](api/FileTransfer.md) - direct client-to-client file transfer over I2P
   - [Storage](api/Storage.md) - pending-content storage backends
   - [Calls](api/Calls.md) - audio/video calls
   - [AdminPanel](api/AdminPanel.md) - fleet status + management web panel (sign-in-with-key)

@@ -1,14 +1,18 @@
-# Service Portal (account onboarding, payments, paid services)
+# Service Portal (account onboarding)
 
-Status: design (2026-06-15).
+Status: implemented.
 
 The **service node** owns user accounts. It exposes a **web portal** (the
-"Service site") through which a user registers, proves ownership of their key,
-tops up a prepaid balance, and buys paid services (a personal I2P
-destination, a larger storage quota). The **messaging server (server-core)** stays a pure delivery
-layer: it never sees payments and never registers anyone. A client can sign and
-fetch, but **cannot self-register** - registration is a human/web flow guarded by
-a captcha (free tier) and payment (paid tier).
+"Service site") through which a user registers and proves ownership of their key.
+The **messaging server (server-core)** stays a pure delivery layer: it never
+registers anyone. A client can sign and fetch, but **cannot self-register** -
+registration is a human/web flow guarded by a captcha.
+
+**Nothing on this node is for sale.** There is no balance, no ledger, no payment
+gateway and no paid service: the only paid component of the project is the alias
+service, which is a separate (private) deployment with its own portal and its own
+payment layer (`AliasResolver.md`). Everything a messaging account gets - its
+storage quota, its own I2P destination - it gets for free.
 
 ```
             +----------- browser -----------+         +---- Client (holds key) ----+
@@ -16,10 +20,9 @@ a captcha (free tier) and payment (paid tier).
             +---------------------------------+  paste | (key never enters browser) |
                            | HTTP                 sig   +----------------------------+
                   +--------v---------+
-                  |   service node   |  accounts, balance ledger, captcha,
-                  |  + payments mod  |  payment gateways (config-driven)
+                  |   service node   |  accounts, captcha, approval
                   +------------------+
-       issues subscription | certs, sets entitlements
+       issues subscription | certs
                   +--------v---------+
                   |   server-core    |  delivery only; points unsubscribed
                   +------------------+  senders at the portal
@@ -62,79 +65,47 @@ GET /v1/account/portal  ->
 {
   "message": "<human text shown by the client>",
   "links":   ["https://portal-a.example/...", "https://portal-b.example/..."],  // >=1
-  "services": {
-    "freeRegistration": { "enabled": true, "captcha": true },
-    "i2pDest":   { "enabled": true, "priceAtomic": "...", "periodDays": 30,  "currency": "XMR" },
-    "storage":   {
-      "freeQuotaBytes": 10485760,
-      "paid": { "enabled": true, "quotaBytes": 5368709120,
-                "priceAtomic": "...", "periodDays": 30, "currency": "XMR" }
-    }
-  }
+  "registration": {
+    "captcha":          true,
+    "requiresApproval": false,
+    "message":          "<how to reach the operator, when approval is required>"
+  },
+  "quotaBytes": 52428800
 }
 ```
 
 The client shows the message and the link(s); the user opens one in a browser.
-Several links allow mirrors/onion/clearnet alternatives. The `services` block is
-driven by the server's config: a node may offer only free registration, or also
-sell a personal I2P destination and/or a larger storage quota. (The global
-`username` namespace is a separate product sold by the central alias-resolver,
-not the service node - see `AliasResolver.md`.)
-
-**Every paid service is recurring (term-based) and renewed from the cabinet -
-none are one-shot.** This is deliberate: an ongoing server-side cost must map to
-ongoing payment, otherwise a one-time fee lets a user load the server with a huge
-number of always-online destinations for almost nothing. Recurring pricing turns
-that into a competitive market of servers (whoever offers a given resource
-cheaper wins), instead of a tragedy of the commons. Terms:
-
-- **i2pDest** - a personal always-online destination, an **opt-in toggle**
-  (off by default - every user already has a fixed pool address) billed
-  **monthly**. The cabinet states the privacy trade-off: a personal destination
-  is portable and stable across servers, but a unique, lasting address across all
-  the user's contacts (less crowd-blending than the shared pool). See
-  *Per-user i2p-dest* below.
-- **storage** - every account gets `freeQuotaBytes` free (the config minimum,
-  10 MiB by default); the paid plan raises the quota and is billed **monthly**.
-
-Term-based services **auto-renew from the prepaid balance**; a lapse reverts to
-the free baseline, but the lapse rule differs per service so the user notices:
-- **storage** - strict: when the balance cannot cover a renewal the upgrade
-  drops to the free quota (a visible shrink, pushed to the messaging server) and
-  stops; the user re-buys to restore it.
-- **i2pDest** - a **one-step negative-balance grace**: the first unfunded
-  renewal is debited anyway (the balance goes negative) and the destination is
-  served a further 30 days; a second is refused while the balance is negative, so
-  the personal destination goes **offline** (the user is **not** silently moved
-  to the pool - that would either break already-shared descriptors or expose a
-  second destination, a deanonymisation surface). The user comes back online by
-  topping up (the same b32 is restored) or by turning the option **off**
-  explicitly, which reverts them to their fixed pool address. A top-up that
-  clears the debt re-arms the grace.
+Several links allow mirrors/onion/clearnet alternatives. There is no service
+catalogue because nothing is sold here: the only variables are whether a captcha
+is required, whether an operator has to approve the account, and the one storage
+quota everybody gets. (The global `username` namespace is a separate product sold
+by the central alias-resolver, not the service node - see `AliasResolver.md`.)
 
 server-core, when it rejects an unsubscribed sender, returns an error that points
 at the same portal.
 
 ## 3. Account model
 
-Per user (`subscriptions/<fp>.json`, `ledger/<fp>.json`):
+Per user (`subscriptions/<fp>.json`, `grants/<fp>.json`):
 
-- **subscription** - issued on free registration (captcha) or on a paid plan;
-  the hybrid-signed subscription certificate the client later fetches via the
-  existing `GET /v1/account/subscription`.
-- **balance** - a prepaid balance in **atomic units of the settlement currency**
-  (integer string, never a float; piconero for monerod), plus the currency code.
-- **ledger** - append-only entries `{ ts, type: topup|spend, amount, currency,
-  ref, balanceAfter }`. Top-ups credit; purchases debit. This is the account
-  history the portal shows.
-- **entitlements** - each is term-based with its own paid-through date, renewed
-  from the cabinet, reverting to a free baseline on lapse:
-  - `i2pDest` (the per-user-destination flag honoured by the messaging server /
-    pool provisioning, monthly);
-  - **storage quota** - the subscription's `quotaBytes`, the free default
-    (10 MiB) until a paid plan raises it, monthly.
+- **subscription** - issued on registration; the hybrid-signed subscription
+  certificate the client later fetches via `GET /v1/account/subscription`.
+- **approval** - `requestedAt` and `approvedAt`. On an open node an account is
+  approved the moment it is created; on a moderated one it stays pending (see
+  below). A renewal never restarts `requestedAt`, so a pending account cannot
+  outlive its deadline by renewing.
+- **transient** - the validity of the offline I2P transient the client last
+  delegated, recorded so any of the user's devices knows when to issue the next
+  one without holding the expiry itself.
 
-### Per-user i2p-dest (key custody + lifecycle)
+Unsubscribing tears the account down rather than merely stopping renewal: the
+destination is revoked and the grants are dropped.
+
+### The user's own I2P destination (key custody + lifecycle)
+
+Every account has its own serving destination - it is part of the base protocol,
+not a purchase, and there is no shared pool to fall back on (a shared address
+would make every user behind it provably co-located).
 
 The master I2P destination key stays on the **client** (the user's long-term
 routing identity, sealed at rest in the profile beside the messaging keys). The
@@ -144,108 +115,57 @@ short-lived **offline transient** delegated from that master, so the b32 is the
 user's own and stable as they move between servers, and an operator is locked out
 once its transient expires.
 
-Two clocks: the **entitlement** is monthly (auto-renewed from balance, with the
-one-step grace above); the **transient** is short (~= 1 week). The client re-issues
-a fresh transient ~= 2 days before it lapses, with a few hours of per-device
-**jitter**, and always **polls `GET /v1/account/i2p-status` before issuing** - so
-when one of the user's devices has already renewed, the others stand down
-(the multi-device race). `i2p-status` reports `enabled`/`active`, the recorded
-transient validity (so any device knows when to re-issue without storing it),
-the effective **storage quota**, and **honest projected shutoff dates** for both
-storage and i2pDest computed from the remaining balance.
+Because the server cannot blind a leaseset it has no master key for, a user's
+destination publishes a **standard** LeaseSet (a plain b32, enumerable by
+floodfills) rather than an encrypted one. That is the accepted cost of never
+sharing an address; every other destination in the project stays encrypted.
+
+The transient is short (~= 1 week). The client re-issues a fresh one ~= 2 days
+before it lapses, with a few hours of per-device **jitter**, and always **polls
+`GET /v1/account/i2p-status` before issuing** - so when one of the user's devices
+has already renewed, the others stand down (the multi-device race). Keeping the
+transient fresh is therefore an unconditional background duty of the client: let
+it lapse and the destination goes down and senders cannot deliver.
 
 On install/enable the client also sends the master to its **other devices** as a
 `device.i2p-master` service message - sealed to the account's own sealing key and
 delivered tokenlessly to the account's own destination - so every device adopts
 the same master (preserving the b32) and can re-issue transients.
 
-The server provisions/serves the personal destination on its embedded I2P router
+The server provisions/serves the destination on its embedded I2P router
 (`POST /v1/account/i2p-dest` -> the messaging server's operator-internal
-per-user-destination endpoint), reports its state on `GET /v1/messaging/destination`
-(`building` -> `active` -> `expired`), and falls a free user back to a fixed
-round-robin **pool** address (default pool size 10; see `Federation.md`).
+per-user-destination endpoint) and reports its state on
+`GET /v1/messaging/destination` (`none` -> `building` -> `active` -> `expired`).
 
 > Off the box: minting the offline transient and the master `.dat` is the
 > client's job (vendored libi2pd); the server consumes and serves the blob but
 > never generates it.
 
-## 4. Free registration
+## 4. Registration: open or moderated
 
 Behind login, gated by the configured **captcha**. On success the node issues a
-free-tier subscription into the `SubscriptionStore`; the client then fetches its
-certificate via `GET /v1/account/subscription`. No payment, no balance touched.
+subscription into the `SubscriptionStore`; the client then fetches its
+certificate via `GET /v1/account/subscription`.
 
-## 5. Payments (config-driven gateways)
+An operator chooses one of two modes (`registration.requireApproval`):
 
-The gateway and the paid-service prices are selected **by config**, not
-hardcoded - a single JSON file passed as `--payments-config <path>`, the one
-source feeding both the discovery advertisement and the buy endpoints (see
-`service-node/payments.example.json`):
+- **open** - the account is servable the moment it is created.
+- **approval** - the account is created but **frozen**: its transient is refused
+  with `ACCOUNT_PENDING_APPROVAL`, so its destination is never brought up and it
+  can neither send nor receive. The error carries the operator's
+  `registration.message`, which is where they say how to reach them to finish
+  registration. The operator approves by hand from the admin panel. An account
+  nobody approves within `registration.ttlDays` (default 7) is deleted, so a dead
+  registration does not hold a fingerprint forever.
 
-```json
-{
-  "gateway": { "type": "monerod", "params": { "url": "...", "user": "...", "password": "...", "minconf": "10", "callback_secret": "..." } },
-  "settlementCurrency": "XMR",
-  "freeStorageBytes": 52428800,
-  "services": {
-    "i2pDest":  { "enabled": true, "priceAtomic": "...", "periodDays": 30 },
-    "storage":  { "enabled": true, "priceAtomic": "...", "periodDays": 30, "quotaBytes": ... }
-  },
-  "portal": {
-    "message": "<onboarding text shown by the client>",
-    "links": ["https://portal-a.example", "http://mirror.b32.i2p"],
-    "captcha": { "enabled": true, "length": 5, "ttlSeconds": 300 }
-  }
-}
-```
+This is moderation, not a paywall.
 
-The `portal` block drives onboarding discovery (section 2): `message` and `links` are
-advertised verbatim by `GET /v1/account/portal`, and `captcha.enabled` is both
-advertised there as `freeRegistration.captcha` **and** enforced at
-`POST /portal/register` - the two cannot disagree. With `captcha.enabled` false,
-free registration is open to any signed-in (sign-in-with-key) user without a
-captcha; `length`/`ttlSeconds` size the self-hosted captcha when it is on.
+| Endpoint | Purpose |
+|---|---|
+| `GET /v1/account/pending` | Operator-signed: accounts awaiting approval, oldest first |
+| `POST /v1/account/approve` | Operator-signed: approve one account |
 
-With no config file the node runs a local-dev default (an auto-confirm `mock`
-gateway and cheap services). The code ships **one** real backend - **monerod** -
-plus the deterministic `mock` used in tests. Backends implement the
-`PaymentGateway` interface and register by `type`; a self-written gateway plugs
-in via `registerPaymentGateway(type, factory)` with no change to the plumbing.
-
-### PaymentGateway interface (server-side)
-
-```
-createInvoice(amount, orderRef) -> Invoice { id, payTo, amount, expiresAt, state }
-checkStatus(invoiceId)          -> PaymentStatus { state, paidAmount, confirmations }
-verifyByTxid(invoiceId, txid)   -> PaymentStatus     // pull path (callback missed)
-parseWebhook(body, signature)   -> PaymentStatus?    // push path (callback)
-```
-
-`PaymentState  in  { pending, paid, confirmed, expired, failed }`. `Money.amount`
-is an exact decimal/atomic string (no floats).
-
-### monerod backend
-
-Talks to a `monero-wallet-rpc`. An invoice is a **fresh subaddress** for the
-account; the invoice id encodes its address index.
-
-- **createInvoice** -> `create_address` -> `{ address, address_index }`; `payTo` is
-  the subaddress (rendered with the amount as a `monero:` URI / QR).
-- **checkStatus** -> `get_transfers { in:true, subaddr_indices:[index] }`; sum the
-  received amount and report confirmations against the configured `minconf`.
-- **callback (push)** -> the node exposes `POST /v1/pay/callback/monerod`, called
-  by an operator-side watcher (e.g. a `get_transfers` poller or a wallet
-  tx-notify hook). The body carries `{ invoiceId, txid }` with an HMAC over a
-  configured secret; the gateway **re-verifies against the wallet** (never trusts
-  the callback's amount) and settles the invoice.
-- **verifyByTxid (pull)** -> the frontend submits a `txid` the user paid with; the
-  gateway calls `get_transfer_by_txid` and confirms it credits our subaddress for
-  >= the amount due. This is the fallback when the callback was missed.
-
-Both paths converge on the same wallet-verified settlement, then the **balance**
-is credited and a ledger entry written.
-
-## 6. Captcha (pluggable, self-hosted default)
+## 5. Captcha (pluggable, self-hosted default)
 
 A `Captcha` interface (`issue() -> {id, challenge-render}`, `verify(id, answer)
 -> bool`). The built-in default is a **self-hosted server-rendered image/text
@@ -254,73 +174,57 @@ register a different provider. Captcha gates free registration (and optionally
 other unauthenticated actions); it never depends on an external service by
 default, preserving the privacy posture.
 
-## 7. Web frontend (JS + JS-free)
+## 6. Web frontend (JS + JS-free)
 
 The service node serves the portal HTML on the same port as the JSON API, at
 `/` (the JSON API stays under `/portal/*` and `/v1/*`, untouched). The
 **JS-free** path (server-rendered forms, full-page reloads, post-redirect-get)
-is implemented; the first **JS-enhanced** layer - inline, same-origin live
-payment-status polling on the pay page - is implemented on top (with the
-Refresh link as the JS-free fallback). Inline QR is still planned (kept out of
-the JS-free path; a JS QR renderer would add a third-party dependency). Pages,
-all reusing the JSON endpoints' logic:
+is the whole frontend: with nothing to pay for there is no status to poll and no
+QR to render. Pages, all reusing the JSON endpoints' logic:
 
 - **login** (`GET /login`, `POST /login`) - render a challenge; a field to paste
   the Client signature; on success set a session cookie and redirect to `/`.
-- **cabinet** (`GET /`) - balance, subscription state, offered services.
-- **register** (`GET /register`, `POST /register`) - inline captcha (when
-  enabled) -> free subscription.
-- **top-up / pay** (`GET /topup`, `POST /topup`, `GET /pay/{id}`) - create
-  invoice; show `payTo` + amount; JS-free offers a "refresh" link and a
-  "I paid -> enter txid" form (`POST /pay/{id}/txid`); JS may poll `GET /pay/{id}`.
-- **buy** (`POST /buy`, `service` field) - debit balance, grant/renew the
-  entitlement.
+- **cabinet** (`GET /`) - subscription state, the server descriptor to paste into
+  a client, and - on a moderated node - the "awaiting approval" notice with the
+  operator's instructions.
+- **register** (`GET /register`, `POST /register`) - captcha, then the grant.
 
-## 8. API relationships
+## 7. API relationships
 
 | Caller | Endpoint | Auth | Purpose |
 |---|---|---|---|
-| Client | `GET /v1/account/portal` | none | onboarding text + portal links + offered services |
+| Client | `GET /v1/account/portal` | none | onboarding text + portal links + registration terms |
 | Client | `sign-login <challenge>` (local) | key | produce the login signature |
 | Browser | `GET /login`, `POST /login` | sig -> session | sign-in-with-key |
-| Browser | `POST /register` | session + captcha | free subscription |
-| Browser | `POST /topup`, `GET /pay/{id}`, `POST /pay/{id}/txid` | session | balance + payment |
-| Browser | `POST /buy` (`service` field) | session | spend balance, grant/renew entitlement |
-| Browser | `POST /i2p-dest` (+ JSON `POST /portal/i2p-dest`) | session | turn the per-user i2p-dest option on/off |
-| watcher | `POST /v1/pay/callback/<gateway>` | HMAC | payment push notification |
+| Browser | `POST /register` | session + captcha | subscription grant |
+| Panel | `GET /v1/account/pending`, `POST /v1/account/approve` | operator sig | moderation |
 | Client | `GET /v1/account/subscription` | key | fetch the issued certificate |
-| Client | `POST /v1/account/i2p-dest/setting` | key | turn the per-user i2p-dest option on/off |
-| Client | `POST /v1/account/i2p-dest` | key | upload a signed offline transient (gated by an active i2pDest entitlement) |
-| Client | `GET /v1/account/i2p-status` | key | enabled/active, transient validity, storage quota, balance-projected shutoff dates |
+| Client | `POST /v1/account/i2p-dest` | key | upload a signed offline transient (refused while the account is unapproved) |
+| Client | `GET /v1/account/i2p-status` | key | approval state and the recorded transient validity |
 | Client | `GET /v1/account/contact` | none | fingerprint -> contact card lookup |
 
-## 9. Removed (replaced by the portal)
+## 8. Removed (replaced by the portal)
 
-- `POST /v1/account/subscribe` (client-initiated grant, no captcha/payment) and
+- `POST /v1/account/subscribe` (client-initiated grant, no captcha) and
   the client `Session::subscribe` direct flow.
 - `POST`/`DELETE /v1/account/alias`, `GET /v1/account/resolve`, and the on-node
   alias registry: the global `username` namespace moved out to the central
   **alias-resolver** (`AliasResolver.md`). The service node no longer sells,
   stores, or resolves names; it sells only `i2pDest` and `storage`.
-- The `bitcoind` payment backend (the abstraction stays; only `monerod` ships).
 
 Kept: `GET /v1/account/subscription`, `contact`; the `mock` gateway
 (tests); the `PaymentGateway` registry/abstraction.
 
-## 10. Security notes
+## 9. Security notes
 
 - The key never enters the browser; login is a relayed one-shot signature bound
   by `purpose` + `audience` + a fresh, HMAC-bound, single-use nonce.
-- Payment settlement is **always** re-verified against the wallet; callbacks are
-  triggers, not sources of truth. Money amounts are integer atomic units.
 - Captcha defaults to self-hosted (no third-party calls, JS-free capable).
-- Sessions are short-lived signed cookies; paid-service grants and balance moves
-  are logged in the per-user ledger.
+- Sessions are short-lived signed cookies.
+- Approval and deletion are operator-signed actions on the private channel; the
+  portal itself can neither approve an account nor see who is waiting.
 
-## 11. Open questions
+## 10. Open questions
 
-- Multi-currency balances / price feeds (monorod-only for now -> single currency).
-- Abuse/revocation: clawback of a paid service on chargeback/fraud (crypto =
-  final, so low risk; fiat gateways later need this).
 - Whether server-core embeds portal links in its rejection error or only
   references the service node's `/v1/account/portal`.
