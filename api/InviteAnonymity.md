@@ -79,13 +79,12 @@ server). Sealing the admission header is also what keeps the **sender's own
 relay server** (and the I2P transport) from learning the recipient: otherwise
 the sender's server would log a social-graph edge "U -> V", violating the
 "sender's own server never learns the recipient" invariant (`Federation.md`);
-for free users it is what preserves the pool k-anonymity.
+it is what keeps the serving key bound to the destination rather than the server.
 
-**Ownership** (so this is not a "server signs" step): for a paid personal dest
+**Ownership** (so this is not a "server signs" step): for a personal dest
 the client may **generate `sealingKey_U` itself and delegate the private half to
 its server** (like the offline destination key), making it fully
-client-originated; for a free pool dest it is the server-owned key shared across
-that pool dest (same k-anonymity set as the dest). Either way the card still
+client-originated. Either way the card still
 carries only U's signature.
 
 ## Routing by destination
@@ -107,7 +106,7 @@ DeliveryEnvelope:
 ```
 
 The sender's own server still learns only "user U sent something to destination
-D" - and D is shared by a whole pool of free users, so it is weaker than a
+D" - which, since D is the recipient's own destination, is as strong as a
 server fingerprint, not stronger.
 
 ### Local delivery only within a destination (no co-location timing channel)
@@ -116,8 +115,8 @@ A server may short-circuit delivery (store straight into the local mailbox
 instead of dialling out over I2P) **only when the sender and the recipient are
 on the same destination** - i.e. `toDest` equals the **sender's own** assigned
 destination. In every other case, including any two local users the server hosts
-on *distinct* serving destinations (e.g. two free users on different pool dests,
-or a pool user and a personal-dest user), the server **must federate** - dial
+on *distinct* serving destinations - which, since no two users ever share one,
+means any two different users - the server **must federate**: dial
 `toDest` over I2P **from the sender's own serving destination**. The two endpoints
 are distinct destinations on the one router; this is not a single dest dialling
 itself. (The server has no shared "home" federation address to fall back on - see
@@ -140,7 +139,7 @@ sender cannot force a revealing short-circuit.
 ## The destination knob (`dest_U`)
 
 **Fundamental rule: a server has no single, shared federation destination.** Every
-user is served by `dest_U` (a pool dest within a k-anonymity set, or a personal
+user is served by `dest_U` (their own personal
 per-user dest), and *all* of that user's federation rides over it - inbound
 delivery, outbound delivery (dialled **from** `dest_U`), and the signed
 `delivered-ack` (`Federation.md`). A server-wide "home" address is never used for
@@ -148,17 +147,13 @@ user traffic (it serves only first-contact card discovery); a shared federation
 source would both leak a common address and, when sender and recipient share a
 server, force the home endpoint to dial itself.
 
-- **Free tier** - `dest_U` is one of the server's **address-pool** destinations
-  (encrypted-LeaseSet b33; `server-core` `FederationPool`). Free users are
-  spread deterministically across the pool (`poolIndexFor`), giving k-anonymity
-  ~= N_free / poolSize. Co-location is bounded to "one of the users on this pool
-  dest," never "this exact user."
-- **Paid tier** - `dest_U` is the user's **personal** destination, brought up
-  from the offline-key transient the user delegates (`PerUserDestinations`). It
-  is the user's full bidirectional federation identity; no other server can tie
-  it to the home server, so there is no co-location signal at all.
+- Every user's `dest_U` is their own: an offline-key master held by the client,
+  delegated to the server as a time-boxed transient. There is deliberately no
+  shared fallback - a shared address would let anyone holding two contact cards
+  prove their owners are hosted together, which is exactly the metadata the
+  project treats as a critical bug.
 
-The pool/personal split already exists in `server-core`; this revision is what
+Per-user destinations already exist in `server-core`; this revision is what
 finally **surfaces** the assigned destination into the user-facing card.
 
 ## Per-destination serving sealing key
@@ -167,7 +162,6 @@ The delivery envelope's routing metadata is sealed to a **serving sealing key
 bound to `dest_U`**, not to one server-wide key:
 
 - A **personal** dest has its own sealing key (effectively per-user).
-- A **pool** dest has one sealing key shared by the free users on that dest -
   the same k-anonymity set as the dest itself, so it leaks nothing the dest did
   not already.
 
@@ -189,7 +183,6 @@ alongside its serving sealing key - a `(destination, signing key, serving sealin
 key)` group, never reused on another destination:
 
 - A **personal** dest has its own signing key (effectively per-user).
-- A **pool** dest has one signing key shared by the free users on that dest - the
   same k-anonymity set as the dest and its serving sealing key.
 
 This closes the last server-wide signer. A single server-identity ack key would
@@ -210,7 +203,7 @@ them:
 
 - The server still stores a user-signed subscription cert as its lifecycle
   anchor, but the binding "this cert is for me" is checked against the
-  **destination + serving sealing key the server operates** (the pool dest it
+  **destination + serving sealing key the server operates** (the dest it
   assigned, or the personal dest the user delegated), not against the server's
   root fingerprint. A server accepts a subscription iff the cert's `dest` /
   `servingSealingKey` are ones it serves.
@@ -224,8 +217,8 @@ Net: the `server` fingerprint disappears from every peer-visible artifact.
 At subscribe time (grant-gated; see `ServicePortal.md`) the server returns, in
 place of the server card:
 
-- the assigned `dest` (pool dest for free; the personal dest brought up from the
-  delegated offline transient for paid), and
+- the assigned `dest` (brought up from the client's delegated offline
+  transient), and
 - the **public** serving sealing key for that dest.
 
 The client folds both into its self-signed contact card and into the cert it
@@ -259,7 +252,7 @@ mapping.
   different destination) - see "Local delivery ..." above. This is the rule, not an
   optimisation; a fast local path for a different-destination recipient is a
   co-location timing leak.
-- Accept side is unchanged in shape: home / pool / personal destinations each
+- Accept side is unchanged in shape: home / personal destinations each
   already run an accept loop into the shared `DeliveryEngine`; add per-dest
   serving-sealing-key selection.
 - The `peers.json` fingerprint->dest resolver is no longer on the client-driven
@@ -273,8 +266,8 @@ mapping.
 
 ## Honest accounting (what still leaks)
 
-- Free users on one pool dest share `dest` + serving sealing key -> k-anonymity
-  ~= N_free / poolSize (tunable by pool size, default 10).
+- No two users ever share a `dest` or a serving sealing key, so a pair of
+  contact cards can never prove their owners are hosted together.
 - The home server knows dest<->U (operator trust) - unchanged.
 - Global passive I2P traffic-correlation is out of scope.
 - Paid personal dests have no co-location signal.
