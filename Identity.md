@@ -29,8 +29,8 @@ Status: draft skeleton.
   `api/FederatedResolve.md`), not from a fetched server card. Cross-server
   username resolution is served by the separate central resolver
   (`api/AliasResolver.md`), which signs its own records.
-- **Delivery sealing is per-destination.** Each serving destination (the home
-  destination, each address-pool destination, a paid per-user destination) has
+- **Delivery sealing is per-destination.** Each serving destination (the server's
+  home destination and every user's own destination) has
   its **own serving sealing key**; the delivery envelope's admission header
   (recipient, token, messageId) is sealed to the serving sealing key of the
   recipient's destination, whose private half the recipient's server holds. There
@@ -58,7 +58,7 @@ Issued **by the user**, signed with the identity key; asserts "server S serves u
 Body (draft): `{ v, user: <fingerprint>, server: <server-fingerprint>, issuedAt, notAfter, sealingKey?, dest?, servingSealingKey? }`.
 
 - `sealingKey` - the user's E2E sealing **prekey** (SPKI DER, base64): a contact encrypts the very first contact request to it before any token exchange. Because it rides inside the user-signed certificate, no intermediary can substitute it, closing the first-message bootstrap gap.
-- `dest` - the user's serving **destination** as a `.b32.i2p` host (its b33; its standard b32 for a paid offline-key destination, which cannot publish a b33): where a contact routes deliveries. Never a raw destination or an addressbook name (`api/Federation.md`).
+- `dest` - the user's serving **destination** as a `.b32.i2p` host (a user's own offline-key destination cannot publish a b33, so there it is the standard b32): where a contact routes deliveries. Never a raw destination or an addressbook name (`api/Federation.md`).
 - `servingSealingKey` - the public **serving sealing key** of that destination: a contact seals the delivery envelope's admission header to it. Not a signature and not a trust anchor - the user just vouches for it under their one signature; a wrong value only makes delivery fail (`InviteAnonymity.md`). Its private half is held by the user's server. The client learns `dest`/`servingSealingKey` from its server (`GET /v1/messaging/destination`) and folds them into the certificate.
 
 There is **no server fingerprint dependency or server card** in the peer-facing artifact - routing is by destination.
@@ -78,7 +78,7 @@ A user holds a subscription with **exactly one server at a time**. Migration S1 
 2. Push the new contact card (S2 destination + serving sealing key + prekey) + fresh token batches to all contacts over E2E.
 3. Contacts switch as the card arrives. Deliveries that race the cutover **fail and stay on the sender's client** (standard send semantics) and are retried after the new card arrives - messages are delayed, not lost.
 
-Failure mode accepted: if S1 dies before the user prepared the migration, contacts' retries keep failing until the user pushes a new card (or, with an alias, contacts re-resolve it). A paid per-user destination is portable across servers (it is the user's own offline key), so migration need not change the destination at all.
+Failure mode accepted: if S1 dies before the user prepared the migration, contacts' retries keep failing until the user pushes a new card (or, with an alias, contacts re-resolve it). A user's destination is portable across servers (it is their own offline key), so migration need not change the destination at all.
 
 ### Alias certificate
 

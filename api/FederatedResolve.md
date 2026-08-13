@@ -56,7 +56,7 @@ even though v1 runs one resolver (`AliasResolver.md`).
 
 ## Transport: direct-dial preferred, own-server proxy fallback
 
-Mirrors the blob-storage download model.
+Mirrors the direct file-transfer fetch (`FileTransfer.md`).
 
 - **Direct (preferred; the client's embedded I2P router is up).** The client dials `srv` (card
   fetch) or the resolver's b32 (alias resolve) itself over a **fresh transient
@@ -140,7 +140,7 @@ Namespace anti-enumeration is out of scope (resolve is unauthenticated by design
    (`record -> delegated -> root`) on the existing hybrid-cert primitives. Unit
    tests round-trip each.
 2. **server-core** - *done.* The card-fetch responder on every serving
-   destination (home/pool/per-user: unseal `fp` query -> return the card sealed to
+   destination (the home one and every user's own: unseal `fp` query -> return the card sealed to
    the response key) and the proxy relay (`POST /v1/messaging/fetch`, op `card`
    and `resolve`, `.b32.i2p`-validated `toDest`) that moves opaque sealed bytes.
 3. **client** - *done.* Descriptor handling, a fetch transport that prefers a

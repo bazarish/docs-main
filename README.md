@@ -39,12 +39,9 @@ One repository per component, developed side by side:
 | Component | Repository |
 |---|---|
 | Shared C++ library | [common-cpp](https://github.com/bazarish/common-cpp) |
-| Messaging server | [server-core](https://github.com/bazarish/server-core) |
-| Service node (user management, portal, payments) | [service-node](https://github.com/bazarish/service-node) |
-| HTTP facade (last mile) | [facade-http](https://github.com/bazarish/facade-http) |
+| Server fleet: messaging server, service node, HTTP facade, admin panel | [bazarish-server](https://github.com/bazarish/bazarish-server) |
 | Client (core, CLI, Qt6 GUI) | [client-qt6](https://github.com/bazarish/client-qt6) |
-| Large-message blob store (encrypted-LeaseSet hosts over I2P) | [blob-storage](https://github.com/bazarish/blob-storage) |
-| Fleet status + management panel (sign-in-with-key) | [admin-panel](https://github.com/bazarish/admin-panel) |
+| Username registry (signed resolve + portal; the one paid component) | [alias-resolver](https://github.com/bazarish/alias-resolver) |
 | Specification | this repository |
 
 ## Cryptography

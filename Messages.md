@@ -297,35 +297,36 @@ read message's `id`, so the sender greens that message and every earlier one it
 sent that peer. A failed delivery surfaces as a distinct failed state, not a tick;
 a delivery the sender's server cannot confirm stays grey (never a false failure).
 
-## Media: blob-storage pointers
+## Media: announced, transferred directly
 
-Bulk content (files, photos, audio, voice) - and any message blob over **512 KB**
-- is **never** inlined in the mailbox envelope. It rides through the **blob store**
-(rotating encrypted-LeaseSet destinations served only over I2P). The whole path is
-**streamed end-to-end** - sender, facade, store and recipient each spool to disk, so
-no node holds the blob in memory and a file can exceed any one node's RAM (full
-design in `api/FileTransfer.md`):
+Bulk content (files, photos, audio, voice) is **never** inlined in the mailbox
+envelope, and it is not parked on a storage service either - there is none. The
+message **announces** the file and the bytes stay with the sender until the
+recipient asks for them, at which point the sender serves that one file over a
+one-time I2P destination (full design in `api/FileTransfer.md`):
 
-1. The sender encrypts the bytes with a fresh random key (CMS password-based
-   envelope, AES-256; the key is the password - standard primitives only, no
-   custom construction).
-2. The sender uploads the ciphertext to the blob store, which returns a
-   `.b32.i2p` capability URL, a `blobId` and a `deleteToken`. The store holds
-   opaque ciphertext only, with its own quota and TTL.
-3. The sender's message (`type: "file"` etc.) carries `{ ptr: base64(sealed
-   BlobPointer), size, mime, name }` - all end-to-end encrypted. The pointer
-   holds the download URL, the decryption key and the integrity digest.
-4. The recipient fetches the ciphertext over I2P (a transient I2P destination
-   straight to the blob's b33, or its own server's proxy fetch), verifies the
-   digest and decrypts. The store never sees the key and cannot read the content.
+1. The sender hashes the plaintext and sends `type: "file"` carrying
+   `{name, size, sha256, mime}` - all end-to-end encrypted, no bytes.
+2. When the recipient wants it, its client sends a silent `file.request`; the
+   sender answers `file.offer` with a one-time destination and the key it
+   encrypted a temporary ciphertext with (CMS password-based envelope, AES-256 -
+   standard primitives only, no custom construction).
+3. The recipient connects to that destination, streams the ciphertext with
+   `offset`-based resume, verifies the announced digest and decrypts. Each
+   attempt dials from a **fresh** destination, so a resumed transfer is
+   unlinkable to the one it continues.
+4. `file.unavailable` is the honest answer when the sender no longer holds the
+   file.
 
-Why a pointer and not an inline blob: the messaging server never carries the
-bulk bytes, so a **quota-constrained recipient can receive arbitrarily large
-content**; the transfer is independent of the conversation; and download is
-I2P-only (`.b32.i2p`), so a direct fetch can never leak the fetcher's IP.
+There is no client-side size threshold: a client sends normally and falls back to
+a direct transfer on the server's typed per-message-limit error, so the threshold
+is the server's own advertised limit.
 
-The blob store sees: ciphertext bytes and their size. It never sees: who the
-content is for, what type it is, the decryption key, or its plaintext.
+Why announce rather than store: the messaging server never carries the bulk
+bytes, so a **quota-constrained recipient can receive arbitrarily large
+content**, and no third party ever holds the ciphertext. The cost, stated
+plainly: a file is available only while the sender is online and still has it,
+which is what `TransferState` reports instead of implying delivery.
 
 ## Calls
 

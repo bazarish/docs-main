@@ -26,7 +26,7 @@ Status: draft skeleton.
   `isB32I2pHost`/`validateB32I2pHost`, applied wherever a destination is ingested
   or dialled). Most destinations are published as an **encrypted LeaseSet2**, so
   the address is the blinded **b33** (`<b33>.b32.i2p`); the raw destination of
-  such a dest is not connectable (no plain leaseset is published). A paid per-user
+  such a dest is not connectable (no plain leaseset is published). A user's own
   offline-key destination can only publish a **standard LeaseSet2**, so it is
   addressed by its standard **b32** (`<b32>.b32.i2p` = base32(sha256(destination)))
   - offline keys cannot sign a b33 (see `Identity.md`, `InviteAnonymity.md`).

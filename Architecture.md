@@ -35,7 +35,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 
 ## Key decisions
 
-1. **Repository scope** - one repository per component: `server-core`, `service-node`, `facade-http`, `client-qt6`, `common-cpp` (shared C++ library), `blob-storage` (large-message store, rotating encrypted-LeaseSet hosts over I2P), `admin-panel` (fleet status + management web panel), and `docs-main` (this repository - the canonical protocol specification all components implement). Repositories are developed side by side in a single workspace.
+1. **Repository scope** - the server fleet lives in one repository, `bazarish-server` (`server-core`, `service-node`, `facade-http`, `admin-panel`, sharing one build of `common`); separate from it are `client-qt6` (client core + CLI + GUI), `common-cpp` (the shared C++ library, checked out as each repository's `common` submodule), `alias-resolver` (the username registry, the only paid component) and `docs-main` (this repository - the canonical protocol specification all components implement). Repositories are developed side by side in a single workspace.
 2. **Service node is a separate process** with its own API, keeping messaging logic and user management separated.
 3. **Facade <-> server transport** - operator private channel, not a hidden network hop.
 4. **Wire format** - JSON for control messages, raw HTTP bodies for binary content (no base64 overhead). E2E-encrypted payloads are opaque blobs to all server-side components.
@@ -84,13 +84,14 @@ docs-main/                       # this repository - canonical protocol specific
     |-- Calls.md                 # call signaling and media tunnels
     +-- Storage.md               # storage backend interface
 
-common-cpp/ (dir: common/)      # shared C++ library: protocol types, OpenSSL wrappers, JSON helpers
-server-core/                     # messaging server daemon (I2P federation, destination-routed)
-service-node/                    # service node daemon (subscriptions, aliases, portal, payments)
-facade-http/                     # HTTP facade daemon
+common-cpp/ (dir: common/)      # shared C++ library: protocol types, OpenSSL wrappers, embedded i2pd
+bazarish-server/                 # the server fleet, one build tree:
+    server-core/                 #   messaging server daemon (I2P federation, destination-routed)
+    service-node/                #   service node daemon (subscriptions, portal, moderation)
+    facade-http/                 #   HTTP facade daemon (secret-path last mile)
+    admin-panel/                 #   fleet status + management web panel (sign-in-with-key)
 client-qt6/                      # client core + CLI + Qt6 GUI
-blob-storage/                    # large-message store: rotating encrypted-LeaseSet hosts over I2P
-admin-panel/                     # fleet status + management web panel (sign-in-with-key)
+alias-resolver/                  # username registry: signed resolve over I2P + portal (paid)
 ```
 
 ## Open questions
