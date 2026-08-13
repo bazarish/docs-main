@@ -6,14 +6,15 @@ The facade is the "last mile" between the client and the server infrastructure. 
 
 ## First implementation: HTTP facade (implemented)
 
-- Deployed behind a reverse proxy (Caddy, nginx, ...) under a **secret URI** known only to clients of this server. The secret URI is part of the registration bundle (server key fingerprint + facade list). The facade also accepts an optional `--base-path <secret>` that it requires and strips before forwarding, so the secret can live at the proxy, the facade, or both.
-- A single catch-all handler relays every request **transparently** - method, headers, body and query string verbatim - to backends over the **operator private channel** (localhost/unix socket/VPN), routing by path prefix:
+- Published under a **secret URI** known only to clients of this server, and that secrecy is **mandatory, not a deployment option**: `bazarish-facade-http` refuses to start without `--base-path <secret>`, which it requires on every request and strips before forwarding. The single exception is an explicit `--public`, and it means one thing only - a fronting reverse proxy (Caddy, nginx, ...) already publishes this facade under a secret URI of its own. The secret reaches a client solely inside the facade URL of the server descriptor (below); it is never advertised, never derived from the server fingerprint, and never sent anywhere else.
+- The whole clearnet API therefore lives under the secret prefix, **including the unauthenticated `GET /v1/messaging/reseed`** (`ClientApi.md`), whose only gate this is: a client fetching its first netDb has no I2P transport and no delivery token yet, so the prefix is what keeps the request - and the fact that this host serves Bazarish at all - out of a scan.
+- A single catch-all handler relays every request **transparently** - method, headers, body and query string verbatim - to backends over the **operator private channel** (localhost/unix socket/VPN), routing by path prefix once the secret prefix is stripped:
   - `/v1/messaging/*` -> messaging server
   - `/v1/account/*` -> service node
-  - `/v1/storage/blob` and `/v1/storage/usage` -> blob store (the only blob endpoints exposed: the upload and the caller's own usage query; the operator quota endpoint `/v1/storage/quota` and the I2P-only `/b/*` downloads are never forwarded)
   - anything else -> 404 (never forwarded)
+- Everything outside the secret prefix answers the same bare **404** - the API root, an unknown path, and the operator liveness endpoint alike - so a probe of the host learns nothing. `/healthz` is not on the client-facing socket at all: it is served on a separate private **ops listener** (`--ops-listen <host> <port>`) that is never published to clients (`AdminPanel.md`).
 - Nothing streams through the facade: the only large payload there ever was - a file upload - now goes directly between clients (see `FileTransfer.md`).
-- Holds no keys, parses no content (the auth signature is verified by the backends, not the facade), stores nothing durably (a streamed blob upload is briefly spooled to a temp file, then removed). An unreachable backend yields a `FACADE_UPSTREAM` 502 - the facade is a dumb pipe.
+- Holds no keys, parses no content (the auth signature is verified by the backends, not the facade), stores nothing. An unreachable backend yields a `FACADE_UPSTREAM` 502 - the facade is a dumb pipe.
 - Implemented in the `facade-http` repository (`Facade`; covered by tests and live-verified relaying to a running server-core).
 
 ## Client addressing
@@ -21,7 +22,7 @@ The facade is the "last mile" between the client and the server infrastructure. 
 A client reaches a facade through a single **facade URL**:
 
 ```
-http[s]://host[:port][/secret-path]
+http[s]://host[:port]/secret-path
 ```
 
 - **scheme** - `http` or `https`. `https` is for facades fronted by a
@@ -31,10 +32,13 @@ http[s]://host[:port][/secret-path]
   fingerprint, not in TLS PKI.
 - **host[:port]** - the facade's address. The port defaults to `443` (https) /
   `80` (http) when omitted.
-- **/secret-path** - the optional secret URI prefix. The client prepends it to
-  every request path; the facade (or the fronting proxy) strips it before
-  forwarding. It is excluded from the signed canonical path, so the backend
-  verifies the stripped, query-less path.
+- **/secret-path** - the secret URI prefix, e.g. `/h9fd/kshdcy/secretdkg`. The
+  client prepends it to **every** request path, the first reseed included; the
+  facade (or the fronting proxy) strips it before forwarding. It is excluded from
+  the signed canonical path, so the backend verifies the stripped, query-less
+  path, and one signature is valid across all of a server's facades. A URL
+  without a path is only ever correct when the fronting proxy holds the secret
+  instead.
 
 ### Facade locality (invariant)
 
