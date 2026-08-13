@@ -1,7 +1,7 @@
 # Admin panel
 
 The `admin-panel` is one web interface to monitor and manage a Bazarish fleet
-(server-core, service-node, blob-storage, facade-http, alias-resolver). It is a
+(server-core, service-node, facade-http, alias-resolver). It is a
 co-located operations tool: it reaches each service on its private listen address
 and is never exposed through the facade or over I2P.
 
@@ -39,13 +39,12 @@ its state directory); it signs every service call with the request-auth headers
 fingerprints (`--operator-fingerprint`, repeatable) and verifies the request with
 `auth::authorizeRequest` (verify both signatures, then require the caller
 fingerprint to be authorised). The service node likewise signs its own
-quota/transient pushes with its identity, so the storage backends authorise both
-the service node and the panel.
+quota/transient pushes with its identity, so server-core authorises both the
+service node and the panel.
 
 | Service | Authorised operators |
 |---|---|
 | server-core | service-node, admin-panel |
-| blob-storage | service-node, admin-panel |
 | service-node | admin-panel |
 | facade-http | admin-panel |
 | alias-resolver | admin-panel |
@@ -63,6 +62,13 @@ Every service exposes the same liveness endpoint, built from the shared
 `uptime` is seconds since the service's API came up; `ramBytes`/`ramPeakBytes` are
 the current and peak resident set (Linux `/proc/self/status` VmRSS / VmHWM). The
 endpoint is operator-signed, so it discloses nothing to an unauthenticated caller.
+
+Every service but one serves it on the same private listener as its API, which is
+already unreachable from the clearnet. The exception is **facade-http**, whose API
+listener *is* the clearnet one: there `/healthz` would answer a caller who does not
+know the secret prefix and thereby identify the host as a facade, so it lives on a
+separate private ops socket (`--ops-listen <host> <port>`) and the panel is
+configured with that address, not the published facade URL (`Facade.md`).
 The panel probes every configured service concurrently and renders status,
 version, uptime, current/peak RAM and round-trip latency.
 
@@ -72,7 +78,7 @@ The panel drives the operator endpoints the services already provide:
 
 | Action | Endpoint | Services |
 |---|---|---|
-| Set a user's storage quota | `PUT /v1/messaging/quota`, `PUT /v1/storage/quota` | server-core, blob-storage |
+| Set a user's mailbox quota | `PUT /v1/messaging/quota` | server-core |
 | Provision/revoke a user's personal I2P destination | `PUT /v1/messaging/i2p-dest` | server-core |
 
 ## Configuration
@@ -84,7 +90,7 @@ The panel drives the operator endpoints the services already provide:
   "listen": {"host": "127.0.0.1", "port": 8460},
   "services": [
     {"name": "server-core", "kind": "server-core", "url": "http://127.0.0.1:8420"},
-    {"name": "blob-storage", "kind": "blob-storage", "url": "http://127.0.0.1:8456"}
+    {"name": "facade", "kind": "facade", "url": "http://127.0.0.1:8429"}
   ]
 }
 ```
