@@ -120,6 +120,13 @@ destination publishes a **standard** LeaseSet (a plain b32, enumerable by
 floodfills) rather than an encrypted one. That is the accepted cost of never
 sharing an address; every other destination in the project stays encrypted.
 
+A destination can only be delegated once the account exists, so the client
+subscribes first, delegates its transient, and immediately re-publishes its
+contact card (`POST /v1/account/renew` inside the term it already holds, which
+grants nothing and consumes no grant) with the routing folded in. On a moderated
+node the delegation is refused until an operator approves the account, so the
+client publishes its routing then instead.
+
 The transient is short (~= 1 week). The client re-issues a fresh one ~= 2 days
 before it lapses, with a few hours of per-device **jitter**, and always **polls
 `GET /v1/account/i2p-status` before issuing** - so when one of the user's devices
@@ -210,7 +217,9 @@ QR to render. Pages, all reusing the JSON endpoints' logic:
 - `POST`/`DELETE /v1/account/alias`, `GET /v1/account/resolve`, and the on-node
   alias registry: the global `username` namespace moved out to the central
   **alias-resolver** (`AliasResolver.md`). The service node no longer sells,
-  stores, or resolves names; it sells only `i2pDest` and `storage`.
+  stores, or resolves names - and since the payment layer moved to the resolver
+  too, it now sells nothing at all: a destination and a mailbox quota come with
+  the account.
 
 Kept: `GET /v1/account/subscription`, `contact`; the `mock` gateway
 (tests); the `PaymentGateway` registry/abstraction.
