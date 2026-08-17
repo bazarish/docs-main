@@ -29,8 +29,8 @@ Status: draft skeleton.
   `api/FederatedResolve.md`), not from a fetched server card. Cross-server
   username resolution is served by the separate central resolver
   (`api/AliasResolver.md`), which signs its own records.
-- **Delivery sealing is per-destination.** Each serving destination (the server's
-  home destination and every user's own destination) has
+- **Delivery sealing is per-destination.** Each user's own serving destination
+  has
   its **own serving sealing key**; the delivery envelope's admission header
   (recipient, token, messageId) is sealed to the serving sealing key of the
   recipient's destination, whose private half the recipient's server holds. There

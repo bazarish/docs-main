@@ -145,7 +145,7 @@ delivery, outbound delivery (dialled **from** `dest_U`), and the signed
 `delivered-ack` (`Federation.md`). A server-wide "home" address is never used for
 user traffic (it serves only first-contact card discovery); a shared federation
 source would both leak a common address and, when sender and recipient share a
-server, force the home endpoint to dial itself.
+server, make one user's destination dial another's.
 
 - Every user's `dest_U` is their own: an offline-key master held by the client,
   delegated to the server as a time-boxed transient. There is deliberately no

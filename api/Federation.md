@@ -9,15 +9,17 @@ Status: draft skeleton.
   by an **embedded i2pd router** (no external SAM bridge). The server has no single
   federation destination - each user's serving destination runs its
   own STREAM accept loop and is persisted so addresses are stable across restarts;
-  the home destination (`<state>/i2p-dest.key`) only *serves* discovery (inbound
-  `op:card`). Outbound discovery fetches (a `card`/`resolve` lookup) dial from a
+  a first-contact `op:card` is answered on those same destinations. The server
+  keeps **no destination of its own**: its only published I2P addresses are the
+  facade's, for its clients (`Facade.md`). Outbound discovery fetches (a
+  `card`/`resolve` lookup) dial from a
   **warm pool of single-use transient destinations** (`WarmDestPool`): each lookup
   leaves from a fresh one-time dest that is **never reused** (so successive lookups
-  are unlinkable, and none is tied to the server's home identity), and the pool
+  are unlinkable, and none is tied to the server), and the pool
   keeps a few dests pre-built so the lookup pays no cold tunnel-build latency. The
   pool size adapts from demand between a floor and `--warm-pool-max` (default 2..10;
-  `--warm-pool-max 0` disables it, falling back to the home dest); it is
-  best-effort, so an empty pool transparently falls back to the home dest. Delivery
+  `--warm-pool-max 0` disables the pool, and a fetch then builds its own one-time
+  dest and waits for it - slower, never a shared address. Delivery
   still dials from the sender's own **serving** dest (the recipient acks back to it),
   never a one-time dest.
 - Every routing/connection target is a full **`.b32.i2p`** address - a
@@ -46,7 +48,7 @@ response: {"delivered":<bool>,"errorCode":...,"errorMessage":...}\n   (best-effo
 
 The recipient runs the same delivery pipeline as a local send (dedup -> token -> size/quota -> store), so local and federated deliveries share one code path.
 
-The synchronous `response` is **best-effort**: its return leg over the recipient's *accepted* stream is unreliable (and on a single server it would require the sender's home endpoint to dial its own address). The **authoritative** confirmation is a separate, reverse **`delivered-ack`** the recipient sends once it has stored the message:
+The synchronous `response` is **best-effort**: its return leg over the recipient's *accepted* stream is unreliable (and on a single server it would require the sender's own destination to dial itself). The **authoritative** confirmation is a separate, reverse **`delivered-ack`** the recipient sends once it has stored the message:
 
 ```
 delivered-ack:  {"op":"delivered-ack","messageId":<id>,"signerPub":<base64>,"sig":<base64>}\n
@@ -69,9 +71,9 @@ user is served by their own serving destination (never shared with another
 k-anonymity set, or a personal per-user dest - see `InviteAnonymity.md`), and *all*
 that user's federation flows over it: inbound delivery is served on it, and an
 outbound delivery dials the recipient **from the sender's own serving destination**
-- never from a server-wide "home" address. The home destination (persisted at
-`<state>/i2p-dest.key`) serves **discovery only** (the `card` request below), never
-user delivery or acks.
+- there is no server-wide address to dial from. Discovery (the `card` request
+below) is answered on the users' own destinations and dialled from a one-time
+transient, so nothing in federation is attributable to the server itself.
 
 A delivery whose `toDest` equals the **sender's own** serving destination (the two
 parties already share it) is stored locally; any other destination - including a
@@ -192,7 +194,7 @@ coordinate into the client) remains.
   destinations are self-standing and the root only certifies offline; this keeps
   the connection origin from being a server-identifying signal.
 - The only key that signs live federation traffic is the **per-destination
-  signing key**: every serving destination (home, each personal
+  signing key**: every serving destination (each personal
   dest) carries its own signing keypair, persisted **bound to the destination**
   together with its serving sealing key - a `(destination, signing key, serving
   sealing key)` group, never reused on another destination. It signs that
