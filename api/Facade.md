@@ -13,12 +13,21 @@ The facade is the "last mile" between the client and the server infrastructure. 
   The addresses are stable across restarts because they travel in the server
   descriptor beside the clearnet URLs. The I2P front parses no HTTP: an accepted
   stream is pumped to the facade's own listener, so routing, the secret prefix
-  and streaming behave identically on both fronts.
+  and streaming behave identically on both fronts. The stream is torn down only
+  after the client has read the reply (or a bounded drain elapses): closing it
+  straight after the last write truncates the reply, and the client then sees an
+  empty stream rather than a response. The log says when each destination's
+  leaseset has actually published ("i2p facade ready"), because until then a dial
+  fails for reasons that have nothing to do with the facade.
 - **Clearnet stays for the bootstrap.** A client with no netDb cannot use an I2P
   facade yet: it fetches the private reseed (`GET /v1/messaging/reseed`) over a
   clearnet facade, starts its embedded router with it, and only then switches to
   the I2P front. That request is pinned to clearnet in the client - routing it
   over I2P would ask the router to start before it had a netDb.
+- **i2pd's built-in reseed hosts are off** in the client. They are allowed in
+  exactly one case: this server's descriptor carries no clearnet facade, or none
+  of them answered - the only situation with nobody to ask. Otherwise the
+  bootstrap stays between the user and their own server.
 - This is the **only** I2P address the server side publishes. Federation runs on
   the users' own destinations (`InviteAnonymity.md`), never a shared one, so a
   facade address says nothing about which users a server hosts.
