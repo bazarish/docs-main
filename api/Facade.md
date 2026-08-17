@@ -6,6 +6,22 @@ The facade is the "last mile" between the client and the server infrastructure. 
 
 ## First implementation: HTTP facade (implemented)
 
+- **The facade's own I2P destination is the way in.** With `--i2p` (plus a
+  `--state` directory for the keys and `--i2p-dests <n>` for how many) the facade
+  publishes the same API on one or more encrypted-LeaseSet destinations, and the
+  client prefers those over clearnet as soon as it has a transport of its own.
+  The addresses are stable across restarts because they travel in the server
+  descriptor beside the clearnet URLs. The I2P front parses no HTTP: an accepted
+  stream is pumped to the facade's own listener, so routing, the secret prefix
+  and streaming behave identically on both fronts.
+- **Clearnet stays for the bootstrap.** A client with no netDb cannot use an I2P
+  facade yet: it fetches the private reseed (`GET /v1/messaging/reseed`) over a
+  clearnet facade, starts its embedded router with it, and only then switches to
+  the I2P front. That request is pinned to clearnet in the client - routing it
+  over I2P would ask the router to start before it had a netDb.
+- This is the **only** I2P address the server side publishes. Federation runs on
+  the users' own destinations (`InviteAnonymity.md`), never a shared one, so a
+  facade address says nothing about which users a server hosts.
 - Published under a **secret URI** known only to clients of this server, and that secrecy is **mandatory, not a deployment option**: `bazarish-facade-http` refuses to start without `--base-path <secret>`, which it requires on every request and strips before forwarding. The single exception is an explicit `--public`, and it means one thing only - a fronting reverse proxy (Caddy, nginx, ...) already publishes this facade under a secret URI of its own. The secret reaches a client solely inside the facade URL of the server descriptor (below); it is never advertised, never derived from the server fingerprint, and never sent anywhere else.
 - The whole clearnet API therefore lives under the secret prefix, **including the unauthenticated `GET /v1/messaging/reseed`** (`ClientApi.md`), whose only gate this is: a client fetching its first netDb has no I2P transport and no delivery token yet, so the prefix is what keeps the request - and the fact that this host serves Bazarish at all - out of a scan.
 - A single catch-all handler relays every request **transparently** - method, headers, body and query string verbatim - to backends over the **operator private channel** (localhost/unix socket/VPN), routing by path prefix once the secret prefix is stripped:
