@@ -24,6 +24,13 @@ The facade is the "last mile" between the client and the server infrastructure. 
   clearnet facade, starts its embedded router with it, and only then switches to
   the I2P front. That request is pinned to clearnet in the client - routing it
   over I2P would ask the router to start before it had a netDb.
+- **A profile that has reached its server over I2P refuses clearnet from then
+  on** ("sticky I2P", persisted per profile). Falling back silently would bind
+  the account's keys to the device's address at the server precisely when the
+  network is being interfered with - the moment the user chose I2P for. The
+  private reseed stays permitted, because it carries no identity and is what
+  makes I2P reachable at all; everything else fails closed until the user allows
+  clearnet again deliberately.
 - **i2pd's built-in reseed hosts are off** in the client. They are allowed in
   exactly one case: this server's descriptor carries no clearnet facade, or none
   of them answered - the only situation with nobody to ask. Otherwise the
