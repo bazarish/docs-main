@@ -24,8 +24,8 @@ An audio frame always fits in a single datagram, so nothing is ever fragmented.
 ### Tunnels
 
 The media destination uses **minimal-length tunnels** (one hop each way, no
-length variance), the single biggest latency and jitter lever for realtime
-media. This does not weaken identity anonymity: the media destination is
+length variance) regardless of the tunnel profile the user picked for everything
+else, the single biggest latency and jitter lever for realtime media. This does not weaken identity anonymity: the media destination is
 one-time and unlinked from the user's identity destination, so a short tunnel
 there exposes nothing about who the user is. Variance is off so the path length
 cannot jump mid-call.

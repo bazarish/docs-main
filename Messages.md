@@ -63,9 +63,25 @@ versioned envelope:
   "from": <sender fingerprint>,
   "sentAt": <unix milliseconds>,   // client send clock; drives ordering and the displayed time
   "replyTo": <id>,            // optional
+  "routing": { "dest": <sender b32>, "servingKey": <base64 SPKI> },
   ... type-specific fields ...
 }
 ```
+
+**`routing` - where to answer, on every message.** A destination is not for life:
+regenerating the I2P key changes the address, and the serving sealing key that
+goes with it. Every message therefore carries the sender's current pair, and a
+receiver whose stored pair differs adopts the new one and persists it before
+dispatching the message. It costs 227 bytes (60-character b32 + 124-character
+key + JSON), applies to every content type including the silent ones, and needs
+no acknowledgement: one message from a moved contact - of any type, in either
+role - repairs the way back to them.
+
+The rule this leaves for people is short: **change your address, write first.**
+Nothing else recovers a pair whose stored routing has gone stale, because the
+only path to a contact is the destination we hold for them; a request for their
+new address would go to the dead one. A client that regenerates its destination
+should say so plainly.
 
 ### Content-type registry (v1)
 

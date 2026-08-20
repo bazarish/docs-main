@@ -72,6 +72,25 @@ http[s]://host[:port]/secret-path
   without a path is only ever correct when the fronting proxy holds the secret
   instead.
 
+### Connections
+
+Over I2P a client dials its facade from **one destination per profile**, shared
+by everything that profile sends: a destination carries many streams at once,
+and every dial takes its own stream with its own receive queue. A second
+destination would mean a second set of tunnels and a second leaseset for the
+same user, which is metadata for nothing.
+
+The connection is **kept between requests** (`Connection: keep-alive`; the
+facade relays bytes and the backend's HTTP engine holds the connection open).
+Measured against the stand, a request that opened its own stream took 1185 ms at
+the median (n=149, quartiles 1067-1476); reusing the connection takes 506 ms
+(n=39, quartiles 306-580). The dial itself measures 0 ms - I2P streaming carries
+the first payload in the packet that opens the stream - so what a fresh stream
+costs is its garlic session, the identity and signature in that first packet and
+a fresh socket at the facade, not a round trip. A client that finds its kept
+connection already closed redials and repeats the request once; request bodies
+are replayable for exactly this reason.
+
 ### Facade locality (invariant)
 
 A facade URL belongs to **exactly one** server and is known **only** to that
