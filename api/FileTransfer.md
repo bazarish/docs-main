@@ -49,9 +49,18 @@ All three are ordinary sealed E2E messages, silent (never a chat bubble):
 
 | Type | Direction | Payload |
 |---|---|---|
-| `file.request` | recipient -> sender | `fileId` (the announcing message's id) |
-| `file.offer` | sender -> recipient | `offer` = `{fileId, host, key, sha256, size}` |
+| `file.request` | recipient -> sender | `fileId` (the announcing message's id), `device` (the requesting client id) |
+| `file.offer` | sender -> recipient | `offer` = `{fileId, host, key, sha256, size}`, `forDevice` (the client id that asked) |
 | `file.unavailable` | sender -> recipient | `fileId` |
+
+**Devices.** A user's devices share one mailbox, so every one of them sees both
+messages. A request names the device that made it; the offer names the same
+device, and the others ignore it - the one-time destination in it was raised for
+that device alone. A device that wants the file too asks for its own copy, and
+the sender serves it over a destination of its own: several serves run at once,
+each with its own address, its own progress and its own cancel. On the sending
+side only the device that announced the file (and still holds the bytes) answers
+at all; the others stay silent rather than reporting it unavailable.
 
 `file.unavailable` is the honest answer when the sender no longer has the file -
 it was unsent, or the user moved it. Without it the recipient would wait on a
