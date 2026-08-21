@@ -215,13 +215,28 @@ server descriptor to paste into a client, or - on a moderated node - the
 `POST /logout` drops the session.
 
 The portal's **web files live on disk**, not in the binary: `--portal-assets
-<dir>` (mandatory with `--portal-listen`) holds the page shell (`page.html` with
-`{{title}}`, `{{server}}` - this node's messaging-server fingerprint - and
-`{{content}}`), the stylesheet, the logo, the fonts and an optional `portal.js`.
-An operator restyles the portal, and rewrites everything the page says around
-those three values, by editing them. The script is progressive enhancement only:
-it adds a copy button to the blocks meant to be taken away, and a browser
-without scripts loses nothing else. Each file is read once
+<dir>` (mandatory with `--portal-listen`) holds one template per state of the
+flow, the stylesheet, the logo, the fonts and an optional `portal.js`. Every word
+on the page is in those files; the node only fills in the values a template asks
+for by name:
+
+| Template | Placeholders |
+|---|---|
+| `page.html` (shell) | `title`, `server` (this node's messaging-server fingerprint), `session`, `content` |
+| `session.html` | `fingerprint` |
+| `signin.html` | `challenge`, `error` |
+| `register.html` | `quota`, `captcha`, `captchaId`, `error` |
+| `registered.html` | `quota`, `term`, `descriptor` |
+| `registered-approval.html` (moderated node) | the same, plus `message` - the operator's note |
+| `waiting.html` | `message` |
+
+`error` and `message` carry a whole notice or nothing at all, because a
+placeholder in a file cannot remove its own box when there is nothing to say.
+A placeholder with no value is left standing, so a typo in a template shows up as
+itself rather than vanishing.
+
+The script is progressive enhancement only: it adds a copy button to the blocks
+meant to be taken away, and a browser without scripts loses nothing else. Each file is read once
 and served from memory afterwards, so an edit takes effect on restart; only files
 in that directory, of a type the portal publishes, are served.
 
