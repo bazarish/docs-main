@@ -83,7 +83,7 @@ Server-side components see only opaque blobs of a generic message.
 |---|---|---|
 | `call.invite` | caller -> callee | `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b33 routing address), `key` (base64 per-call media key) |
 | `call.accept` | callee -> caller | `callId`, `media` (`audio`), `dest` (the callee's media b33 routing address) |
-| `call.decline` | callee -> caller | `callId`, `reason` (`declined` / `busy`) |
+| `call.decline` | callee -> caller | `callId`, `reason` (`declined` / `busy` / `refused`) |
 | `call.end` | either | `callId` |
 
 Adding or evolving a call signal is a client-only change.
@@ -136,3 +136,9 @@ port are involved.
   a deeper adaptive jitter buffer is a refinement.
 - **Glare / busy** - a second incoming call while busy is auto-declined with
   `reason: busy`; richer call-waiting is future work.
+- **Calls turned off** - a profile may refuse incoming calls entirely (a privacy
+  setting, on by default). An invitation is then answered at once with
+  `reason: refused`, so the caller learns it instead of ringing into nothing. The
+  caller's call button stays where it is: the setting can be turned back on at any
+  moment, and there is nothing to publish about it - the refusal is the only
+  signal, and it says nothing beyond "not now".
