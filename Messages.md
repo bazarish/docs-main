@@ -2,6 +2,38 @@
 
 Status: design draft (decided direction).
 
+## Types
+
+A message says what it is, and the type decides what the other side does with
+it - never the file name, and never a mime the sender wrote:
+
+| `type` | What it carries | What the recipient does |
+|---|---|---|
+| `text` | the text | shows it |
+| `file` | a transfer's metadata (name, size, sha256, mime) | offers to fetch it; the bytes travel client to client |
+| `image` | the picture itself, base64 in the envelope | decodes it, keeps it in the profile, draws it |
+| `contact.request`, `reaction`, `receipt`, `call.*`, `device.*` | as their names say | as documented elsewhere |
+
+`image` carries the picture **inside the message**: there is no announcement and
+nothing to request, so it arrives once, with the message, and it arrives even if
+the sender goes offline the moment after sending - the mailbox holds it like any
+other message. The sender shrinks it first (long edge 1600, re-encoded, at most
+256 KiB) so that its base64 and the envelope around it stay inside the 512 KiB
+message limit.
+
+Before it is drawn it must decode as an image; a decoder that refuses it is the
+answer. Such a message is not quietly turned back into a file card - the bubble
+says it is broken, because a fallback would be the client second-guessing what it
+was handed. The bytes live in the profile database, encrypted with everything
+else, and "Save as" is how they leave it.
+
+A `file` is the other path and keeps the announcement: the metadata travels in
+the message, the bytes travel client to client on demand, and nothing is bounded
+but patience.
+
+The message that announces a transfer is a small message like any other: the
+progress bar belongs to the transfer that follows it, not to the announcement.
+
 ## Size
 
 One message carries at most **512 KiB** of payload (`common/Limits.hpp`,
