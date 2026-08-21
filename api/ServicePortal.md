@@ -174,8 +174,25 @@ This is moderation, not a paywall.
 | `GET /v1/account/users?q&state&limit&offset` | Operator-signed: the accounts on this node, searched and paged here |
 | `GET /v1/account/user?user=` | Operator-signed: one account in full |
 | `PUT /v1/account/quota` | Operator-signed: set an account's storage quota (and push it to server-core) |
+| `POST /v1/account/undelegate` | Operator-signed: revoke the account's destination and put it back on hold, with a message for its owner |
+| `DELETE /v1/account/user?user=` | Operator-signed: delete the account (certificate, grants, destination) |
+| `POST /v1/account/ban` | Operator-signed: delete the account and refuse this key from now on (reason defaults to "Banned") |
+| `POST /v1/account/unban` | Operator-signed: lift a ban |
+| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed: registration mode, the message a waiting account is shown, the storage a new account gets - plus the account count and the sum of the quotas |
 
-`q` is a case-insensitive substring of the fingerprint and `state` is
+A ban outlives the account it removed - it is what stops the same key from
+registering again - so it is stored apart from the record it deletes, and a
+banned fingerprint stays in the listing (`banned: true`) because that is the only
+way back to lifting it. A banned key is refused at the portal, at
+`POST /portal/register` and at `POST /v1/account/subscribe`, and the reason the
+operator wrote is what its owner is shown.
+
+Settings changed here are applied live and written back to the node's config
+file, so what an operator sets in the panel is what the node reads at its next
+start. A write that cannot be persisted is refused rather than applied.
+
+`q` is a case-insensitive substring of the fingerprint **or of the account's
+destination address**, and `state` is
 `all` / `pending` / `approved`; the answer carries the page (`users`) and the
 number of matches (`total`). The search belongs here rather than in the panel:
 the node is the only side that has the accounts, and shipping them all to filter

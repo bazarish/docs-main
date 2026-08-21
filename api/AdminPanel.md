@@ -84,10 +84,22 @@ A sidebar carries the views:
 
 - **Monitoring** - every configured service probed concurrently (status, version,
   uptime, current/peak RAM, latency), re-probed every few seconds.
-- **Users** - the accounts on the service node: search by fingerprint, filter by
-  approval state, and open one to read its terms, set its storage quota (in
-  whole megabytes) or approve it. The open account is in the address bar
-  (`#/users/<fingerprint>`), so a link points at one account.
+- **Users** - the accounts on the service node. Search by fingerprint or by the
+  address the account is served at, filter by approval state, and scroll: the
+  list loads a page at a time. Each row carries whether the account is approved
+  and whether its destination is delegated right now - the two say different
+  things, and an account can be approved and unreachable. Open one to read its
+  terms and act on it: set the storage quota (in whole megabytes), approve it,
+  undelegate it (the address is revoked and the account waits again, with a
+  message its owner is shown in place of the node-wide one), delete it, or ban
+  the key. The open account is in the address bar (`#/users/<fingerprint>`), so a
+  link points at one account.
+- **Settings** - what the service node does with new accounts: open or moderated
+  registration, the message a waiting account is shown, and the storage a new
+  account gets. Beside them, the two numbers that say whether those settings
+  still fit: what the quotas have promised, and what the messaging server's disk
+  actually holds (`GET /v1/messaging/storage`, measured by walking its state
+  directory - quotas are a promise, the filesystem is the fact).
 
 The **search runs on the service node**, not in the browser: the panel passes
 `q`, `state`, `limit` and `offset` through and shows what comes back, so a node
@@ -100,6 +112,8 @@ with many accounts never has to ship them all to find one.
 | `GET /api/user?user=` | service-node `GET /v1/account/user` |
 | `POST /api/approve` | service-node `POST /v1/account/approve` |
 | `PUT /api/quota` | service-node `PUT /v1/account/quota` |
+| `POST /api/undelegate`, `POST /api/delete`, `POST /api/ban`, `POST /api/unban` | the matching service-node operator endpoints |
+| `GET /api/settings`, `PUT /api/settings` | service-node `/v1/account/settings`, plus server-core `GET /v1/messaging/storage` for the disk figure |
 
 The quota is set **on the service node**, which is the component that grants it
 and pushes it to server-core. Setting it straight on server-core (as an earlier
