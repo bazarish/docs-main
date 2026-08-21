@@ -2,6 +2,19 @@
 
 Status: design draft (decided direction).
 
+## Size
+
+One message carries at most **512 KiB** of payload (`common/Limits.hpp`,
+`kMaxMessagePayloadBytes`). The server checks it before spending a token and
+answers `MESSAGE_TOO_LARGE`; the client checks the same number before sending,
+so a message a server would refuse is never built.
+
+Anything larger is a file: `sendFile` puts only its metadata (name, size,
+sha256, mime) in the message and the bytes travel client to client over a
+one-time destination, so a file never enters a mailbox and is bounded by nothing
+but patience. Pictures sent from the composer are scaled and re-encoded to a few
+hundred KiB before they go.
+
 ## Principle: two independent layers
 
 A message has **two** type discriminators that must never be conflated:
