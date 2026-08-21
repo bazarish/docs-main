@@ -171,6 +171,15 @@ This is moderation, not a paywall.
 |---|---|
 | `GET /v1/account/pending` | Operator-signed: accounts awaiting approval, oldest first |
 | `POST /v1/account/approve` | Operator-signed: approve one account |
+| `GET /v1/account/users?q&state&limit&offset` | Operator-signed: the accounts on this node, searched and paged here |
+| `GET /v1/account/user?user=` | Operator-signed: one account in full |
+| `PUT /v1/account/quota` | Operator-signed: set an account's storage quota (and push it to server-core) |
+
+`q` is a case-insensitive substring of the fingerprint and `state` is
+`all` / `pending` / `approved`; the answer carries the page (`users`) and the
+number of matches (`total`). The search belongs here rather than in the panel:
+the node is the only side that has the accounts, and shipping them all to filter
+one would be both slow and a leak of the whole roster into a browser.
 
 ## 5. Captcha (pluggable, self-hosted default)
 
@@ -249,6 +258,7 @@ in that directory, of a type the portal publishes, are served.
 | Browser | `GET /`, `POST /login` | sig -> session | sign-in-with-key |
 | Browser | `POST /register` | session + captcha | subscription grant |
 | Panel | `GET /v1/account/pending`, `POST /v1/account/approve` | operator sig | moderation |
+| Panel | `GET /v1/account/users`, `GET /v1/account/user`, `PUT /v1/account/quota` | operator sig | the operator's account list, search and quota |
 | Client | `GET /v1/account/subscription` | key | fetch the issued certificate |
 | Client | `POST /v1/account/i2p-dest` | key | upload a signed offline transient (refused while the account is unapproved) |
 | Client | `GET /v1/account/i2p-status` | key | approval state and the recorded transient validity |

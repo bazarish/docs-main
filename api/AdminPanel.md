@@ -73,20 +73,52 @@ configured with that address, not the published facade URL (`Facade.md`).
 The panel probes every configured service concurrently and renders status,
 version, uptime, current/peak RAM and round-trip latency.
 
-## Management
+## The panel itself
 
-The panel drives the operator endpoints the services already provide:
+Past the sign-in page the panel is a small script talking to a JSON API of its
+own. It is an operator tool on an operator's own perimeter, so it assumes
+JavaScript; the sign-in page does not, because a fleet that is down must still be
+loggable into.
 
-| Action | Endpoint | Services |
-|---|---|---|
-| Set a user's mailbox quota | `PUT /v1/messaging/quota` | server-core |
-| Provision/revoke a user's personal I2P destination | `PUT /v1/messaging/i2p-dest` | server-core |
+A sidebar carries the views:
+
+- **Monitoring** - every configured service probed concurrently (status, version,
+  uptime, current/peak RAM, latency), re-probed every few seconds.
+- **Users** - the accounts on the service node: search by fingerprint, filter by
+  approval state, and open one to read its terms, set its storage quota (in
+  whole megabytes) or approve it. The open account is in the address bar
+  (`#/users/<fingerprint>`), so a link points at one account.
+
+The **search runs on the service node**, not in the browser: the panel passes
+`q`, `state`, `limit` and `offset` through and shows what comes back, so a node
+with many accounts never has to ship them all to find one.
+
+| Panel route | Passed through to |
+|---|---|
+| `GET /api/services` | each service's `/healthz` |
+| `GET /api/users?q&state&limit&offset` | service-node `GET /v1/account/users` |
+| `GET /api/user?user=` | service-node `GET /v1/account/user` |
+| `POST /api/approve` | service-node `POST /v1/account/approve` |
+| `PUT /api/quota` | service-node `PUT /v1/account/quota` |
+
+The quota is set **on the service node**, which is the component that grants it
+and pushes it to server-core. Setting it straight on server-core (as an earlier
+panel did) would have been overwritten by the node's next push.
+
+The panel serves its web files from `--assets <dir>` (mandatory): the page shell,
+the sign-in page, the stylesheet, the script and the logo, read once and answered
+from memory. An operator restyles the panel by editing them and restarting it.
+
+There is no hand-driven I2P destination form. A user's destination is delegated
+by their own client and published by the service node
+(`PUT /v1/messaging/i2p-dest` on server-core is that push, and stays); an
+operator poking at it by hand had no place in that flow.
 
 ## Configuration
 
 ```json
 {
-  "admin": "<admin hybrid fingerprint, base32>",
+  "admin": ["<admin hybrid fingerprint, base32>"],
   "audience": "bazarish-admin-panel",
   "listen": {"host": "127.0.0.1", "port": 8460},
   "services": [
