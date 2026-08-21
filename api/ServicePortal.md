@@ -197,9 +197,9 @@ rest of the site.
 ## 6. Web frontend (JS-free)
 
 The portal is **one page** at `/`, server-rendered with no JavaScript (forms,
-full-page reloads, post-redirect-get). It carries a two-step flow and nothing
-else - there is no account area to visit, because with nothing for sale there is
-nothing to manage:
+full-page reloads, post-redirect-get). It shows one thing to do at a time and
+nothing else - there is no account area to visit, because with nothing for sale
+there is nothing to manage:
 
 1. **your key** - the page renders a challenge; the user signs it in their client
    and pastes the blob back. `POST /login` verifies it and sets the session
