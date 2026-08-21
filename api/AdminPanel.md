@@ -7,8 +7,9 @@ and is never exposed through the facade or over I2P.
 
 ## Sign-in-with-key (panel access)
 
-Access is gated to a single configured **admin identity** - no passwords, no
-account store. Login reuses the portal sign-in-with-key wire contract, but the
+Access is gated to the configured **admin identities** - no passwords, no
+account store. `admin` is one fingerprint or a list of them, so a fleet with
+several operators does not have to share a key. Login reuses the portal sign-in-with-key wire contract, but the
 panel is the self-contained verifier, so **no backend has to be online to log
 in**.
 
@@ -21,7 +22,7 @@ in**.
    four request-auth headers over the canonical `BZ-LOGIN` / `/portal/login`
    request whose body is the challenge).
 4. `POST /login` verifies both signatures locally (common `auth::verifyRequest`),
-   requires the recovered fingerprint to equal the configured admin, then consumes
+   requires the recovered fingerprint to be one of the configured admins, then consumes
    the challenge and sets a session cookie (`HttpOnly; SameSite=Strict`).
 
 The challenge is **single-use** and bound to the panel audience. The panel only
