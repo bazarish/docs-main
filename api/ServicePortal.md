@@ -175,26 +175,51 @@ This is moderation, not a paywall.
 ## 5. Captcha (pluggable, self-hosted default)
 
 A `Captcha` interface (`issue() -> {id, challenge-render}`, `verify(id, answer)
--> bool`). The built-in default is a **self-hosted server-rendered image/text
+-> bool`). The built-in default is a **self-hosted server-rendered image
 captcha** - no third party, works **without JavaScript**. An operator may
-register a different provider. Captcha gates free registration (and optionally
-other unauthenticated actions); it never depends on an external service by
-default, preserving the privacy posture.
+register a different provider. Captcha gates free registration; it never depends
+on an external service by default, preserving the privacy posture.
 
-## 6. Web frontend (JS + JS-free)
+The id is stateless: `base64({ts, tag})` where `tag = HMAC(secret, answer||ts)`,
+so verification stores nothing per challenge beyond a small single-use set, and
+a challenge outside the window (default 300 s) is dead.
 
-The service node serves the portal HTML on the same port as the JSON API, at
-`/` (the JSON API stays under `/portal/*` and `/v1/*`, untouched). The
-**JS-free** path (server-rendered forms, full-page reloads, post-redirect-get)
-is the whole frontend: with nothing to pay for there is no status to poll and no
-QR to render. Pages, all reusing the JSON endpoints' logic:
+The image is a **drawing, not text**. Every character is a set of stroked
+polylines from a built-in stroke font, placed with a per-challenge rotation,
+shear, baseline shift and point jitter, cut into pieces at random seams and
+emitted in shuffled document order, together with decoy strokes and a wave that
+crosses the whole code. Nothing in the markup names a character or their order,
+so the answer cannot be read out of the source - the reader has to rasterise,
+segment and recognise, which is the work a captcha is meant to cost. The strokes
+carry `currentColor` and no background, so the page styles the captcha with the
+rest of the site.
 
-- **login** (`GET /login`, `POST /login`) - render a challenge; a field to paste
-  the Client signature; on success set a session cookie and redirect to `/`.
-- **cabinet** (`GET /`) - subscription state, the server descriptor to paste into
-  a client, and - on a moderated node - the "awaiting approval" notice with the
-  operator's instructions.
-- **register** (`GET /register`, `POST /register`) - captcha, then the grant.
+## 6. Web frontend (JS-free)
+
+The portal is **one page** at `/`, server-rendered with no JavaScript (forms,
+full-page reloads, post-redirect-get). It carries a two-step flow and nothing
+else - there is no account area to visit, because with nothing for sale there is
+nothing to manage:
+
+1. **your key** - the page renders a challenge; the user signs it in their client
+   and pastes the blob back. `POST /login` verifies it and sets the session
+   cookie.
+2. **register** - a signed-in user without a subscription is shown a captcha.
+   `POST /register` verifies the answer and issues the grant: reading the captcha
+   *is* the registration. When the node is configured without a captcha, proving
+   the key is the registration and the grant is issued as the page loads.
+
+Afterwards the same page states the account (quota, term) and hands over the
+server descriptor to paste into a client, or - on a moderated node - the
+"waiting for the operator" notice with the operator's instructions.
+`POST /logout` drops the session.
+
+The portal's **web files live on disk**, not in the binary: `--portal-assets
+<dir>` (mandatory with `--portal-listen`) holds the page shell (`page.html` with
+`{{title}}`, `{{subtitle}}`, `{{content}}`), the stylesheet, the logo and the
+fonts. An operator restyles the portal by editing them. Each file is read once
+and served from memory afterwards, so an edit takes effect on restart; only files
+in that directory, of a type the portal publishes, are served.
 
 ## 7. API relationships
 
@@ -202,7 +227,7 @@ QR to render. Pages, all reusing the JSON endpoints' logic:
 |---|---|---|---|
 | Client | `GET /v1/account/portal` | none | onboarding text + portal links + registration terms |
 | Client | `sign-login <challenge>` (local) | key | produce the login signature |
-| Browser | `GET /login`, `POST /login` | sig -> session | sign-in-with-key |
+| Browser | `GET /`, `POST /login` | sig -> session | sign-in-with-key |
 | Browser | `POST /register` | session + captcha | subscription grant |
 | Panel | `GET /v1/account/pending`, `POST /v1/account/approve` | operator sig | moderation |
 | Client | `GET /v1/account/subscription` | key | fetch the issued certificate |
