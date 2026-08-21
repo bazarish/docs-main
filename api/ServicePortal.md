@@ -70,7 +70,7 @@ GET /v1/account/portal  ->
     "requiresApproval": false,
     "message":          "<how to reach the operator, when approval is required>"
   },
-  "quotaBytes": 52428800
+  "quotaBytes": 20971520
 }
 ```
 

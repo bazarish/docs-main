@@ -60,7 +60,7 @@ Both are local-only facts that must never reach a contact, so they travel the se
 
 ## Quota interplay
 
-`message-echo` with attachments doubles outgoing traffic and transiently occupies the user's own quota: echo blobs live only until all registered clients fetch them, so with normally-online devices the pressure is brief. An offline device accumulates echoes up to the retention period - heavy attachment use on the free tier (50 MB) will hit the quota; this is an accepted tradeoff, to be revisited if practice shows pain.
+`message-echo` with attachments doubles outgoing traffic and transiently occupies the user's own quota: echo blobs live only until all registered clients fetch them, so with normally-online devices the pressure is brief. An offline device accumulates echoes up to the retention period - heavy attachment use on the free tier (20 MB) will hit the quota; this is an accepted tradeoff, to be revisited if practice shows pain.
 
 ## Open questions
 
