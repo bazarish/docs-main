@@ -216,8 +216,12 @@ server descriptor to paste into a client, or - on a moderated node - the
 
 The portal's **web files live on disk**, not in the binary: `--portal-assets
 <dir>` (mandatory with `--portal-listen`) holds the page shell (`page.html` with
-`{{title}}`, `{{subtitle}}`, `{{content}}`), the stylesheet, the logo and the
-fonts. An operator restyles the portal by editing them. Each file is read once
+`{{title}}`, `{{server}}` - this node's messaging-server fingerprint - and
+`{{content}}`), the stylesheet, the logo, the fonts and an optional `portal.js`.
+An operator restyles the portal, and rewrites everything the page says around
+those three values, by editing them. The script is progressive enhancement only:
+it adds a copy button to the blocks meant to be taken away, and a browser
+without scripts loses nothing else. Each file is read once
 and served from memory afterwards, so an edit takes effect on restart; only files
 in that directory, of a type the portal publishes, are served.
 
