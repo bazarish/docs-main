@@ -1,7 +1,13 @@
 # Admin panel
 
-The `admin-panel` is one web interface to monitor and manage a Bazarish fleet
-(server-core, service-node, facade-http, alias-resolver). It is a
+The `admin-panel` is one web interface to monitor and manage Bazarish
+deployments. A deployment is the unit that scales: **one messaging server, the
+service node bound to it, and the facades in front of the pair** - a subscription
+certificate names one messaging server, and the node that issues it is bound to
+that server's card, so the two do not scale apart. Facades do: several may front
+one pair, and different facades may front different pairs. The central alias
+service is not managed here at all - it belongs to the project, not to an
+operator's server. It is a
 co-located operations tool: it reaches each service on its private listen address
 and is never exposed through the facade or over I2P.
 
@@ -48,7 +54,6 @@ service node and the panel.
 | server-core | service-node, admin-panel |
 | service-node | admin-panel |
 | facade-http | admin-panel |
-| alias-resolver | admin-panel |
 
 ## Status: `GET /healthz`
 
@@ -82,8 +87,13 @@ loggable into.
 
 A sidebar carries the views:
 
-- **Monitoring** - every configured service probed concurrently (status, version,
-  uptime, current/peak RAM, latency), re-probed every few seconds.
+- **Monitoring** - every configured service of every deployment probed
+  concurrently (status, version, uptime, current/peak RAM, latency), grouped by
+  deployment and re-probed every few seconds. A facade also reports what it is
+  carrying: requests over the last minute, hour and day, and how many are in
+  flight. Those are sampled from bucketed counters (one per second for the last
+  minute, one per minute for the last day) - a reading, not a history: nothing is
+  stored and nothing has to be pruned.
 - **Users** - the accounts on the service node. Search by fingerprint or by the
   address the account is served at, filter by approval state, and scroll: the
   list loads a page at a time. Each row carries whether the account is approved
