@@ -11,7 +11,8 @@ it - never the file name, and never a mime the sender wrote:
 |---|---|---|
 | `text` | the text | shows it |
 | `file` | a transfer's metadata (name, size, sha256, mime) | offers to fetch it; the bytes travel client to client |
-| `image` | the picture itself, base64 in the envelope | decodes it, keeps it in the profile, draws it |
+| `image` | the picture itself, bytes in the envelope | decodes it, keeps it in the profile, draws it |
+| `voice` | Opus audio, bytes in the envelope | keeps it in the profile, plays it on a press |
 | `contact.request`, `reaction`, `receipt`, `call.*`, `device.*` | as their names say | as documented elsewhere |
 
 `image` carries the picture **inside the message**: there is no announcement and
@@ -33,6 +34,20 @@ but patience.
 
 The message that announces a transfer is a small message like any other: the
 progress bar belongs to the transfer that follows it, not to the announcement.
+
+## Encoding
+
+The body inside the seal is **CBOR**, not JSON text: the same document with the
+same field names, but binary values travel as themselves. That is what lets a
+picture or a voice message ride inside the message rather than being announced
+and fetched - base64 would have cost a third of every such payload (measured at
+1.333x), and compressing it buys nothing, because both JPEG/PNG and Opus are
+already entropy-coded (gzip on a JPEG: 0.986x; on a PNG: 1.000x).
+
+A voice message is Opus at the call format - 48 kHz mono, 20 ms frames, each one
+length-prefixed - and nothing else: no container, because both ends of this
+protocol are the same client and an Ogg header would be bytes spent telling
+ourselves what we already know.
 
 ## Size
 
