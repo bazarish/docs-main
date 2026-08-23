@@ -37,10 +37,9 @@ server fingerprint. Then the only fields a card carries are the user's own, plus
 a destination - and the destination is the single tunable anonymity knob.
 
 ```
-ContactCard  (CMS-signed by user U - the only artifact in an invite):
+ContactCard  (CMS-signed by user U - the only artifact a contact fetches):
   v
   user:              <U fingerprint>     # equals the signer; the identity anchor
-  issuedAt, notAfter
   prekey:            <SPKI DER>          # U's E2E sealing prekey (first message)
   dest:              <i2p destination>   # dest_U - where to deliver to U
   servingSealingKey: <SPKI DER>          # key the delivery envelope is sealed to
@@ -194,23 +193,25 @@ k-anonymity set), so it leaks nothing new. The server **root identity** signs on
 outside federation (the server card / `bazarish://server` link, `Facade.md`),
 never a federated message.
 
-## Subscription certificate vs contact card
+## Done: there is no subscription certificate
 
-The subscription certificate serves two roles today: (a) the lifecycle anchor
-the serving server stores ("S serves U until T", anti-replay), and (b) the
-peer-facing routing/contact statement. This revision keeps both but re-anchors
-them:
+Implemented 2026-08-23. The old subscription certificate served two audiences
+with one signed object - the node's lifecycle anchor and the peer-facing routing
+statement - and told both which server serves the user. Both halves are gone:
 
-- The server still stores a user-signed subscription cert as its lifecycle
-  anchor, but the binding "this cert is for me" is checked against the
-  **destination + serving sealing key the server operates** (the dest it
-  assigned, or the personal dest the user delegated), not against the server's
-  root fingerprint. A server accepts a subscription iff the cert's `dest` /
-  `servingSealingKey` are ones it serves.
-- The **contact card** above is the peer-facing artifact. It is the same signed
-  body shape, minus anything server-identifying beyond the destination.
+- **The card** above is what a contact fetches. It has no `server`, no
+  `issuedAt`/`notAfter`, and no server signature. Nothing peer-visible names the
+  server.
+- **The subscription is gone entirely.** Registration opens an unbounded channel;
+  the client authenticates every request by signature anyway, so a signed "I
+  subscribe here" told the node nothing it had not already verified. The only
+  clock is the **delegation** of the destination, which the I2P network itself
+  enforces, and an account with none for the node's idle window is deleted.
+- The card fetch asks for the descriptor's `key` back, so a card cannot be
+  requested by fingerprint alone: a server never confirms whom it hosts.
 
-Net: the `server` fingerprint disappears from every peer-visible artifact.
+No expiry on the card either - routing that moved is repaired by the `routing`
+field every message carries.
 
 ## How the user learns `dest_U` and the serving sealing key
 

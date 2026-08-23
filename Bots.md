@@ -5,7 +5,7 @@ Status: design draft (decided direction).
 ## Principle: a bot is an ordinary identity
 
 A bot has no special status anywhere in the infrastructure. It is a normal
-identity (`Identity.md`) that subscribes to a server, accepts contacts and
+identity (`Identity.md`) that registers on a server, accepts contacts and
 exchanges the same sealed `content` / `contact` envelopes as a human client
 (`Messages.md`, `Contacts.md`). Everything that makes it a *bot* - commands,
 inline keyboards, button callbacks - lives entirely in **Layer 2**, the
@@ -123,5 +123,5 @@ logic the CLI and GUI use, plus a demo bot (`bazarish-bot`):
 - replies are sent with the normal `content` path, spending delivery tokens
   exactly as a human client does.
 
-Because the bot is just a subscribed identity, the same framework runs against a
+Because the bot is just a registered identity, the same framework runs against a
 single server or across a federation with no change.

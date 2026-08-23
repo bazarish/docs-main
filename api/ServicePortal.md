@@ -22,9 +22,9 @@ storage quota, its own I2P destination - it gets for free.
                   +--------v---------+
                   |   service node   |  accounts, captcha, approval
                   +------------------+
-       issues subscription | certs
+       grants registration | quota
                   +--------v---------+
-                  |   server-core    |  delivery only; points unsubscribed
+                  |   server-core    |  delivery only; points unregistered
                   +------------------+  senders at the portal
 ```
 
@@ -81,15 +81,17 @@ is required, whether an operator has to approve the account, and the one storage
 quota everybody gets. (The global `username` namespace is a separate product sold
 by the central alias-resolver, not the service node - see `AliasResolver.md`.)
 
-server-core, when it rejects an unsubscribed sender, returns an error that points
+server-core, when it rejects an unregistered sender, returns an error that points
 at the same portal.
 
 ## 3. Account model
 
-Per user (`subscriptions/<fp>.json`, `grants/<fp>.json`):
+Per user (`subscriptions/<fp>.json` - the account record - and `grants/<fp>.json`):
 
-- **subscription** - issued on registration; the hybrid-signed subscription
-  certificate the client later fetches via `GET /v1/account/subscription`.
+- **account** - created when the client first publishes its card; holds the
+  granted quota, the published card and when a destination was last delegated.
+  There is no term: `GET /v1/account/status` reports the quota and that last
+  delegation, and the node deletes an account idle for `idleDeleteDays` (180).
 - **approval** - `requestedAt` and `approvedAt`. On an open node an account is
   approved the moment it is created; on a moderated one it stays pending (see
   below). A renewal never restarts `requestedAt`, so a pending account cannot
@@ -98,7 +100,7 @@ Per user (`subscriptions/<fp>.json`, `grants/<fp>.json`):
   delegated, recorded so any of the user's devices knows when to issue the next
   one without holding the expiry itself.
 
-Unsubscribing tears the account down rather than merely stopping renewal: the
+Closing an account tears it down rather than merely letting it lapse: the
 destination is revoked and the grants are dropped.
 
 ### The user's own I2P destination (key custody + lifecycle)
@@ -121,7 +123,7 @@ floodfills) rather than an encrypted one. That is the accepted cost of never
 sharing an address; every other destination in the project stays encrypted.
 
 A destination can only be delegated once the account exists, so the client
-subscribes first, delegates its transient, and immediately re-publishes its
+publishes its card first, delegates its transient, and immediately re-publishes it
 contact card (`POST /v1/account/renew` inside the term it already holds, which
 grants nothing and consumes no grant) with the routing folded in. On a moderated
 node the delegation is refused until an operator approves the account, so the
@@ -151,8 +153,8 @@ per-user-destination endpoint) and reports its state on
 ## 4. Registration: open or moderated
 
 Behind login, gated by the configured **captcha**. On success the node issues a
-subscription into the `SubscriptionStore`; the client then fetches its
-certificate via `GET /v1/account/subscription`.
+account into the store when the client publishes its card; the client reads its
+state back via `GET /v1/account/status`.
 
 An operator chooses one of two modes (`registration.requireApproval`):
 
@@ -184,7 +186,7 @@ A ban outlives the account it removed - it is what stops the same key from
 registering again - so it is stored apart from the record it deletes, and a
 banned fingerprint stays in the listing (`banned: true`) because that is the only
 way back to lifting it. A banned key is refused at the portal, at
-`POST /portal/register` and at `POST /v1/account/subscribe`, and the reason the
+`POST /portal/register` and at `POST /v1/account/card`, and the reason the
 operator wrote is what its owner is shown.
 
 Settings changed here are applied live and written back to the node's config
@@ -230,7 +232,7 @@ there is nothing to manage:
 1. **your key** - the page renders a challenge; the user signs it in their client
    and pastes the blob back. `POST /login` verifies it and sets the session
    cookie.
-2. **register** - a signed-in user without a subscription is shown a captcha.
+2. **register** - a signed-in user without an account is shown a captcha.
    `POST /register` verifies the answer and issues the grant: reading the captcha
    *is* the registration. When the node is configured without a captcha, proving
    the key is the registration and the grant is issued as the page loads.
@@ -273,18 +275,18 @@ in that directory, of a type the portal publishes, are served.
 | Client | `GET /v1/account/portal` | none | onboarding text + portal links + registration terms |
 | Client | `sign-login <challenge>` (local) | key | produce the login signature |
 | Browser | `GET /`, `POST /login` | sig -> session | sign-in-with-key |
-| Browser | `POST /register` | session + captcha | subscription grant |
+| Browser | `POST /register` | session + captcha | registration grant |
 | Panel | `GET /v1/account/pending`, `POST /v1/account/approve` | operator sig | moderation |
 | Panel | `GET /v1/account/users`, `GET /v1/account/user`, `PUT /v1/account/quota` | operator sig | the operator's account list, search and quota |
-| Client | `GET /v1/account/subscription` | key | fetch the issued certificate |
+| Client | `POST /v1/account/card` | key | publish the card, redeem the grant |
 | Client | `POST /v1/account/i2p-dest` | key | upload a signed offline transient (refused while the account is unapproved) |
 | Client | `GET /v1/account/i2p-status` | key | approval state and the recorded transient validity |
 | Client | `GET /v1/account/contact` | none | fingerprint -> contact card lookup |
 
 ## 8. Removed (replaced by the portal)
 
-- `POST /v1/account/subscribe` (client-initiated grant, no captcha) and
-  the client `Session::subscribe` direct flow.
+- `POST /v1/account/card` (client-initiated grant, no captcha) and
+  the client `Session::registerAccount` direct flow.
 - `POST`/`DELETE /v1/account/alias`, `GET /v1/account/resolve`, and the on-node
   alias registry: the global `username` namespace moved out to the central
   **alias-resolver** (`AliasResolver.md`). The service node no longer sells,
@@ -292,7 +294,7 @@ in that directory, of a type the portal publishes, are served.
   too, it now sells nothing at all: a destination and a mailbox quota come with
   the account.
 
-Kept: `GET /v1/account/subscription`, `contact`; the `mock` gateway
+Kept: `GET /v1/account/status`, `card`; the `mock` gateway
 (tests); the `PaymentGateway` registry/abstraction.
 
 ## 9. Security notes

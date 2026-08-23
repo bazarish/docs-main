@@ -20,8 +20,8 @@ Content is opaque ciphertext; the interface never interprets blob contents.
 ## Lifecycle rules
 
 1. A blob is **deleted immediately** once all **registered** client IDs of the user (see `../DeviceSync.md`) have acked it - before any quota or TTL pressure. Retiring a client ID triggers re-evaluation: blobs that were waiting only on the retired client are deleted.
-2. Maximum retention equals the server's **maximum subscription period** (default 14 days); blobs older than that are purged.
-3. When a user's subscription expires without renewal, the server may **purge all pending content** for that user.
+2. Maximum retention is the server's **mailbox retention** setting (`mailboxRetentionDays`); blobs older than that are purged.
+3. When the service node deletes an account (idle, closed or removed), the server may **purge all pending content** for that user.
 4. Admission is refused (typed errors, see `../Errors.md`) when a blob exceeds the per-message limit or the user's quota; nothing is partially stored.
 
 ## Interface sketch (draft)
@@ -32,7 +32,7 @@ Content is opaque ciphertext; the interface never interprets blob contents.
 | `list(user, clientId)` | Enumerate blobs not yet acked by this client |
 | `get(user, blobId)` | Read blob data |
 | `ack(user, blobId, clientId)` | Record receipt; triggers deletion when the ack set is complete |
-| `purgeUser(user)` | Drop everything for a user (subscription expiry) |
+| `purgeUser(user)` | Drop everything for a user (account deleted) |
 | `purgeExpired()` | TTL sweep |
 | `usage(user)` | Current usage in bytes |
 

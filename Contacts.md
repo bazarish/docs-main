@@ -69,7 +69,7 @@ For the same reason the contact request **delivery** is routed by destination ov
 
 ## Anti-enumeration
 
-Invalid token, unknown mailbox, and unsubscribed recipient must be externally indistinguishable (single `DELIVERY_REJECTED` error). Detailed typed errors (e.g. `QUOTA_EXCEEDED`, which the sender must see explicitly) are returned only after a valid token has been presented - so only actual contacts can learn mailbox state.
+Invalid token, unknown mailbox, and a recipient not served here must be externally indistinguishable (single `DELIVERY_REJECTED` error). Detailed typed errors (e.g. `QUOTA_EXCEEDED`, which the sender must see explicitly) are returned only after a valid token has been presented - so only actual contacts can learn mailbox state.
 
 ## Open questions
 

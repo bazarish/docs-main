@@ -11,9 +11,9 @@ Status: draft skeleton.
 
 - A user **is** a hybrid keypair set. The canonical UID is the identity fingerprint covering both public keys.
 - Address / contact forms:
-  - `<fingerprint>:<b33>` - the **descriptor**: identity fingerprint + the user's serving destination (a `.b32.i2p` host). The primary scannable/QR form; the full link `bazarish://invite?fp=...&srv=...&srv_key=...` also carries the server's serving sealing key (`api/FederatedResolve.md`). A fingerprint is an identity, not a route, so it is always paired with a destination - there is no `@server-fingerprint` form (nothing maps a fingerprint to an endpoint).
+  - `<fingerprint>:<b32>` - the **descriptor**: identity fingerprint + the user's own destination (a `.b32.i2p` host). The primary scannable/QR form; the full link `bazarish://invite?fp=...&dest=...&key=...` also carries the per-user serving key (`api/FederatedResolve.md`). A fingerprint is an identity, not a route, so it is always paired with a destination - there is no `@server-fingerprint` form (nothing maps a fingerprint to an endpoint).
   - `<alias>` - an exclusive **username** on the central resolver (paid; the project's monetization, `api/AliasResolver.md`). Resolving it yields a descriptor, after which the contact card is fetched and verified.
-- Users have no strict binding to a server; the binding is expressed by a time-limited subscription certificate.
+- Users have no binding to a server in anything a contact can see. Registration opens an unbounded channel with the server, and the only thing that expires is the delegation of the user's destination - which the network itself enforces. Nothing signed by the user names the server.
 - All clients (devices/app instances) of a user **share the identity keypair set**; a new device receives it during enrollment (see `DeviceSync.md`). Each client registers a unique random **client ID** so the server can track delivery completeness across clients.
 
 ## Server identity
@@ -25,7 +25,7 @@ Status: draft skeleton.
   bound to it). It is **not** the peer-facing routing artifact and is **not**
   carried in invites: delivery routing and sealing are per-destination and travel
   in the user's contact card (below); a contact discovers the serving sealing key
-  needed to fetch that card from the **descriptor** (`srv_key`,
+  needed to fetch that card from the **descriptor** (`key`,
   `api/FederatedResolve.md`), not from a fetched server card. Cross-server
   username resolution is served by the separate central resolver
   (`api/AliasResolver.md`), which signs its own records.
@@ -65,16 +65,16 @@ There is **no server fingerprint dependency or server card** in the peer-facing 
 
 It has **two consumers**:
 
-1. **The serving server (via the service node)** - the lifecycle anchor: "subscription active" <=> "valid certificate on file". Renewal = a fresh certificate; the server publishes its maximum term and rejects longer ones. After expiry the server may purge all pending content for the user (grace period is server config). Registration is grant-gated through the service portal (`api/ServicePortal.md`).
+1. **The serving server (via the service node)** - the account, which has no term. Registration is grant-gated through the service portal (`api/ServicePortal.md`) and opens an unbounded channel. What expires is the **delegation** of the user's destination, which the I2P network enforces; an account with none for the node's idle window (`idleDeleteDays`, 180 by default) is deleted along with its pending content.
 2. **Contacts' clients** - the **contact card**: the same artifact, handed to contacts over E2E (or in an invite), is the cryptographic answer to "where and how do I deliver to U?" (prekey + destination + serving sealing key). Signed by U, so it stays trustworthy through any untrusted intermediary.
 
 Routing-staleness policy for contacts: the last known card remains the routing target even past `notAfter` - expiry signals staleness, not invalidity. A fresh card is pushed to **the server on every renewal**, but to **contacts only when the destination changes** (avoids re-broadcast every few days).
 
 ### One serving server, hard-cutover migration
 
-A user holds a subscription with **exactly one server at a time**. Migration S1 -> S2:
+A user is served by **exactly one server at a time**. Migration S1 -> S2:
 
-1. Subscribe to S2, register fresh token hashes there, unsubscribe from S1 (or let the certificate lapse).
+1. Register on S2, register fresh token hashes there, close the account on S1 (or let it go idle).
 2. Push the new contact card (S2 destination + serving sealing key + prekey) + fresh token batches to all contacts over E2E.
 3. Contacts switch as the card arrives. Deliveries that race the cutover **fail and stay on the sender's client** (standard send semantics) and are retried after the new card arrives - messages are delayed, not lost.
 
@@ -105,7 +105,7 @@ sealed via the client's own server), so the requester's own server never learns 
 ### Out-of-band invites (the descriptor)
 
 A contact is shared out of band as a small **descriptor** - `<fingerprint>:<b33>`,
-or the link `bazarish://invite?fp=...&srv=...&srv_key=...[&name=...]`: identity +
+or the link `bazarish://invite?fp=...&dest=...&key=...[&name=...]`: identity +
 serving destination + the server's serving sealing key, plus an optional advertised
 display name the recipient adopts at add time (static thereafter; see `Messages.md`).
 It fits a single QR. The recipient
@@ -129,7 +129,7 @@ Trust ladder for adding a contact, strongest first:
 
 ## Algorithms (decided empirically against OpenSSL 3.5)
 
-- **Identity is a post-quantum hybrid: ECDSA P-256 + ML-DSA-65 (FIPS 204).** Every identity-level statement (subscription certificate, alias certificate, server card) carries **both** signatures and is valid only when both verify - forging requires breaking both schemes. This is mandatory, not optional.
+- **Identity is a post-quantum hybrid: ECDSA P-256 + ML-DSA-65 (FIPS 204).** Every identity-level statement (contact card, alias certificate, server card) carries **both** signatures and is valid only when both verify - forging requires breaking both schemes. This is mandatory, not optional.
 - **Hybrid layering.** OpenSSL CMS cannot carry ML-DSA (or EdDSA) signers, so the hybrid is layered from standard primitives with no custom constructions: the exact body bytes are signed with ML-DSA-65 at the EVP level; the wrapper `{body: base64(bodyBytes), pq: {alg, pub, sig}}` is then CMS-SignedData-signed with the classical key. Verification checks both layers **and both key types** (a classical key smuggled into the pq slot is a downgrade and fails). Replace with CMS composite signatures when OpenSSL supports the LAMPS composite drafts.
 - **Identity fingerprint**: lowercase unpadded base32 (RFC 4648) of SHA-256 over the concatenation `classical SPKI DER || ML-DSA SPKI DER` - 52 characters, covering both keys; substituting either key changes the identity. Display shortening is a client UX concern.
 - **Sealing keys: ECDH P-256** (CMS KeyAgreeRecipientInfo, RFC 5753) with **AES-256-GCM** content encryption. X25519 recipients are not supported by OpenSSL CMS. A sealing key is distinct from the identity keys by design.

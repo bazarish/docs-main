@@ -185,7 +185,7 @@ No server, facade, federation or storage change accompanies a new row.
 ### Bots & interactive messages
 
 A bot is not a server concept either: it is an **ordinary identity** that
-subscribes to a server like any client, accepts contacts and exchanges the same
+registers on a server like any client, accepts contacts and exchanges the same
 `content`/`contact` envelopes. "Botness" lives entirely in Layer 2 - three
 client-only pieces, all forward-compatible:
 

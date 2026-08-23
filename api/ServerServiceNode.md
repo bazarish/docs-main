@@ -2,20 +2,21 @@
 
 Status: draft skeleton.
 
-Internal API over the operator private channel. The service node owns per-operator user-management state (subscriptions); the server owns content and delivery, and consults the service node to make admission decisions. The global **username** namespace is **not** here - it is a separate central service (`api/AliasResolver.md`), not the operator service node.
+Internal API over the operator private channel. The service node owns per-operator user-management state (accounts: the quota granted and the card published); the server owns content and delivery, and consults the service node to make admission decisions. The global **username** namespace is **not** here - it is a separate central service (`api/AliasResolver.md`), not the operator service node.
+
+An account has **no term**. Registration opens an unbounded channel; the only clock is the delegated destination, and an account that has none for the node's idle window is deleted (`idleDeleteDays`, 180 by default).
 
 ## Server -> Service node (draft)
 
 | Request | Purpose |
 |---|---|
-| `subscription-status` | Is user U actively subscribed? Returns expiry and quota (MB) |
-| `get-card` | fingerprint -> the user's subscription certificate (its **contact card**: prekey + destination + serving sealing key). Backs the federation `card` request - the first-contact card fetch (`api/FederatedResolve.md`). Realized as an account-API lookup by fingerprint |
+| `get-card` | fingerprint + the descriptor's `key` -> the user's **contact card** (prekey + destination + serving sealing key). Backs the federation `card` request - the first-contact card fetch (`api/FederatedResolve.md`). The key must be the one the node issued for that destination: a wrong key is refused **exactly** like an unknown user, so the lookup cannot be used to ask a server whether it hosts a fingerprint |
 
 ## Service node -> Server (draft)
 
 | Event | Purpose |
 |---|---|
-| `subscription-expired` | Subscription for user U lapsed; the server may purge all pending content for U |
+| `account-deleted` | The node dropped user U (idle, closed by its owner, or removed by the operator); the server may purge all pending content for U |
 
 ## Client-ID registry
 
@@ -23,6 +24,6 @@ Owned by the **server** (it drives the delete-when-all-acked storage rule, see `
 
 ## Open questions
 
-- **Pull vs push**: does the server query subscription status per request (with caching), or does the service node push state changes? Affects failure modes when one daemon is down.
-- **Quota usage accounting**: limits come from the subscription (service node), usage from stored content (server). Confirm the split: service node = limit, server = usage.
+- **Pull vs push**: does the server query account state per request (with caching), or does the service node push state changes? Affects failure modes when one daemon is down.
+- **Quota usage accounting**: limits come from the account (service node), usage from stored content (server). Confirm the split: service node = limit, server = usage.
 - Transport details (unix socket vs localhost HTTP) and whether this API needs authentication beyond channel isolation.

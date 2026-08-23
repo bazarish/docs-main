@@ -11,19 +11,21 @@ transport in `Federation.md`.
 
 - **Descriptor** - a small, single-QR pointer:
   ```
-  bazarish://invite?v=1&fp=<52-char base32 fingerprint>&srv=<b33>.b32.i2p&srv_key=<base64 SPKI>[&name=<percent-encoded>]
+  bazarish://invite?v=1&fp=<52-char base32 fingerprint>&dest=<b32>.b32.i2p&key=<base64url SPKI>[&name=<percent-encoded>]
   ```
-  identity (`fp`) + route to the user's server (`srv`, a `.b32.i2p` host) + that
-  server's serving/resolve sealing key (`srv_key`), plus an optional `name` the
+  identity (`fp`) + the user's **own** destination (`dest`, a `.b32.i2p` host) +
+  the per-user serving key its server holds for it (`key`), plus an optional `name` the
   inviter advertises (percent-encoded). The recipient adopts `name` as the
   contact's local display name at add time - a one-time static label, never
   re-fetched or transmitted afterwards (`Messages.md`). Older invites omit it.
-  Rendered for humans as `fp:b33` (the `:` distinguishes it from an alias); the
-  full link/QR also carries `srv_key`. It does **not** contain the contact card -
+  Rendered for humans as `fp:b32` (the `:` distinguishes it from an alias); the
+  full link/QR also carries `key`. It does **not** contain the contact card -
   it points at one.
-- **Contact card** - the user-signed subscription certificate (`prekey`, `dest`,
-  `servingSealingKey`; ~= 8 KB), fetched live and verified against `fp`
-  (`../Identity.md`).
+- **Contact card** - user-signed (`user`, `dest`, `prekey`, `servingSealingKey`;
+  ~= 8.7 KB, the hybrid post-quantum signature dominates), fetched live and
+  verified against `fp` (`../Identity.md`). It names **no server**: a card that
+  did would tell every contact who hosts its owner, and let two cards be compared
+  for co-location.
 
 The old full-card-in-invite (offline, multi-QR) is **removed**: the descriptor +
 a live fetch replaces it (rationale in `AliasResolver.md`). Cost: the user's
@@ -33,11 +35,18 @@ relay never sees who is being added (below).
 ## Two lookups, different trust
 
 1. **Card fetch - `fp` is known** (from a descriptor/QR). Fetch the contact card
-   for `fp` at `srv`. `fp` is the integrity anchor: the card is user-signed and
-   verified against `fp`, so neither `srv` nor the relay can forge it - only
-   withhold. The query carries `fp` **sealed to `srv_key`**, so the relay cannot
-   read which identity is looked up. **Relay-safe by construction**, and
-   substitution-proof.
+   for `fp` at `dest`. `fp` is the integrity anchor: the card is user-signed and
+   verified against `fp`, so neither the serving server nor the relay can forge
+   it - only withhold. The query carries `fp` and the descriptor's `key`,
+   **sealed to `key`**, so the relay cannot read which identity is looked up.
+   **Relay-safe by construction**, and substitution-proof.
+
+   The `key` in the query is also what makes the fetch unaskable without a
+   descriptor: the server answers only when it matches the key it issued for that
+   destination, and a wrong key is refused **identically** to an unknown user.
+   Without that, anyone could ask a server whether it hosts a fingerprint. A
+   caller whose descriptor is out of date gets that one answer and knows to ask
+   for a fresh one.
 2. **Alias resolve - `fp` is unknown.** `username` -> descriptor. This is the only
    step without an `fp` anchor, so it is where MITM and the trusted alias->identity
    binding live. Served by the single central resolver (`AliasResolver.md`).
@@ -78,15 +87,15 @@ facade - direct b33 dials are already used for blob fetch).
 ## Card-fetch protocol (`fp` -> contact card)
 
 ```
-client has descriptor {fp, srv, srv_key}
-  query   = seal({ v, fp, responseKey: <ephemeral SPKI> }, srv_key)   # only srv can open
+client has descriptor {fp, dest, key}
+  query   = seal({ v, fp, key, responseKey: <ephemeral SPKI> }, key)  # only the serving dest can open
   -> dial srv (direct dial over a transient I2P destination) or relay via own server
   srv unseals, looks up the card for fp, returns:
-  response = seal({ v, subscriptionCert: <b64 DER> }, responseKey)    # only the client can open
+  response = seal({ v, card: <b64 DER> }, responseKey)                # only the client can open
   client: verify card signature; assert card.user == fp and card.dest is .b32.i2p
 ```
 
-`srv_key` is the server's serving sealing key - the same key it unseals delivery
+`key` is the per-user serving sealing key - the same key the server unseals delivery
 admission headers with (`../Identity.md`, `InviteAnonymity.md`); no new key. On
 the direct path the I2P stream is already confidential to `srv`, so app-layer
 sealing is optional; on the proxy path it hides `fp` from the relay. Integrity is
@@ -99,7 +108,7 @@ for uniform client automation (`AliasResolver.md`). The resolver returns a
 **self-verifying signed record**:
 
 ```
-sign_delegated({ v, alias, descriptor: {fp, srv, srv_key}, issuedAt, notAfter }) + delegationCert
+sign_delegated({ v, alias, descriptor: {fp, dest, key}, issuedAt, notAfter }) + delegationCert
 ```
 
 The client verifies the chain `record -> delegationCert (delegated key <- root) ->

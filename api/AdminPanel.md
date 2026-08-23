@@ -2,7 +2,7 @@
 
 The `admin-panel` is one web interface to monitor and manage Bazarish
 deployments. A deployment is the unit that scales: **one messaging server, the
-service node bound to it, and the facades in front of the pair** - a subscription
+service node bound to it, and the facades in front of the pair** - a registration
 certificate names one messaging server, and the node that issues it is bound to
 that server's card, so the two do not scale apart. Facades do: several may front
 one pair, and different facades may front different pairs. The central alias

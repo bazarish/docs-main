@@ -9,7 +9,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 | Component | Form | Responsibility |
 |---|---|---|
 | **Server** | daemon (C++) | Core messaging: pending content storage, delivery, federation over hidden networks |
-| **Service node** | separate daemon (C++) | User management: subscriptions, aliases. Isolated from messaging logic |
+| **Service node** | separate daemon (C++) | User management: accounts, aliases. Isolated from messaging logic |
 | **Facade** | daemon (C++) | "Last mile" between client and server infrastructure. First implementation: HTTP REST behind a reverse proxy at a secret URI |
 | **Client** | separate repository | Qt6 desktop app (and future bots) |
 | **I2P router** | embedded, in-process (`libi2pd_bazarish`) | Transport for federation and calls; no external i2pd or SAM bridge |
@@ -52,7 +52,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 13. **Explicit client registry** - client IDs are registered/retired via the API; the delete-when-all-acked rule operates on the registered set. The registry is owned by the server, not the service node.
 14. **Device sync via the own mailbox** - an E2E event journal (contacts, token bookkeeping, full message-history echo) delivered through the standard send/pending/ack path; no dedicated server mechanism.
 15. **Subscription certificate is dual-purpose** - the lifecycle anchor on the serving server and, pushed to contacts over E2E, the **contact card** (prekey + destination + serving sealing key) that answers "where and how do I deliver?". Exactly one serving server at a time; migration is a hard cutover that leans on retry-on-client send semantics (messages delayed, not lost). Registration is grant-gated through the service portal. See `Identity.md`, `api/ServicePortal.md`, `api/InviteAnonymity.md`.
-16. **All certificates are CMS SignedData over JSON bodies** (subscription/contact card, alias, server card) - OpenSSL-native standard container, consistent with the JSON wire format.
+16. **All certificates are CMS SignedData over JSON bodies** (contact card, alias, server card) - OpenSSL-native standard container, consistent with the JSON wire format.
 17. **Sealed alias resolution** - first-contact lookups are encrypted to the target server's resolve key and relayed blindly; the requester's own server never learns the alias. The response is a self-verifying chain (alias cert + the user's contact card). Cross-server resolution (central-resolver `resolve` + sealed card fetch) is implemented and live-validated over real I2P, as is invite-based first contact; only the production resolver deployment (baking the resolver coordinate into the client) remains.
 18. **Identity is a post-quantum hybrid (mandatory)** - ECDSA P-256 + ML-DSA-65; every identity statement is dual-signed and valid only when both signatures verify. The fingerprint covers both public keys. Sealing remains classical for now (OpenSSL CMS lacks ML-KEM) - recorded as an accepted, revisitable gap in `Identity.md`.
 
@@ -89,7 +89,7 @@ docs-main/                       # this repository - canonical protocol specific
 common-cpp/ (dir: common/)      # shared C++ library: protocol types, OpenSSL wrappers, embedded i2pd
 bazarish-server/                 # the server fleet, one build tree:
     server-core/                 #   messaging server daemon (I2P federation, destination-routed)
-    service-node/                #   service node daemon (subscriptions, portal, moderation)
+    service-node/                #   service node daemon (accounts, portal, moderation)
     facade-http/                 #   HTTP facade daemon (secret-path last mile)
     admin-panel/                 #   fleet status + management web panel (sign-in-with-key)
 client-qt6/                      # client core + CLI + Qt6 GUI
