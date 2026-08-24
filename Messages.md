@@ -123,7 +123,7 @@ versioned envelope:
   "from": <sender fingerprint>,
   "sentAt": <unix milliseconds>,   // client send clock; drives ordering and the displayed time
   "replyTo": <id>,            // optional
-  "routing": { "dest": <sender b32>, "servingKey": <base64 SPKI> },
+  "routing": { "dest": <sender b32>, "servingKey": <base64 SPKI>, "view": <32 hex> },
   ... type-specific fields ...
 }
 ```
@@ -136,6 +136,13 @@ dispatching the message. It costs 227 bytes (60-character b32 + 124-character
 key + JSON), applies to every content type including the silent ones, and needs
 no acknowledgement: one message from a moved contact - of any type, in either
 role - repairs the way back to them.
+
+`view` is the sender's own descriptor capability, the one their invite carries.
+It rides here for the same reason the pair does: a dialog that began from the
+other side never carried it, and without it that contact could never be handed
+on to a third person. It grants the holder nothing they do not already have -
+the card it reads is the destination and keys they are already talking on - and
+it is what makes "share this contact" work in both directions.
 
 The rule this leaves for people is short: **change your address, write first.**
 Nothing else recovers a pair whose stored routing has gone stale, because the
