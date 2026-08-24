@@ -83,5 +83,5 @@ sign-in-with-key, verified locally against the configured admin identity with no
 backend online (`api/AdminPanel.md`).
 
 Out of scope for v1 (tracked as future concepts): per-device identity keys
-(`DeviceSync.md`), post-quantum sealing via ML-KEM (`Identity.md`), and a
+(`DeviceSync.md`), and a
 standalone threat-model document.
