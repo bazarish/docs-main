@@ -23,7 +23,7 @@ in**.
    panel config `admin` field.
 2. `GET /login` issues a challenge: base64(JSON `{nonce, ts, aud}`), where `aud`
    is the panel's audience.
-3. The operator signs it with their client: `bazarish-client sign-login <profile>
+3. The operator signs it with their client: `bazarish-client sign-login <account>
    <challenge>`, producing the standard login blob (base64(JSON `{k,t,c,p}`) - the
    four request-auth headers over the canonical `BZ-LOGIN` / `/portal/login`
    request whose body is the challenge).

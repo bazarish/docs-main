@@ -309,5 +309,5 @@ with no `peers.json`, dialling each other's b33.
 ## Compatibility
 
 Fresh alpha - **no** backward-compatibility shims. Old invites, server cards and
-stored contacts are dropped; profiles re-subscribe to obtain a destination-routed
+stored contacts are dropped; accounts re-subscribe to obtain a destination-routed
 card. The legacy fingerprint routing path is removed, not gated.

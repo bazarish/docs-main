@@ -114,7 +114,7 @@ Adding or evolving a call signal is a client-only change.
   capture thread and one receive thread); and the call signaling + state machine
   on `Session` (`startAudioCall` / `acceptCall` / `declineCall` / `endCall` /
   `setCallMuted` / `currentCall`).
-- **CLI**: `bazarish-client call <profile> <peer> [seconds]` and
+- **CLI**: `bazarish-client call <account> <peer> [seconds]` and
   `call-answer` (drive the signaling loop; with the synthetic backends they give
   a headless end-to-end media path for integration testing).
 - **GUI**: `CallScreen.qml` (peer, state, mute / end controls) plus the Qt
@@ -136,7 +136,7 @@ port are involved.
   a deeper adaptive jitter buffer is a refinement.
 - **Glare / busy** - a second incoming call while busy is auto-declined with
   `reason: busy`; richer call-waiting is future work.
-- **Calls turned off** - a profile may refuse incoming calls entirely (a privacy
+- **Calls turned off** - an account may refuse incoming calls entirely (a privacy
   setting, on by default). An invitation is then answered at once with
   `reason: refused`, so the caller learns it instead of ringing into nothing. The
   caller's call button stays where it is: the setting can be turned back on at any

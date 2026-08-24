@@ -49,9 +49,9 @@ Two devices may race to spend the same token from the shared per-contact stash. 
 - Any device can retire a client ID (lost/stolen device included). The server immediately **re-evaluates ack-completeness** of pending content: blobs that were waiting only on the retired client are deleted.
 - **Honest limitation:** with a shared identity key, a stolen device keeps the identity forever - retirement stops deliveries to it but cannot revoke the key. A token epoch reset limits mailbox abuse; the identity itself is unrecoverable. Per-device keys with cross-signing are the known evolution path if this risk proves unacceptable in practice.
 
-## Profile sync (avatar & contact names)
+## Account sync (avatar & contact names)
 
-Two pieces of profile state propagate to the user's other devices as dedicated **self-messages** - sealed to the user's own key and delivered to their own destination - independent of the journal above:
+Two pieces of account state propagate to the user's other devices as dedicated **self-messages** - sealed to the user's own key and delivered to their own destination - independent of the journal above:
 
 - `device.avatar` - the user's own avatar, re-sent whenever it changes.
 - `device.contact-name` - a local contact rename, carrying `peer` (fingerprint) and the new `name`.

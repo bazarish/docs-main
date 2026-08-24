@@ -11,8 +11,8 @@ it - never the file name, and never a mime the sender wrote:
 |---|---|---|
 | `text` | the text | shows it |
 | `file` | a transfer's metadata (name, size, sha256, mime) | offers to fetch it; the bytes travel client to client |
-| `image` | the picture itself, bytes in the envelope | decodes it, keeps it in the profile, draws it |
-| `voice` | Opus audio, bytes in the envelope | keeps it in the profile, plays it on a press |
+| `image` | the picture itself, bytes in the envelope | decodes it, keeps it in the account, draws it |
+| `voice` | Opus audio, bytes in the envelope | keeps it in the account, plays it on a press |
 | `contact.request`, `reaction`, `receipt`, `call.*`, `device.*` | as their names say | as documented elsewhere |
 
 `image` carries the picture **inside the message**: there is no announcement and
@@ -25,7 +25,7 @@ message limit.
 Before it is drawn it must decode as an image; a decoder that refuses it is the
 answer. Such a message is not quietly turned back into a file card - the bubble
 says it is broken, because a fallback would be the client second-guessing what it
-was handed. The bytes live in the profile database, encrypted with everything
+was handed. The bytes live in the account database, encrypted with everything
 else, and "Save as" is how they leave it.
 
 A `file` is the other path and keeps the announcement: the metadata travels in
@@ -163,7 +163,7 @@ should say so plainly.
 | `edit` | content | An in-place edit of a message the sender previously sent: `ref` (the target message's `id`), `text` (new text), `keyboard` (new inline keyboard, `[]` to clear). The recipient replaces its copy. Applied only to a message `from` actually sent. See *Editing and deleting messages*. |
 | `delete` | content | A delete-for-everyone of a message the sender previously sent: `ref` (the target message's `id`). The recipient removes its copy with **no tombstone** left behind. Scoped, like `edit`, to a message `from` actually sent. See *Editing and deleting messages*. |
 | `chat.clear` | content | Asks the peer to clear the **whole** one-to-one conversation with the sender (no `ref`). The recipient's client wipes its transcript with `from` and leaves a single "cleared the chat" notice. The chat itself remains. The "clear for everyone" choice in the chat-info panel. |
-| `avatar` | content | The sender's profile photo pushed to a contact: `avatar` = `{ mime, data }`, `data` being base64 of a square PNG/JPEG compressed client-side to at most **500 KB**. A silent service message - stored as that contact's picture, never shown as a chat bubble. Sent once the dialog is mutually established and re-sent to every contact when the avatar changes. See *Avatars and display names* and `Contacts.md`. |
+| `avatar` | content | The sender's avatar pushed to a contact: `avatar` = `{ mime, data }`, `data` being base64 of a square PNG/JPEG compressed client-side to at most **500 KB**. A silent service message - stored as that contact's picture, never shown as a chat bubble. Sent once the dialog is mutually established and re-sent to every contact when the avatar changes. See *Avatars and display names* and `Contacts.md`. |
 | `device.avatar` | contact | Self-sync of the user's own avatar to their other devices: the same `avatar` block, sealed to the user's own key and delivered to their own destination. See `DeviceSync.md`. |
 | `device.contact-name` | contact | Self-sync of a local contact rename to the user's other devices: `peer` (fingerprint), `name`. A purely local label, never sent to the contact. See `DeviceSync.md`. |
 | `device.i2p-master` | contact | Self-sync of the user's own I2P master key to their other devices: `i2pMaster` (base64), sealed to the user's own key and delivered to their own destination, so every device keeps the same personal address. Applied only when `from` is the user themselves. See `DeviceSync.md`, `Identity.md`. |

@@ -24,8 +24,8 @@ The facade is the "last mile" between the client and the server infrastructure. 
   clearnet facade, starts its embedded router with it, and only then switches to
   the I2P front. That request is pinned to clearnet in the client - routing it
   over I2P would ask the router to start before it had a netDb.
-- **A profile that has reached its server over I2P refuses clearnet from then
-  on** ("sticky I2P", persisted per profile). Falling back silently would bind
+- **An account that has reached its server over I2P refuses clearnet from then
+  on** ("sticky I2P", persisted per account). Falling back silently would bind
   the account's keys to the device's address at the server precisely when the
   network is being interfered with - the moment the user chose I2P for. The
   private reseed stays permitted, because it carries no identity and is what
@@ -74,8 +74,8 @@ http[s]://host[:port]/secret-path
 
 ### Connections
 
-Over I2P a client dials its facade from **one destination per profile**, shared
-by everything that profile sends: a destination carries many streams at once,
+Over I2P a client dials its facade from **one destination per account**, shared
+by everything that account sends: a destination carries many streams at once,
 and every dial takes its own stream with its own receive queue. A second
 destination would mean a second set of tunnels and a second leaseset for the
 same user, which is metadata for nothing.

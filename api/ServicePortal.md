@@ -110,7 +110,7 @@ not a purchase, and there is no shared pool to fall back on (a shared address
 would make every user behind it provably co-located).
 
 The master I2P destination key stays on the **client** (the user's long-term
-routing identity, sealed at rest in the profile beside the messaging keys). The
+routing identity, sealed at rest in the account beside the messaging keys). The
 client either **generates** a fresh master or **loads** one it already owns from
 an unencrypted Ed25519 (signing type 7) `.dat`. The server only ever holds a
 short-lived **offline transient** delegated from that master, so the b32 is the
