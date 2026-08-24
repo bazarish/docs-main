@@ -111,7 +111,7 @@ can never be confused.
 ## Portal features
 
 - **Username search.** Look up a `username`: shows the bound **descriptor**
-  (`{fp, dest, key}`, the normal form) if taken, or "free" if available.
+  (`{fp, dest, view}`, the normal form) if taken, or "free" if available.
   Display only - the authoritative signed resolve is the I2P path.
 - **Atomic purchase of a free name.** Claim a free `username` -> debit balance ->
   bind to the signed-in account (its `fp`), all under one lock/transaction so two
@@ -119,7 +119,7 @@ can never be confused.
   already hold sufficient balance (no name is ever held pending an invoice - the
   only asynchronous payment step is top-up). The buyer submits an **alias
   certificate** (user-signed `{alias, user: fp}`, `Identity.md`) plus their
-  **descriptor** (`{fp, dest, key}`; `dest`/`key` come from the buyer's home
+  **descriptor** (`{fp, dest, view}`; `dest`/`view` come from the buyer's home
   server). The client produces both with `bazarish-client alias-cert <profile>
   <alias>` (the signing key never leaves the client) and the portal `POST
   /portal/buy` is driven with that JSON. The resolver verifies the cert (signer ==
@@ -130,7 +130,7 @@ can never be confused.
   background scheduler renews each due alias by debiting the balance: funds
   present -> extend `notAfter` +1 year; insufficient -> **freeze** (below).
 - **Manage.** Update the bound descriptor (e.g. after the owner migrates servers -
-  the alias then points at the new `dest`/`key`); view owned aliases and their
+  the alias then points at the new `dest`/`view`); view owned aliases and their
   state/expiry.
 - **Admin face** (opt-in via `--admin <fingerprint>`). Admin-gated pages
   (sign-in-with-key; the signed-in fingerprint must equal the configured admin): an

@@ -207,8 +207,10 @@ statement - and told both which server serves the user. Both halves are gone:
   subscribe here" told the node nothing it had not already verified. The only
   clock is the **delegation** of the destination, which the I2P network itself
   enforces, and an account with none for the node's idle window is deleted.
-- The card fetch asks for the descriptor's `key` back, so a card cannot be
-  requested by fingerprint alone: a server never confirms whom it hosts.
+- The card fetch asks for the descriptor's `view` capability back, so a card
+  cannot be requested by fingerprint alone: a server never confirms whom it
+  hosts. The fetch is direct over I2P only - relaying it would tell the asker's
+  own server who is being added - and therefore needs no app-layer sealing.
 
 No expiry on the card either - routing that moved is repaired by the `routing`
 field every message carries.

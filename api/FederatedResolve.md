@@ -11,15 +11,16 @@ transport in `Federation.md`.
 
 - **Descriptor** - a small, single-QR pointer:
   ```
-  bazarish://invite?v=1&fp=<52-char base32 fingerprint>&dest=<b32>.b32.i2p&key=<base64url SPKI>[&name=<percent-encoded>]
+  bazarish://invite?v=1&fp=<52-char base32 fingerprint>&dest=<b32>.b32.i2p&view=<32 hex>[&name=<percent-encoded>]
   ```
   identity (`fp`) + the user's **own** destination (`dest`, a `.b32.i2p` host) +
-  the per-user serving key its server holds for it (`key`), plus an optional `name` the
+  the card-read capability its server issued (`view`, 16 random bytes as hex),
+  plus an optional `name` the
   inviter advertises (percent-encoded). The recipient adopts `name` as the
   contact's local display name at add time - a one-time static label, never
   re-fetched or transmitted afterwards (`Messages.md`). Older invites omit it.
   Rendered for humans as `fp:b32` (the `:` distinguishes it from an alias); the
-  full link/QR also carries `key`. It does **not** contain the contact card -
+  full link/QR also carries `view`. It does **not** contain the contact card -
   it points at one.
 - **Contact card** - user-signed (`user`, `dest`, `prekey`, `servingSealingKey`;
   ~= 8.7 KB, the hybrid post-quantum signature dominates), fetched live and
@@ -36,17 +37,24 @@ relay never sees who is being added (below).
 
 1. **Card fetch - `fp` is known** (from a descriptor/QR). Fetch the contact card
    for `fp` at `dest`. `fp` is the integrity anchor: the card is user-signed and
-   verified against `fp`, so neither the serving server nor the relay can forge
-   it - only withhold. The query carries `fp` and the descriptor's `key`,
-   **sealed to `key`**, so the relay cannot read which identity is looked up.
-   **Relay-safe by construction**, and substitution-proof.
+   verified against `fp`, so the serving server can only withhold, never forge.
 
-   The `key` in the query is also what makes the fetch unaskable without a
-   descriptor: the server answers only when it matches the key it issued for that
-   destination, and a wrong key is refused **identically** to an unknown user.
-   Without that, anyone could ask a server whether it hosts a fingerprint. A
-   caller whose descriptor is out of date gets that one answer and knows to ask
-   for a fresh one.
+   The fetch is **direct over I2P and nothing else**: the client dials `dest`
+   from a fresh transient destination. There is no relayed fallback, because a
+   lookup relayed through one's own server would tell it exactly who is being
+   added. No router, no fetch - the client says so instead of downgrading.
+
+   Query and answer travel **in the clear**: the I2P stream is already encrypted
+   and authenticated to the destination, and there is no third party on the path
+   to hide them from.
+
+   The `view` in the query is what makes the fetch unaskable without a
+   descriptor: the server answers only when it matches the capability it issued
+   for that account, and a wrong one is refused **identically** to an unknown
+   user. Without that, anyone could ask a server whether it hosts a fingerprint.
+   A caller whose descriptor is out of date gets that one answer and knows to ask
+   for a fresh one. Rotating `view` retires every descriptor already shared -
+   which a key doing double duty in the delivery path could never do.
 2. **Alias resolve - `fp` is unknown.** `username` -> descriptor. This is the only
    step without an `fp` anchor, so it is where MITM and the trusted alias->identity
    binding live. Served by the single central resolver (`AliasResolver.md`).
@@ -87,15 +95,15 @@ facade - direct b33 dials are already used for blob fetch).
 ## Card-fetch protocol (`fp` -> contact card)
 
 ```
-client has descriptor {fp, dest, key}
-  query   = seal({ v, fp, key, responseKey: <ephemeral SPKI> }, key)  # only the serving dest can open
+client has descriptor {fp, dest, view}
+  query   = { v, fp, view }                                  # plain; the I2P stream is the envelope
   -> dial srv (direct dial over a transient I2P destination) or relay via own server
   srv unseals, looks up the card for fp, returns:
-  response = seal({ v, card: <b64 DER> }, responseKey)                # only the client can open
+  response = <card DER>                                      # plain, same reason
   client: verify card signature; assert card.user == fp and card.dest is .b32.i2p
 ```
 
-`key` is the per-user serving sealing key - the same key the server unseals delivery
+`view` is a read capability and nothing else - it encrypts nothing. The serving key the sender needs for delivery
 admission headers with (`../Identity.md`, `InviteAnonymity.md`); no new key. On
 the direct path the I2P stream is already confidential to `srv`, so app-layer
 sealing is optional; on the proxy path it hides `fp` from the relay. Integrity is
@@ -140,7 +148,7 @@ above with the descriptor. A free/unknown name returns `ALIAS_UNKNOWN`.
 | Target (the serving server / resolver) | the `fp` (it serves that card) and that someone holding the descriptor asked | the alias (it owns the namespace); requester unlinkable on direct path |
 | Client | the verified card | the verified descriptor -> card |
 
-Namespace anti-enumeration is out of scope for the resolver (resolve is unauthenticated by design). The **card fetch** is not: it answers only to a caller returning the descriptor's `key`, refuses a wrong key exactly as it refuses an unknown user, and is not routed through the clearnet facade at all - otherwise a contact could take the descriptor it legitimately holds and try it against every facade it knows until one answered "yes, here".
+Namespace anti-enumeration is out of scope for the resolver (resolve is unauthenticated by design). The **card fetch** is not: it answers only to a caller returning the descriptor's `view` capability, refuses a wrong one exactly as it refuses an unknown user, and is not routed through the clearnet facade at all - otherwise a contact could take the descriptor it legitimately holds and try it against every facade it knows until one answered "yes, here".
 
 ## Phasing
 

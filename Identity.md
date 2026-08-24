@@ -11,7 +11,7 @@ Status: draft skeleton.
 
 - A user **is** a hybrid keypair set. The canonical UID is the identity fingerprint covering both public keys.
 - Address / contact forms:
-  - `<fingerprint>:<b32>` - the **descriptor**: identity fingerprint + the user's own destination (a `.b32.i2p` host). The primary scannable/QR form; the full link `bazarish://invite?fp=...&dest=...&key=...` also carries the per-user serving key (`api/FederatedResolve.md`). A fingerprint is an identity, not a route, so it is always paired with a destination - there is no `@server-fingerprint` form (nothing maps a fingerprint to an endpoint).
+  - `<fingerprint>:<b32>` - the **descriptor**: identity fingerprint + the user's own destination (a `.b32.i2p` host). The primary scannable/QR form; the full link `bazarish://invite?fp=...&dest=...&view=...` also carries the card-read capability (`api/FederatedResolve.md`). A fingerprint is an identity, not a route, so it is always paired with a destination - there is no `@server-fingerprint` form (nothing maps a fingerprint to an endpoint).
   - `<alias>` - an exclusive **username** on the central resolver (paid; the project's monetization, `api/AliasResolver.md`). Resolving it yields a descriptor, after which the contact card is fetched and verified.
 - Users have no binding to a server in anything a contact can see. Registration opens an unbounded channel with the server, and the only thing that expires is the delegation of the user's destination - which the network itself enforces. Nothing signed by the user names the server.
 - All clients (devices/app instances) of a user **share the identity keypair set**; a new device receives it during enrollment (see `DeviceSync.md`). Each client registers a unique random **client ID** so the server can track delivery completeness across clients.
@@ -105,7 +105,7 @@ sealed via the client's own server), so the requester's own server never learns 
 ### Out-of-band invites (the descriptor)
 
 A contact is shared out of band as a small **descriptor** - `<fingerprint>:<b33>`,
-or the link `bazarish://invite?fp=...&dest=...&key=...[&name=...]`: identity +
+or the link `bazarish://invite?fp=...&dest=...&view=...[&name=...]`: identity +
 serving destination + the server's serving sealing key, plus an optional advertised
 display name the recipient adopts at add time (static thereafter; see `Messages.md`).
 It fits a single QR. The recipient
