@@ -135,12 +135,12 @@ above with the descriptor. A free/unknown name returns `ALIAS_UNKNOWN`.
 | Party | Card fetch | Alias resolve |
 |---|---|---|
 | Relay (own server), **direct** path | nothing (bypassed) | nothing (bypassed) |
-| Relay, **proxy** path | "U fetched from `srv`" - not `fp` (sealed), not the card (sealed) | "U queried the resolver" - not the alias (sealed), not the result (sealed) |
+| Relay, **proxy** path | "U fetched from `dest`" - not `fp` (sealed), not the card (sealed). The dest is the contact's own address; it names no server | "U queried the resolver" - not the alias (sealed), not the result (sealed) |
 | I2P network | two opaque sealed blobs | two opaque sealed blobs |
-| Target (`srv` / resolver) | the `fp` (it serves that card) | the alias (it owns the namespace); requester unlinkable on direct path |
+| Target (the serving server / resolver) | the `fp` (it serves that card) and that someone holding the descriptor asked | the alias (it owns the namespace); requester unlinkable on direct path |
 | Client | the verified card | the verified descriptor -> card |
 
-Namespace anti-enumeration is out of scope (resolve is unauthenticated by design).
+Namespace anti-enumeration is out of scope for the resolver (resolve is unauthenticated by design). The **card fetch** is not: it answers only to a caller returning the descriptor's `key`, refuses a wrong key exactly as it refuses an unknown user, and is not routed through the clearnet facade at all - otherwise a contact could take the descriptor it legitimately holds and try it against every facade it knows until one answered "yes, here".
 
 ## Phasing
 
