@@ -39,6 +39,14 @@ Delivery over I2P can take tens of seconds, so sending is asynchronous at the AP
 
 | Endpoint | Purpose |
 |---|---|
+A **tokenless contact request** is capped by the protocol at **4096 sealed
+bytes** (`kMaxContactRequestBytes`) - not by any operator setting. Measured
+against a real request, the body is 3776 bytes with no greeting and 3910 with a
+100-byte one, nearly all of it the 64-token reply batch the requester hands over;
+the cap is that worst case rounded up. The greeting a person may write is capped
+at **100 bytes** (`kMaxContactGreetingBytes`) and the client refuses more, so the
+limit is met where it can be explained rather than at the recipient's server.
+
 | `POST /v1/messaging/send` | Submit a delivery envelope (see `Federation.md`; kinds: `message`, `contact-request`). The body also carries the `messageId` in the clear so the server can correlate the recipient's `delivered-ack` to this attempt. Early validation (account, size), then returns an `attemptId` immediately |
 | `GET /v1/messaging/send/{attemptId}` | Poll the attempt: `pending` / `delivered` / `unconfirmed` / `failed` + typed error. While `pending`, the response also carries a `phase` string reporting the live federation progress - `queued`, `dialing` (finding the recipient's destination and opening a stream to it; the server's own tunnels are usually already up), `connected`, `sending`, `awaiting-ack` - so a client can show real delivery status instead of an opaque "pending" (the client maps these to human text in its background-activity panel). `delivered` is set by the recipient's verified `delivered-ack` (the yellow tick), or **synchronously on local store** when the recipient shares the sender's own destination (no federated ack - see `Federation.md`); `unconfirmed` means the server exhausted retries without a confirmation - **not** a failure (the message may have been stored, only the ack lost), so the client keeps it grey. Optional `wait` parameter for long-polling. Completed attempts are kept briefly, then dropped |
 
