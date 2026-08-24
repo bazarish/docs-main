@@ -69,6 +69,13 @@ For the same reason the contact request **delivery** is routed by destination ov
 
 ## Anti-enumeration
 
+A destination belongs to one user, and only their mail is stored in it. A
+tokenless contact request naming any other mailbox is answered exactly like a
+delivered one and dropped - refusing it would answer "whose destination is
+this?" - and it never touches the seen-cache, so it cannot be used to censor the
+real delivery of the same id. A token-bearing delivery for another mailbox is
+refused like any other bad admission.
+
 Invalid token, unknown mailbox, and a recipient not served here must be externally indistinguishable (single `DELIVERY_REJECTED` error). Detailed typed errors (e.g. `QUOTA_EXCEEDED`, which the sender must see explicitly) are returned only after a valid token has been presented - so only actual contacts can learn mailbox state.
 
 ## Open questions
