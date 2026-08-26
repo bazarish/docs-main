@@ -51,10 +51,10 @@ The recipient runs the same delivery pipeline as a local send (dedup -> token ->
 The synchronous `response` is **best-effort**: its return leg over the recipient's *accepted* stream is unreliable (and on a single server it would require the sender's own destination to dial itself). The **authoritative** confirmation is a separate, reverse **`delivered-ack`** the recipient sends once it has stored the message:
 
 ```
-delivered-ack:  {"op":"delivered-ack","messageId":<id>,"signerPub":<base64>,"sig":<base64>}\n
+delivered-ack:  {"op":"delivered-ack","deliveryId":<id>,"signerPub":<base64>,"sig":<base64>}\n
 ```
 
-The recipient opens a **fresh outbound connection from the serving destination that received the delivery** back to the sender's serving destination, and signs `messageId` with that **serving destination's own per-destination signing key** (`signerPub` carries the public half; see *Authentication*) - never the server's root identity. The sender verifies the signature and that the `messageId` matches a pending send attempt - and since `messageId` is sealed inside the envelope, only a server that actually unsealed it can know it, so the ack doubles as a capability. On a verified ack the attempt is marked **delivered** (the yellow tick, `../Messages.md`) and the delivery job stops retrying. A `delivered-ack` gets no reply; the side that sent it keeps the connection open until the receiver closes, so the single line flushes before teardown.
+The recipient opens a **fresh outbound connection from the serving destination that received the delivery** back to the sender's serving destination, and signs `deliveryId` with that **serving destination's own per-destination signing key** (`signerPub` carries the public half; see *Authentication*) - never the server's root identity. The sender verifies the signature and that the `deliveryId` matches a pending send attempt - and since `deliveryId` is sealed inside the envelope, only a server that actually unsealed it can know it, so the ack doubles as a capability. On a verified ack the attempt is marked **delivered** (the yellow tick, `../Messages.md`) and the delivery job stops retrying. A `delivered-ack` gets no reply; the side that sent it keeps the connection open until the receiver closes, so the single line flushes before teardown.
 
 Operational note: a freshly created destination must publish its leaseset before peers can reach it; the first connect after startup may return `CANT_REACH_PEER` ("LeaseSet not found") and should be retried with backoff. Verified end to end against a live i2pd (`i2p-federation-smoke`, and the full cross-server `demo-federation-i2p.sh`).
 
@@ -104,7 +104,7 @@ DeliveryEnvelope:
                                             # content type, which is E2E - see ../Messages.md
     mailbox: <recipient UID>
     token: <one-time delivery token>        # absent for class "contact"
-    messageId: <delivery id: the sender's name for this envelope>  # idempotency / dedup
+    deliveryId: <the sender's name for this envelope>   # idempotency / dedup
   payload: <E2E blob>                       # opaque to every server-side component
 ```
 
@@ -120,14 +120,14 @@ DeliveryEnvelope:
 
 ## Message delivery flow
 
-1. Sender's client -> own server: `send` with the envelope (the client also passes the `messageId` in the clear - the delivery id, see `../Messages.md` - so the server can correlate the recipient's later `delivered-ack` to this attempt). The server accepts it, **spools it on disk** and returns an attempt id at once; the client polls for the outcome (see `ClientApi.md`). The submit never blocks on federation, so the sender's "grey" tick is instant.
+1. Sender's client -> own server: `send` with the envelope (the client also passes the `deliveryId` in the clear so the server can correlate the recipient's later `delivered-ack` to this attempt). The server accepts it, **spools it on disk** and returns an attempt id at once; the client polls for the outcome (see `ClientApi.md`). The submit never blocks on federation, so the sender's "grey" tick is instant.
 2. Sender's server -> recipient's server over I2P: `deliver` with the envelope, **dialled from the sender's own serving destination**.
 3. Recipient's server unseals and processes in strict order:
-   1. **messageId dedup** - if the `messageId` is still pending in the mailbox, or is in the retained **seen-messageId set** (every admitted id, kept independently of the blob until the TTL sweep ages it out), respond success *without* consuming a token. This makes client retries idempotent and blocks replays of an already-delivered envelope - including tokenless `contact` requests that have since been fetched, acked and swept;
+   1. **deliveryId dedup** - if the `deliveryId` is still pending in the mailbox, or is in the retained **seen-deliveryId set** (every admitted id, kept independently of the blob until the TTL sweep ages it out), respond success *without* consuming a token. This makes client retries idempotent and blocks replays of an already-delivered envelope - including tokenless `contact` requests that have since been fetched, acked and swept;
    2. **token check** - hash the presented token, look it up in the mailbox's registered set (`../Contacts.md`); no match -> `DELIVERY_REJECTED`;
    3. **size/quota checks** - explicit typed errors (`QUOTA_EXCEEDED`, `STORAGE_FULL`), revealed only past a valid token;
-   4. **store** as pending content; the token is consumed atomically with the store, and the `messageId` is added to the seen set.
-4. Recipient's server -> sender's server: a signed **`delivered-ack`** for the stored `messageId` (see *Delivery framing*), dialled from the recipient's serving dest back to the sender's serving dest. The sender verifies it and marks the attempt **delivered**; the client sees this on its next poll (the yellow tick).
+   4. **store** as pending content; the token is consumed atomically with the store, and the `deliveryId` is added to the seen set.
+4. Recipient's server -> sender's server: a signed **`delivered-ack`** for the stored `deliveryId` (see *Delivery framing*), dialled from the recipient's serving dest back to the sender's serving dest. The sender verifies it and marks the attempt **delivered**; the client sees this on its next poll (the yellow tick).
 5. The outcome propagates to the sender's client via polling. A definite rejection (token/size) is a **failed** state; an unconfirmed delivery (no ack, recipient unreachable) **stays grey** rather than reporting a false failure - the envelope may have been stored while only its ack was lost - and the spooled copy is retried on the schedule in `ClientApi.md`. Once the last attempt is spent the envelope is dropped and the sender is told: their client shows that message as failed and sending it again is the user's decision. A resend produces the same delivery id, so a recipient's server that did store the first copy recognises it and spends no second token.
 
 `contact-request` deliveries skip the token check, are capped in payload size (default 8192 bytes, server-configurable - large enough for the bootstrap prekey + a full reply-token batch), and are subject to a separate quota and per-origin-server rate limiting.
@@ -137,7 +137,7 @@ DeliveryEnvelope:
 | Request | Purpose |
 |---|---|
 | `deliver` | Deliver an envelope (message or contact request) for a local mailbox |
-| `delivered-ack` | Signed confirmation, sent back to the sender's serving dest, that a delivered `messageId` was stored (drives the yellow tick) |
+| `delivered-ack` | Signed confirmation, sent back to the sender's serving dest, that a delivered `deliveryId` was stored (drives the yellow tick) |
 | `card` | Return a local user's contact card for a sealed fingerprint query - the first-contact card fetch (`FederatedResolve.md`) |
 
 Username resolution (`alias` -> descriptor) is **not** an operator-to-operator

@@ -32,7 +32,7 @@ Status: draft skeleton.
 - **Delivery sealing is per-destination.** Each user's own serving destination
   has
   its **own serving sealing key**; the delivery envelope's admission header
-  (recipient, token, messageId) is sealed to the serving sealing key of the
+  (recipient, token, deliveryId) is sealed to the serving sealing key of the
   recipient's destination, whose private half the recipient's server holds. There
   is no single server-wide delivery sealing key (`InviteAnonymity.md`).
 - **Federation signing is per-destination too.** Each serving destination also

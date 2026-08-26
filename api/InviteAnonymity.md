@@ -100,7 +100,7 @@ DeliveryEnvelope:
     class: content | contact
     mailbox: <recipient UID>
     token: <one-time delivery token>        # absent for class "contact"
-    messageId: <delivery id>
+    deliveryId: <delivery id>
   payload: <E2E blob>
 ```
 

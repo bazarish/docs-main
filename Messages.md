@@ -96,7 +96,7 @@ types never appear here:
 | `content` | one-time delivery token (required) | Token consumed atomically with storage (see `Contacts.md`). The path for every established-contact message, whatever its content type. |
 
 The server branches on `class` and nothing else: it validates the mailbox,
-deduplicates by `messageId` (the delivery id below), enforces the token (for
+deduplicates by `deliveryId` (below), enforces the token (for
 `content`) or the size
 cap (for `contact`), and stores the opaque payload. The pending list returns
 the `class` back to the recipient - an admission-class hint the server already
@@ -107,10 +107,17 @@ Sealed envelope as the server sees it:
 ```
 { "class": "content" | "contact",
   "mailbox": <recipient fingerprint>,
-  "messageId": <delivery id>,
+  "deliveryId": <delivery id>,
   "token": <base64 one-time token>      // present iff class == "content"
 }
 ```
+
+The account database it all lands in carries a **schema version** of its own
+(SQLite's `user_version`, stamped when the tables are laid out and checked on
+every open). A database written against another number is refused with both
+numbers rather than read through guesswork. It is **1** and stays 1 until the
+first release: before then a schema change means creating the account again, and
+after it, this is the number a migration steps from.
 
 ### Two identifiers, and which is which
 
@@ -118,7 +125,7 @@ A message and an envelope are named separately, and the two names are known to
 different sides. The **e2e id** is what the two *ends* call the message; the
 **delivery id** is what the two *servers* call one envelope carrying it:
 
-| | **e2e id** (`id` in the layer-2 envelope; `e2eId` in the client) | **delivery id** (`messageId` on the wire) |
+| | **e2e id** (`id` in the layer-2 envelope) | **delivery id** (`deliveryId` everywhere) |
 |---|---|---|
 | Names | the message | one envelope handed to a server |
 | Who knows it | the two clients, and the sender's other devices - it is sealed | both servers - it is in the clear |

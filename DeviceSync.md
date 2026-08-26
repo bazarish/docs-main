@@ -33,7 +33,7 @@ Two devices may race to spend the same token from the shared per-contact stash. 
 
 1. A device picks a random token it believes unspent.
 2. If another device already burned it, delivery fails with `DELIVERY_REJECTED` -> retry with another token.
-3. messageId dedup on the recipient's server guarantees a successfully delivered message is never duplicated.
+3. deliveryId dedup on the recipient's server guarantees a successfully delivered message is never duplicated.
 
 `token-spent` events keep the known-unspent sets converging, making collisions rare; no strict stash partitioning is needed.
 
