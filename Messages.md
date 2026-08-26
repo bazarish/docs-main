@@ -114,15 +114,16 @@ Sealed envelope as the server sees it:
 
 ### Two identifiers, and which is which
 
-A message and an envelope are named separately, and the two names live in
-different worlds:
+A message and an envelope are named separately, and the two names are known to
+different sides. The **e2e id** is what the two *ends* call the message; the
+**delivery id** is what the two *servers* call one envelope carrying it:
 
-| | **protocol id** (`id` in the layer-2 envelope) | **delivery id** (`messageId` on the wire) |
+| | **e2e id** (`id` in the layer-2 envelope; `e2eId` in the client) | **delivery id** (`messageId` on the wire) |
 |---|---|---|
 | Names | the message | one envelope handed to a server |
-| Who sees it | the two clients, and the sender's other devices - it is sealed | both servers - it is in the clear |
+| Who knows it | the two clients, and the sender's other devices - it is sealed | both servers - it is in the clear |
 | Used for | replies, reactions, edits, read receipts, deletes; the recipient's client recognising a redelivery | the mailbox blob name, the recipient server's dedup and seen-set, the `delivered-ack` correlation |
-| Chosen by | the sending client, at random, once per message | derived by the sending client: `HMAC(account secret, protocol id + mailbox)` |
+| Chosen by | the sending client, at random, once per message | derived by the sending client: `HMAC(account secret, e2e id + mailbox)` |
 
 The delivery id being **derived** is what makes sending the same message again
 idempotent: the envelope keeps its name, so a recipient's server that already
@@ -142,7 +143,7 @@ versioned envelope:
 ```
 { "v": 1,
   "type": <content-type string>,
-  "id":   <protocol id: what this message is called between the clients>,
+  "id":   <e2e id: what this message is called between the two ends>,
   "from": <sender fingerprint>,
   "sentAt": <unix milliseconds>,   // client send clock; drives ordering and the displayed time
   "replyTo": <id>,            // optional
