@@ -12,11 +12,18 @@ An account has **no term**. Registration opens an unbounded channel; the only cl
 |---|---|
 | `get-card` | fingerprint + the descriptor's `view` capability -> the user's **contact card** (prekey + destination + serving sealing key). Backs the federation `card` request - the first-contact card fetch (`api/FederatedResolve.md`). The capability must be the one the node issued for that account: a wrong one is refused **exactly** like an unknown user, so the lookup cannot be used to ask a server whether it hosts a fingerprint |
 
-## Service node -> Server (draft)
+## Service node -> Server (implemented)
 
-| Event | Purpose |
+Signed with the node's own identity, which the server authorises by fingerprint;
+no shared secret.
+
+| Request | Purpose |
 |---|---|
-| `account-deleted` | The node dropped user U (idle, closed by its owner, or removed by the operator); the server may purge all pending content for U |
+| `PUT /v1/messaging/i2p-dest` | Hand over the user's signed offline transient, or revoke the destination with an empty one |
+| `PUT /v1/messaging/quota` | Set the mailbox quota the account grants, so the server stops answering with its own default |
+| `PUT /v1/messaging/serving-key` | Rotate a destination's serving sealing key, in two phases (prepare, then commit) |
+| `GET /v1/messaging/account?user=` | What the server holds for one account: devices, bytes used, quota (the panel shows it) |
+| `DELETE /v1/messaging/account?user=` | The account is gone: drop the mailbox, the replay markers, the token hashes, the device registry and the quota override. Sent when an account is deleted, whether by its owner or by the operator, and idempotent - a fingerprint the server holds nothing for is already in the state this asks for |
 
 ## Client-ID registry
 

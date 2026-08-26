@@ -21,7 +21,7 @@ Content is opaque ciphertext; the interface never interprets blob contents.
 
 1. A blob is **deleted immediately** once all **registered** client IDs of the user (see `../DeviceSync.md`) have acked it - before any quota or TTL pressure. Retiring a client ID triggers re-evaluation: blobs that were waiting only on the retired client are deleted.
 2. Maximum retention is the server's **mailbox retention** setting (`mailboxRetentionDays`); blobs older than that are purged.
-3. When the service node deletes an account (idle, closed or removed), the server may **purge all pending content** for that user.
+3. When the service node deletes an account (idle, ended by its owner, or removed by an operator), it tells the messaging server, which drops **everything** it held for that fingerprint: pending content, replay markers, token hashes, the device registry and any quota override. An account that no longer exists must not leave a mailbox that answers for it.
 4. Admission is refused (typed errors, see `../Errors.md`) when a blob exceeds the per-message limit or the user's quota; nothing is partially stored.
 
 ## Interface sketch (draft)

@@ -23,8 +23,7 @@ Status: draft skeleton. The single client-facing API, reached through a facade (
 | Endpoint | Purpose |
 |---|---|
 | `POST /v1/account/card` | Publish the user-signed **contact card** (`{card}`): the sealing **prekey** plus the serving **destination** + **serving sealing key** the client fetched from `GET /v1/messaging/destination` (see `../Identity.md`, `InviteAnonymity.md`). The card names no server and carries no validity window. This call is also what turns a portal registration into an account - the first one redeems the grant (`ServicePortal.md`) - and it is repeated whenever the routing changes; a repeat grants nothing. The destination can only be delegated once the account exists, so the first card carries no routing: the client delegates its transient and publishes again straight after. Responds `{quotaBytes, serverCard, approval, registrationMessage}` |
-| `GET /v1/account/status` | `{quotaBytes, delegatedAt}` - what the account holds and when it last delegated a destination. There is no term. (Usage lives on the messaging server.) |
-| `DELETE /v1/account/registration` | Close the account (migration cutover); the destination is revoked and the server purges all pending content immediately |
+| `DELETE /v1/account/registration` | End the account. The destination is revoked, the node drops the record and the grants, and the messaging server is told to drop the mailbox and everything else it held for that fingerprint (`DELETE /v1/messaging/account`, operator-signed). Signed with the account's own identity key, which is the only thing that can authorise it - so a client deletes on the server first and removes its profile only once that succeeded |
 | `POST /v1/account/i2p-dest` | Upload a signed offline **transient** (`{transient, expiresUnix}`; empty revokes). Every account owns a destination - it is the base protocol, not a purchase - so the only gates are that the account exists here and, on a moderated node, that it is approved (`ACCOUNT_PENDING_APPROVAL` until then). The node hands the transient to the messaging server, which operates the destination, and records its validity |
 | `GET /v1/account/i2p-status` | `{approval, registrationMessage, transientExpires, transientUpdatedAt, ...}` - the client polls this to drive transient re-issue and to see whether a moderated account is still awaiting approval |
 | `GET /v1/account/card?user=X&view=V` | The contact card behind a descriptor: returns `{user, card}`. `V` is the descriptor's `view` capability (32 hex characters, issued by the node when the account is created and reported with every card publish); a wrong one is refused **identically** to an unknown user, so this cannot be used to ask whether a server hosts a fingerprint. Reached from the messaging server, which serves a peer's query on the user's own destination - there is no lookup by fingerprint alone. The `username` namespace lives on the central resolver (`api/AliasResolver.md`, `api/FederatedResolve.md`) |
@@ -106,8 +105,7 @@ and so identify itself as Bazarish - to any scanner.
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /v1/messaging/tokens` | Register a batch of one-time token hashes for this user's mailbox |
-| `DELETE /v1/messaging/tokens` | Delete listed unused hashes (contact revocation or epoch reset) |
+| `POST /v1/messaging/tokens` | Register a batch of one-time token hashes for this user's mailbox. There is no delete: a hash is spent, aged out, or goes with the account |
 
 ### Client registry (see `../DeviceSync.md`)
 

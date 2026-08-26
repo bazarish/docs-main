@@ -90,8 +90,8 @@ Per user (`subscriptions/<fp>.json` - the account record - and `grants/<fp>.json
 
 - **account** - created when the client first publishes its card; holds the
   granted quota, the published card and when a destination was last delegated.
-  There is no term: `GET /v1/account/status` reports the quota and that last
-  delegation, and the node deletes an account idle for `idleDeleteDays` (180).
+  There is no term: `GET /v1/account/i2p-status` reports what the client needs to
+  see, and the node deletes an account idle for `idleDeleteDays` (180).
 - **approval** - `requestedAt` and `approvedAt`. On an open node an account is
   approved the moment it is created; on a moderated one it stays pending (see
   below). A renewal never restarts `requestedAt`, so a pending account cannot
@@ -154,7 +154,7 @@ per-user-destination endpoint) and reports its state on
 
 Behind login, gated by the configured **captcha**. On success the node issues a
 account into the store when the client publishes its card; the client reads its
-state back via `GET /v1/account/status`.
+state back via `GET /v1/account/i2p-status`.
 
 An operator chooses one of two modes (`registration.requireApproval`):
 
@@ -171,8 +171,7 @@ This is moderation, not a paywall.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /v1/account/pending` | Operator-signed: accounts awaiting approval, oldest first |
-| `POST /v1/account/approve` | Operator-signed: approve one account |
+| `POST /v1/account/approve` | Operator-signed: approve one account (the ones awaiting approval are listed by `GET /v1/account/users?state=pending`) |
 | `GET /v1/account/users?q&state&limit&offset` | Operator-signed: the accounts on this node, searched and paged here |
 | `GET /v1/account/user?user=` | Operator-signed: one account in full |
 | `PUT /v1/account/quota` | Operator-signed: set an account's storage quota (and push it to server-core) |
@@ -276,7 +275,7 @@ in that directory, of a type the portal publishes, are served.
 | Client | `sign-login <challenge>` (local) | key | produce the login signature |
 | Browser | `GET /`, `POST /login` | sig -> session | sign-in-with-key |
 | Browser | `POST /register` | session + captcha | registration grant |
-| Panel | `GET /v1/account/pending`, `POST /v1/account/approve` | operator sig | moderation |
+| Panel | `POST /v1/account/approve` | operator sig | moderation |
 | Panel | `GET /v1/account/users`, `GET /v1/account/user`, `PUT /v1/account/quota` | operator sig | the operator's account list, search and quota |
 | Client | `POST /v1/account/card` | key | publish the card, redeem the grant |
 | Client | `POST /v1/account/i2p-dest` | key | upload a signed offline transient (refused while the account is unapproved) |
@@ -294,8 +293,8 @@ in that directory, of a type the portal publishes, are served.
   too, it now sells nothing at all: a destination and a mailbox quota come with
   the account.
 
-Kept: `GET /v1/account/status`, `card`; the `mock` gateway
-(tests); the `PaymentGateway` registry/abstraction.
+Kept: `card`; the `mock` gateway (tests); the `PaymentGateway`
+registry/abstraction.
 
 ## 9. Security notes
 
