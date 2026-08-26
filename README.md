@@ -29,7 +29,7 @@ component implements.
   - [ServerServiceNode](api/ServerServiceNode.md) - internal server <-> service node API
   - [FileTransfer](api/FileTransfer.md) - direct client-to-client file transfer over I2P
   - [Storage](api/Storage.md) - pending-content storage backends
-  - [Calls](api/Calls.md) - audio/video calls
+  - [Calls](api/Calls.md) - audio calls
   - [AdminPanel](api/AdminPanel.md) - fleet status + management web panel (sign-in-with-key)
 
 ## Components
@@ -55,13 +55,13 @@ identity statement is dual-signed. Containers are OpenSSL-native standards
 The protocol is implemented across all components, with unit tests green and the
 core flows live-validated over real I2P: E2EE first contact, destination-routed
 federation, the central alias resolver (claim -> resolve -> card fetch ->
-conversation) including its offline-key serving-dest hot-swap, large-file blob
-transfer, bots and interactive messages,
+conversation) including its offline-key serving-dest hot-swap, direct
+client-to-client file transfer, bots and interactive messages,
 message editing and read receipts, multiple accounts, at-rest encryption of all
-local state, and client-to-client audio and video calls (Opus and VP8 media over
-I2P RAW datagrams to b33 destinations, per-call AES-256-GCM, minimal-length media
-tunnels, strict I2P requirement; the embedded `libi2pd_bazarish` carries the
-datagram-to-b33 routing in-process).
+local state, and client-to-client audio calls (Opus over I2P RAW datagrams to b33
+destinations, per-call AES-256-GCM, minimal-length media tunnels, strict I2P
+requirement; the embedded `libi2pd_bazarish` carries the datagram-to-b33 routing
+in-process). There is no video - see `api/Calls.md` for why.
 
 Near-term work (not yet done):
 

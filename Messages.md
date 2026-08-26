@@ -96,7 +96,8 @@ types never appear here:
 | `content` | one-time delivery token (required) | Token consumed atomically with storage (see `Contacts.md`). The path for every established-contact message, whatever its content type. |
 
 The server branches on `class` and nothing else: it validates the mailbox,
-deduplicates by `messageId`, enforces the token (for `content`) or the size
+deduplicates by `messageId` (the delivery id below), enforces the token (for
+`content`) or the size
 cap (for `contact`), and stores the opaque payload. The pending list returns
 the `class` back to the recipient - an admission-class hint the server already
 knew, never the content type.
@@ -106,10 +107,32 @@ Sealed envelope as the server sees it:
 ```
 { "class": "content" | "contact",
   "mailbox": <recipient fingerprint>,
-  "messageId": <dedup id>,
+  "messageId": <delivery id>,
   "token": <base64 one-time token>      // present iff class == "content"
 }
 ```
+
+### Two identifiers, and which is which
+
+A message and an envelope are named separately, and the two names live in
+different worlds:
+
+| | **protocol id** (`id` in the layer-2 envelope) | **delivery id** (`messageId` on the wire) |
+|---|---|---|
+| Names | the message | one envelope handed to a server |
+| Who sees it | the two clients, and the sender's other devices - it is sealed | both servers - it is in the clear |
+| Used for | replies, reactions, edits, read receipts, deletes; the recipient's client recognising a redelivery | the mailbox blob name, the recipient server's dedup and seen-set, the `delivered-ack` correlation |
+| Chosen by | the sending client, at random, once per message | derived by the sending client: `HMAC(account secret, protocol id + mailbox)` |
+
+The delivery id being **derived** is what makes sending the same message again
+idempotent: the envelope keeps its name, so a recipient's server that already
+stored it recognises it, stores nothing twice and spends no second token. Binding
+it to the mailbox is what keeps it from linking anything: the copy a sender keeps
+for their own devices and the copy the recipient gets are the same message under
+two unrelated names, so the two servers holding them have nothing to match on.
+Keying it with a secret only the sender holds means nobody else can work out what
+a message of theirs will be called - and so cannot poison a recipient's seen-set
+with that name before the real envelope arrives.
 
 ## Layer 2 - content type (end-to-end only)
 
@@ -119,7 +142,7 @@ versioned envelope:
 ```
 { "v": 1,
   "type": <content-type string>,
-  "id":   <client message id>,
+  "id":   <protocol id: what this message is called between the clients>,
   "from": <sender fingerprint>,
   "sentAt": <unix milliseconds>,   // client send clock; drives ordering and the displayed time
   "replyTo": <id>,            // optional
@@ -161,9 +184,7 @@ should say so plainly.
 | `file` | content | An announcement: `name`, `size`, `sha256` and `mime`. The bytes stay on the sender's disk until the recipient asks for them. See `api/FileTransfer.md`. |
 | `photo` | content | Same shape as `file`, plus optional `width`, `height`. |
 | `audio` / `voice` | content | Same shape as `file`, plus optional `duration`. |
-| `call.invite` | content | Contact type (audio/video), one-time tunnel destination + credentials (`api/Calls.md`). |
-| `call.accept` / `call.decline` / `call.end` | content | Call control (`api/Calls.md`). |
-| `receipt` | content | `ref` (the read message's `id`). A **read** receipt - the recipient's client sends it only on a genuine read (the chat is open, the app window focused, and the message scrolled into the visible area), confirming the "green" delivery state below. `ref` is the newest read incoming id, so it acknowledges that message and every earlier one (a read high-water). Optional/toggleable. |
+| `receipt` | content | `ref` (the read message's `id`). A **read** receipt - the recipient's client sends it only on a genuine read (the chat is open, the app window focused, and the message scrolled into the visible area), confirming the "green" delivery state below. `ref` is the newest read incoming id, so it acknowledges that message and every earlier one **the sender got as far as the recipient's server** (a read high-water); one that never arrived is not carried up by it. Optional/toggleable. |
 | `reaction` | content | A reaction to a message: `ref` (the target message's `id`), `text` (**at most 4 characters and 20 bytes** - enough for an emoji with a modifier or a joined pair; **empty removes** the reactor's reaction). Both limits are checked when sending and again on receipt: a peer's client is not the receiver's to trust, and an oversized one is dropped rather than rendered on someone's message. One reaction per user per message - a new one overwrites the old at every recipient. A single sealed delivery to the peer. Never a chat bubble - clients render it as a chip on the target message. See *Reactions*. |
 | `bot.command` | content | A command invocation aimed at a bot: `command` (name, no leading slash), `args` (raw argument string). See *Bots & interactive messages*. |
 | `bot.callback` | content | An inline-keyboard button press: `data` (the button's payload), `ref` (the `id` of the keyboard message). See *Bots & interactive messages*. |
@@ -178,6 +199,8 @@ should say so plainly.
 | `call.accept` | content | Accepts a call: `callId`, `dest` (the callee's media b32). See `api/Calls.md`. |
 | `call.decline` | content | Rejects a call: `callId`, `reason`. See `api/Calls.md`. |
 | `call.end` | content | Hangs up / cancels a call: `callId`. See `api/Calls.md`. |
+| `call.ring` | content | A device of the callee's is showing the call: `callId`. What turns the caller's "invitation delivered" into "their device is ringing". See `api/Calls.md`. |
+| `call.taken` | contact | Self-sync: the device that answered or refused an incoming call, so the account's other devices stop ringing - `callId`, `device`. See `api/Calls.md`, `DeviceSync.md`. |
 
 One further field is additive and may ride on any content message:
 
@@ -377,8 +400,17 @@ client cooperating (yellow is the recipient *server's* authenticated confirmatio
 not the recipient *user*); only green requires the recipient's client to opt in
 and reflects an actual read, not mere arrival. The read receipt carries the newest
 read message's `id`, so the sender greens that message and every earlier one it
-sent that peer. A failed delivery surfaces as a distinct failed state, not a tick;
-a delivery the sender's server cannot confirm stays grey (never a false failure).
+sent that peer **that reached the recipient's server** - reading one message says
+the earlier ones were seen, and says nothing at all about one that never arrived,
+which stays grey rather than being painted read by the message after it.
+
+A message still grey is one the sender's server is still carrying. It says so on
+itself: while the spool is retrying, the sender's client shows the attempt it is
+on ("retrying delivery 6 of 8", from `GET /v1/messaging/outbound`). Once the last
+attempt is spent the server gives up, tells the sender, and the message turns
+**red** - "the recipient could not be reached" - with a resend the user triggers
+when they choose. Nothing resends by itself, and a definite refusal (token, size)
+is red immediately without any of the waiting.
 
 ## Media: announced, transferred directly
 

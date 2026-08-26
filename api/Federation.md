@@ -104,7 +104,7 @@ DeliveryEnvelope:
                                             # content type, which is E2E - see ../Messages.md
     mailbox: <recipient UID>
     token: <one-time delivery token>        # absent for class "contact"
-    messageId: <client-generated random id> # idempotency / dedup
+    messageId: <delivery id: the sender's name for this envelope>  # idempotency / dedup
   payload: <E2E blob>                       # opaque to every server-side component
 ```
 
@@ -120,7 +120,7 @@ DeliveryEnvelope:
 
 ## Message delivery flow
 
-1. Sender's client -> own server: `send` with the envelope (the client also passes the `messageId` in the clear so the server can correlate the recipient's later `delivered-ack` to this attempt). The server accepts it **in memory only** (no outbound persistence, no outbound queue) and returns an attempt id at once; the client polls for the outcome (see `ClientApi.md`). The submit never blocks on federation, so the sender's "grey" tick is instant.
+1. Sender's client -> own server: `send` with the envelope (the client also passes the `messageId` in the clear - the delivery id, see `../Messages.md` - so the server can correlate the recipient's later `delivered-ack` to this attempt). The server accepts it, **spools it on disk** and returns an attempt id at once; the client polls for the outcome (see `ClientApi.md`). The submit never blocks on federation, so the sender's "grey" tick is instant.
 2. Sender's server -> recipient's server over I2P: `deliver` with the envelope, **dialled from the sender's own serving destination**.
 3. Recipient's server unseals and processes in strict order:
    1. **messageId dedup** - if the `messageId` is still pending in the mailbox, or is in the retained **seen-messageId set** (every admitted id, kept independently of the blob until the TTL sweep ages it out), respond success *without* consuming a token. This makes client retries idempotent and blocks replays of an already-delivered envelope - including tokenless `contact` requests that have since been fetched, acked and swept;
@@ -128,7 +128,7 @@ DeliveryEnvelope:
    3. **size/quota checks** - explicit typed errors (`QUOTA_EXCEEDED`, `STORAGE_FULL`), revealed only past a valid token;
    4. **store** as pending content; the token is consumed atomically with the store, and the `messageId` is added to the seen set.
 4. Recipient's server -> sender's server: a signed **`delivered-ack`** for the stored `messageId` (see *Delivery framing*), dialled from the recipient's serving dest back to the sender's serving dest. The sender verifies it and marks the attempt **delivered**; the client sees this on its next poll (the yellow tick).
-5. The outcome propagates to the sender's client via polling. A definite rejection (token/size) is a **failed** state; an unconfirmed delivery (no ack, recipient unreachable) **stays grey** rather than reporting a false failure - the envelope may have been stored while only its ack was lost. On failure the message stays **only on the client**, which may retry with the same messageId; the sender's server drops its in-memory copy as soon as the attempt concludes.
+5. The outcome propagates to the sender's client via polling. A definite rejection (token/size) is a **failed** state; an unconfirmed delivery (no ack, recipient unreachable) **stays grey** rather than reporting a false failure - the envelope may have been stored while only its ack was lost - and the spooled copy is retried on the schedule in `ClientApi.md`. Once the last attempt is spent the envelope is dropped and the sender is told: their client shows that message as failed and sending it again is the user's decision. A resend produces the same delivery id, so a recipient's server that did store the first copy recognises it and spends no second token.
 
 `contact-request` deliveries skip the token check, are capped in payload size (default 8192 bytes, server-configurable - large enough for the bootstrap prekey + a full reply-token batch), and are subject to a separate quota and per-origin-server rate limiting.
 

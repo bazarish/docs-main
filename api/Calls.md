@@ -82,11 +82,18 @@ Server-side components see only opaque blobs of a generic message.
 | Type | Direction | Payload |
 |---|---|---|
 | `call.invite` | caller -> callee | `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b33 routing address), `key` (base64 per-call media key) |
+| `call.ring` | callee -> caller | `callId`. Sent the moment a device of the callee's shows the call. Until it arrives the caller only knows the invitation reached their server; from it, the caller's screen says their device is ringing and the ringing tone starts |
 | `call.accept` | callee -> caller | `callId`, `media` (`audio`), `dest` (the callee's media b33 routing address) |
-| `call.decline` | callee -> caller | `callId`, `reason` (`declined` / `busy` / `refused`) |
+| `call.decline` | callee -> caller | `callId`, `reason` (`declined` / `busy` / `refused`). Honoured only while the caller is still calling: with several devices on one account, one of them answering and another refusing must not end the call that was answered |
 | `call.end` | either | `callId` |
+| `call.taken` | device -> the account's own devices | `callId`, `device`. Self-delivered (`DeviceSync.md`): every device of an account is shown the same invitation, and the one that answers or refuses stops the others. They drop the call without recording anything - the device that took it owns the outcome |
 
 Adding or evolving a call signal is a client-only change.
+
+Both sides run their own ring timeout, so a call nobody answers ends on its own:
+the caller's window runs from the moment their peer's device said it was ringing
+(from delivery to their server, when it never did), and the callee's from when the
+invitation arrived. Neither side needs the other's signal to stop ringing.
 
 ## Flow (I2P)
 
@@ -94,13 +101,17 @@ Adding or evolving a call signal is a client-only change.
    (strict: I2P unavailable -> `I2P_UNAVAILABLE`), generates a per-call AES key, and
    sends a `call.invite` carrying its media b33 and the key over the normal E2E
    delivery path.
-2. **Callee** receives the invite (on sync) and rings. On accept it builds its
-   own RAW datagram destination and replies with `call.accept` carrying its
-   media b33.
+2. **Callee** receives the invite (on sync), rings, and answers the caller with
+   `call.ring` so their screen stops guessing. On accept it builds its own RAW
+   datagram destination and replies with `call.accept` carrying its media b33,
+   and tells its own other devices with `call.taken`.
 3. Both sides now know each other's media destination and the shared key. Each
    captures the microphone, encodes Opus, AES-256-GCM-seals each datagram and
    sends it to the peer's b33; received datagrams are opened, decoded and played.
-   Mute keeps the capture loop running but transmits nothing.
+   Nothing is played until media is proven in **both** directions - what arrives
+   before that is half of a path still being opened, and playing it is heard as a
+   burst of broken audio just before the call starts. Mute keeps the capture loop
+   running but transmits nothing.
 4. Either side hangs up with `call.end`; the media engine and the one-time
    datagram destination are torn down.
 

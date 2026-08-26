@@ -55,8 +55,13 @@ Two pieces of account state propagate to the user's other devices as dedicated *
 
 - `device.avatar` - the user's own avatar, re-sent whenever it changes.
 - `device.contact-name` - a local contact rename, carrying `peer` (fingerprint) and the new `name`.
+- `device.message` - what this device just sent a contact, so the conversation reads the same on all of them.
+- `device.delegation-term` - the term this account delegates its destination for; the shortest choice wins.
+- `call.taken` - the device that answered or refused an incoming call, stopping the others ringing (`api/Calls.md`).
 
-Both are local-only facts that must never reach a contact, so they travel the self-channel exclusively. The routing-key sibling `device.i2p-master` (preserving the user's I2P address across devices, see `Identity.md`) uses the same mechanism. Wire shapes are in `Messages.md`.
+All are local-only facts that must never reach a contact, so they travel the self-channel exclusively. The routing-key sibling `device.i2p-master` (preserving the user's I2P address across devices, see `Identity.md`) uses the same mechanism. Wire shapes are in `Messages.md`.
+
+A self-message is named by a **delivery id of its own**, unrelated to the one the same message carries to its recipient (`Messages.md`): the copy kept for the account's devices and the copy the contact receives share no name, so the two servers holding them cannot be matched against each other.
 
 ## Quota interplay
 
