@@ -19,20 +19,21 @@ The facade is the "last mile" between the client and the server infrastructure. 
   empty stream rather than a response. The log says when each destination's
   leaseset has actually published ("i2p facade ready"), because until then a dial
   fails for reasons that have nothing to do with the facade.
-- **Clearnet stays for the bootstrap.** A client with no netDb cannot use an I2P
-  facade yet: it fetches the private reseed (`GET /v1/messaging/reseed`) over a
-  clearnet facade, starts its embedded router with it, and only then switches to
-  the I2P front. That request is pinned to clearnet in the client - routing it
-  over I2P would ask the router to start before it had a netDb.
-- **An account that has reached its server over I2P refuses clearnet from then
-  on** ("sticky I2P", persisted per account). Falling back silently would bind
-  the account's keys to the device's address at the server precisely when the
-  network is being interfered with - the moment the user chose I2P for. The
-  private reseed stays permitted, because it carries no identity and is what
-  makes I2P reachable at all; everything else fails closed until the user allows
-  clearnet again deliberately.
+- **A facade is an I2P address, and the API is spoken over nothing else.** A
+  clearnet facade is not tried at all, so there is no first connection in the
+  clear either - which is when a client would otherwise show its address to the
+  server it is about to register with. Where a stand on a LAN has no I2P at all,
+  the client is started with `--allow-facade-without-i2p-for-dev-purposes` and
+  the node's config key of the same name; both say what they cost, and both are
+  off by default.
+- **Clearnet is the bootstrap, and only the bootstrap.** A client with no netDb
+  cannot dial anything on I2P, so the descriptor carries **reseed** addresses
+  beside the facades: clearnet, asked for exactly one thing (`GET
+  /v1/messaging/reseed`), and never asked again once the router is up. They are a
+  separate list because they are a different job; a reseed serves no API and a
+  facade is never a reseed.
 - **i2pd's built-in reseed hosts are off** in the client. They are allowed in
-  exactly one case: this server's descriptor carries no clearnet facade, or none
+  exactly one case: this server's descriptor carries no reseed address, or none
   of them answered - the only situation with nobody to ask. Otherwise the
   bootstrap stays between the user and their own server.
 - This is the **only** I2P address the server side publishes. Federation runs on

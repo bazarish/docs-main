@@ -95,12 +95,14 @@ destination when the recipient asks for it.
 |---|---|
 | `GET /v1/messaging/reseed` | A random slice of the server's netDb as `{routers: [<base64 RouterInfo>]}`, so a client's first I2P start never reaches a public reseed host. Unauthenticated on purpose - the client has no transport yet - and safe, because every RouterInfo carries its own router's signature |
 
-The reseed is the one request pinned to a **clearnet** facade: it bootstraps the
-transport an I2P facade needs. It is reached under that facade's secret prefix
-(`Facade.md`), which the client already holds because the prefix is part of the
-facade URL in the server descriptor. If it cannot be fetched - no clearnet facade
-in the descriptor, or none answered - the client falls back to i2pd's built-in
-reseed hosts, and only then. Being unauthenticated, that prefix is
+The reseed is the one request that goes to a **reseed** address - the clearnet
+half of the server descriptor - and it is the only thing those addresses serve.
+It bootstraps the transport every other request needs, and it is reached under
+that address's secret prefix (`Facade.md`), which the client already holds
+because the prefix is part of the URL in the descriptor. If it cannot be fetched -
+no reseed in the descriptor, or none answered - the client falls back to i2pd's
+built-in reseed hosts, and only then. Everything else the client asks for goes to
+a facade, over I2P. Being unauthenticated, that prefix is
 the request's only gate: a facade published at a bare root would answer a reseed -
 and so identify itself as Bazarish - to any scanner.
 
