@@ -2,8 +2,8 @@
 
 Status: **design** (supersedes the earlier draft of this document). Specifies how
 a client discovers a contact it knows only by a small scannable identifier or by
-name, over I2P, with the home server (relay) learning as little as possible and
-unable to forge the result. The central username registry/daemon is specified in
+name, over I2P, with the home server learning nothing about it - it is not on the
+path - and nobody able to forge the result. The central username registry/daemon is specified in
 `AliasResolver.md`; the identity/certificate formats in `../Identity.md`; the I2P
 transport in `Federation.md`.
 
@@ -31,7 +31,7 @@ transport in `Federation.md`.
 The old full-card-in-invite (offline, multi-QR) is **removed**: the descriptor +
 a live fetch replaces it (rationale in `AliasResolver.md`). Cost: the user's
 server must be reachable at add-time. Benefit: one QR, always-fresh card, and the
-relay never sees who is being added (below).
+home server never sees who is being added (below).
 
 ## Two lookups, different trust
 
@@ -63,7 +63,7 @@ relay never sees who is being added (below).
 
 | Form | Meaning | Trust |
 |---|---|---|
-| `<fp>:<b33>` (descriptor) | identity + direct route; primary QR/link | strongest - `fp` anchor, no substitution (relay learns `fp` only on the proxy path) |
+| `<fp>:<b33>` (descriptor) | identity + direct route; primary QR/link | strongest - `fp` anchor, no substitution, and nothing in between to learn `fp` |
 | `<alias>` | name on the central resolver | trusted alias->`fp` binding; UI must show the resolved `fp` for out-of-band verification |
 | ~~`<x>@<fingerprint>`~~ | **removed** | a fingerprint is an identity, not a route - nothing maps it to an endpoint (no resolver, no `peers.json`) |
 
@@ -71,33 +71,28 @@ Aliases are global on the single resolver, so the `@server` form is unnecessary;
 the protocol stays federation-capable (descriptor + signed records are general)
 even though v1 runs one resolver (`AliasResolver.md`).
 
-## Transport: direct-dial preferred, own-server proxy fallback
+## Transport: the client dials, and nothing relays
 
 Mirrors the direct file-transfer fetch (`FileTransfer.md`).
 
-- **Direct (preferred; the client's embedded I2P router is up).** The client dials `srv` (card
-  fetch) or the resolver's b32 (alias resolve) itself over a **fresh transient
-  I2P destination**. I2P encrypts the stream end-to-end to the destination and the
-  `.b32.i2p` address *is* a commitment to the destination key, so the relay is
-  bypassed entirely - **no relay-MITM, no relay metadata, no extra key needed**,
-  and the target sees only an unlinkable transient. This is why a `.b32.i2p` host
-  (not a facade) is the unit of cross-server reachability (`Facade.md`).
-- **Proxy (fallback; thin client whose embedded I2P router is not up).** The client submits the sealed
-  query to its **own** server, which relays opaque bytes over I2P and returns the
-  opaque response. The client did all sealing/verification; the relay moves bytes.
-  Here the relay could in principle MITM the *transport*, so integrity must come
-  from an end-to-end anchor (below), not from the relay honestly dialling.
+The client dials `srv` (card fetch) or the resolver's b32 (alias resolve) itself
+over a **fresh transient I2P destination**. I2P encrypts the stream end-to-end to
+the destination and the `.b32.i2p` address *is* a commitment to the destination
+key, so there is no relay to MITM, no relay metadata and no extra key needed, and
+the target sees only an unlinkable transient. This is why a `.b32.i2p` host (not a
+facade) is the unit of cross-server reachability (`Facade.md`).
 
-This revises the earlier "the client never connects to the target server itself":
-thin clients proxy; clients with their own I2P dial directly (a b33 is not a
-facade - direct b33 dials are already used for blob fetch).
+**There is no proxy fallback.** Relaying a lookup through one's own server would
+tell it exactly who is being added - the one thing this design withholds - so a
+client with no working I2P router is told so plainly instead of being quietly
+downgraded. The route that once did this (`POST /v1/messaging/fetch`) is gone.
 
 ## Card-fetch protocol (`fp` -> contact card)
 
 ```
 client has descriptor {fp, dest, view}
   query   = { v, fp, view }                                  # plain; the I2P stream is the envelope
-  -> dial srv (direct dial over a transient I2P destination) or relay via own server
+  -> dial srv (direct dial over a transient I2P destination)
   srv unseals, looks up the card for fp, returns:
   response = <card DER>                                      # plain, same reason
   client: verify card signature; assert card.user == fp and card.dest is .b32.i2p
@@ -105,9 +100,8 @@ client has descriptor {fp, dest, view}
 
 `view` is a read capability and nothing else - it encrypts nothing. The serving key the sender needs for delivery
 admission headers with (`../Identity.md`, `InviteAnonymity.md`); no new key. On
-the direct path the I2P stream is already confidential to `srv`, so app-layer
-sealing is optional; on the proxy path it hides `fp` from the relay. Integrity is
-always the `fp` anchor.
+the only path there is, the I2P stream is already confidential to `srv`, so
+app-layer sealing is optional. Integrity is always the `fp` anchor.
 
 ## Alias-resolve protocol (`username` -> descriptor)
 
@@ -124,26 +118,24 @@ hardcoded resolver root fingerprint`, plus `notAfter`. It then runs the card-fet
 above with the descriptor. A free/unknown name returns `ALIAS_UNKNOWN`.
 
 - **Integrity / anti-MITM** is the signature chain to the **hardcoded root
-  fingerprint** - transport-independent, so even a malicious relay on the proxy
-  path can only DoS, never forge. On the direct path, the resolver's b32 also
-  authenticates the destination.
-- **Confidentiality** of *which* name is looked up: direct-dial hides it from the
-  relay entirely; on the proxy path the query is sealed to the resolver's key
-  (authenticated via the hardcoded root fingerprint - bootstrap the rotatable
-  sealing key from a root-signed server card).
+  fingerprint** - transport-independent, so anything in the path can only DoS,
+  never forge. The resolver's b32 also authenticates the destination.
+- **Confidentiality** of *which* name is looked up: the client dials the resolver
+  itself, so nothing between the two learns the name. The query is sealed to the
+  resolver's key regardless (authenticated via the hardcoded root fingerprint -
+  bootstrap the rotatable sealing key from a root-signed server card).
 - **Residual trust**: the resolver asserts the alias->`fp` binding (the nature of
   names). The only defense is **surfacing the resolved `fp` in the UI** for
-  out-of-band verification (safety-number style); the hardcoded anchor removes the
-  *relay* from trust, not the resolver itself.
-- **Cacheable**: the signed record is self-verifying, so relays/clients may cache
-  it up to `notAfter`, relieving load on the single resolver.
+  out-of-band verification (safety-number style); the hardcoded anchor removes
+  everything but the resolver itself from trust.
+- **Cacheable**: the signed record is self-verifying, so clients may cache it up
+  to `notAfter`, relieving load on the single resolver.
 
 ## What is hidden from whom
 
 | Party | Card fetch | Alias resolve |
 |---|---|---|
-| Relay (own server), **direct** path | nothing (bypassed) | nothing (bypassed) |
-| Relay, **proxy** path | "U fetched from `dest`" - not `fp` (sealed), not the card (sealed). The dest is the contact's own address; it names no server | "U queried the resolver" - not the alias (sealed), not the result (sealed) |
+| The asker's own server | nothing: it is not on the path, and there is no path through it | nothing: it is not on the path |
 | I2P network | two opaque sealed blobs | two opaque sealed blobs |
 | Target (the serving server / resolver) | the `fp` (it serves that card) and that someone holding the descriptor asked | the alias (it owns the namespace); requester unlinkable on direct path |
 | Client | the verified card | the verified descriptor -> card |
@@ -157,12 +149,12 @@ Namespace anti-enumeration is out of scope for the resolver (resolve is unauthen
    (`record -> delegated -> root`) on the existing hybrid-cert primitives. Unit
    tests round-trip each.
 2. **server-core** - *done.* The card-fetch responder on every serving
-   destination (the home one and every user's own: unseal `fp` query -> return the card sealed to
-   the response key) and the proxy relay (`POST /v1/messaging/fetch`, op `card`
-   and `resolve`, `.b32.i2p`-validated `toDest`) that moves opaque sealed bytes.
-3. **client** - *done.* Descriptor handling, a fetch transport that prefers a
-   direct fetch over a transient I2P destination and falls back to the own-server proxy (a served
-   `CARD_UNKNOWN` / `ALIAS_UNKNOWN` is authoritative and does not fall back),
+   destination (the home one and every user's own: unseal `fp` query -> return the
+   card sealed to the response key). The proxy relay that once backed a thin
+   client is gone, along with the route it was served on.
+3. **client** - *done.* Descriptor handling, a fetch transport that dials the
+   target directly over a transient I2P destination (a served `CARD_UNKNOWN` /
+   `ALIAS_UNKNOWN` is authoritative),
    ephemeral seal/verify, address parsing (`fp:b33` vs `<alias>`), `addByUsername`
    routed to the resolver (record chain verified against the hardcoded root,
    alias normalized to `a-z0-9`/1-32), and OOB-fingerprint display (the resolved
@@ -189,6 +181,5 @@ Namespace anti-enumeration is out of scope for the resolver (resolve is unauthen
 
 - `bazarish://resolver/<...>` sharing for a federated (non-central) resolver - the
   protocol supports it; v1 ships one resolver only.
-- Submit+poll for the proxy relay (vs synchronous) if I2P dial latency demands it.
 - Optional clearnet/Tor DNS-SRV -> b33 convenience for `<alias>@<domain>` (weakest
   rung; unauthenticated DNS, opt-in, always show the `fp`).

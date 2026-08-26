@@ -199,7 +199,7 @@ purchase and renewal are instant balance debits.
 ## Signed resolve (I2P-only)
 
 A client resolves `username` by dialling the resolver's hardcoded b32 over I2P
-(a direct fetch over a transient I2P destination preferred; own-server proxy fallback - `FederatedResolve.md`)
+(a direct fetch over a transient I2P destination of the client's own - `FederatedResolve.md`)
 and receives a **signed descriptor record**:
 
 ```

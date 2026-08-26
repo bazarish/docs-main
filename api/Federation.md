@@ -162,10 +162,8 @@ summary:
   carries the fingerprint and route directly. The client fetches the user-signed
   contact card for that fingerprint over I2P - the `card` request above, with the
   fingerprint sealed to the serving sealing key - a direct fetch over a transient
-  I2P destination preferred, own-server proxy fallback, and verifies the card
-  against the fingerprint. `fp`
-  anchors integrity; the relay learns neither the fingerprint (sealed) nor the
-  result.
+  I2P destination, and verifies the card against the fingerprint. `fp` anchors
+  integrity; nothing in between learns the fingerprint (sealed) or the result.
 - A **username** resolves to a descriptor at the central resolver
   (`AliasResolver.md`), which returns a signed self-verifying record over its I2P
   endpoint; the client then runs the card fetch above.
