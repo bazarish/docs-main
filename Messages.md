@@ -121,6 +121,8 @@ after it, this is the number a migration steps from.
 
 ### Two identifiers, and which is which
 
+![How a message is wrapped, what travels on each hop, and where each identifier is created and read](img/identifiers.svg)
+
 A message and an envelope are named separately, and the two names are known to
 different sides. The **e2e id** is what the two *ends* call the message; the
 **delivery id** is what the two *servers* call one envelope carrying it:
