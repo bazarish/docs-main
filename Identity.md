@@ -39,7 +39,7 @@ Status: draft skeleton.
   has its **own signing keypair**, stored bound to that destination together with
   its serving sealing key - a `(destination, signing key, serving sealing key)`
   group that is never reused on another destination. It is the only key that signs
-  live federation traffic (the `delivered-ack`, `api/Federation.md`). The server
+  live federation traffic (a delivery confirmation, `api/Federation.md`). The server
   **root identity** (the server card above) signs only **outside** federation -
   the `bazarish://server` configuration link (`api/Facade.md`) and the
   service-node binding - so two users one server hosts on different destinations

@@ -75,9 +75,10 @@ The server stores-and-forwards while U is offline, so it **must** read
 `../Contacts.md`) - while staying blind to the content layer, which it cannot
 decrypt. One key cannot serve both layers because the readers differ (U vs U's
 server). Sealing the admission header is also what keeps the **sender's own
-relay server** (and the I2P transport) from learning the recipient: otherwise
-the sender's server would log a social-graph edge "U -> V", violating the
-"sender's own server never learns the recipient" invariant (`Federation.md`);
+relay server** (and the I2P transport) from learning the recipient. The envelope
+no longer passes through that server at all - the client delivers it - and the
+sealed header is what kept the "sender's own server never learns the recipient"
+invariant (`Federation.md`) even when it did;
 it is what keeps the serving key bound to the destination rather than the server.
 
 **Ownership** (so this is not a "server signs" step): for a personal dest
@@ -89,13 +90,13 @@ carries only U's signature.
 ## Routing by destination
 
 `DeliveryEnvelope.toServer` (a server fingerprint) becomes `toDest` (an I2P
-destination string). The sender's own server connects **directly** to `toDest`
-over I2P - no fingerprint->`peers.json` resolution, no server card needed to
-route. The rest of the envelope is unchanged:
+destination string). The sending client connects **directly** to `toDest` over I2P
+- no fingerprint->`peers.json` resolution, no server card needed to route. The rest
+of the envelope is unchanged:
 
 ```
 DeliveryEnvelope:
-  toDest: <i2p destination>                 # routing only - all the sender's server sees
+  toDest: <i2p destination>                 # routing only - and only the sending client sees it
   sealed:                                   # CMS envelope to the destination's serving sealing key
     class: content | contact
     mailbox: <recipient UID>
@@ -108,41 +109,29 @@ The sender's own server still learns only "user U sent something to destination
 D" - which, since D is the recipient's own destination, is as strong as a
 server fingerprint, not stronger.
 
-### Local delivery only within a destination (no co-location timing channel)
+### No local delivery at all (no co-location timing channel)
 
-A server may short-circuit delivery (store straight into the local mailbox
-instead of dialling out over I2P) **only when the sender and the recipient are
-on the same destination** - i.e. `toDest` equals the **sender's own** assigned
-destination. In every other case, including any two local users the server hosts
-on *distinct* serving destinations - which, since no two users ever share one,
-means any two different users - the server **must federate**: dial
-`toDest` over I2P **from the sender's own serving destination**. The two endpoints
-are distinct destinations on the one router; this is not a single dest dialling
-itself. (The server has no shared "home" federation address to fall back on - see
-the fundamental rule below.)
+There is no short-circuit anywhere. Every message is dialled over I2P by the
+sender's **client** to the recipient's serving destination, including when the
+same server hosts both parties - it is not asked to deliver, so it has nothing to
+short-circuit. The one write that stays local is a message to the sender's **own
+other devices**, where there is no second party and no destination to dial.
 
-Rationale: if the server delivered cross-destination recipients locally (fast)
-but remote recipients over I2P (slow), the **delivery latency** would reveal
-whether the recipient is co-located on the sender's server - a timing
-side-channel that re-introduces exactly the co-location signal the
-destination-routing model removes. Routing within one destination is safe (the
-two parties already share that destination by construction, so "local" leaks
-nothing new); routing across destinations must be indistinguishable from a
-remote delivery.
-
-The server determines the sender's destination authoritatively from its own
-assignment of the authenticated sender (the same lookup that backs the
-destination-surfacing step below) - never from a value the sender supplies, so a
-sender cannot force a revealing short-circuit.
+Rationale: if a co-located recipient were served locally (fast) while a remote one
+went over I2P (slow), the **delivery latency** would reveal whether the two parties
+share a server - a timing side-channel that re-introduces exactly the co-location
+signal destination routing removes. With delivery in the client's hands the
+question does not arise: the client knows a destination and dials it, and cannot
+tell (or leak) whose server is behind it.
 
 ## The destination knob (`dest_U`)
 
 **Fundamental rule: a server has no single, shared federation destination.** Every
-user is served by `dest_U` (their own personal
-per-user dest), and *all* of that user's federation rides over it - inbound
-delivery, outbound delivery (dialled **from** `dest_U`), and the signed
-`delivered-ack` (`Federation.md`). A server-wide "home" address is never used for
-user traffic (it serves only first-contact card discovery); a shared federation
+user is served by `dest_U` (their own personal per-user dest), which is where their
+mail arrives and where their server signs for it (`Federation.md`). It dials
+nobody: outgoing mail is dialled by the sender's own client, from a destination the
+client holds for that one correspondent. A server-wide "home" address is never used
+for user traffic (it serves only first-contact card discovery); a shared federation
 source would both leak a common address and, when sender and recipient share a
 server, make one user's destination dial another's.
 
@@ -176,7 +165,7 @@ value is no longer shared server-wide.
 ## Per-destination signing key
 
 The same per-destination binding applies to the key that **signs** live
-federation traffic (the `delivered-ack`, `Federation.md`). Each serving
+federation traffic (a delivery confirmation, `Federation.md`). Each serving
 destination carries its own signing keypair, stored bound to the destination
 alongside its serving sealing key - a `(destination, signing key, serving sealing
 key)` group, never reused on another destination:
@@ -248,13 +237,11 @@ mapping.
 
 ## Federation impact
 
-- `toServer` -> `toDest`; the sender's server dials `toDest` directly.
-- **Local short-circuit only within a destination**: deliver locally iff
-  `toDest` equals the **sender's own** destination; otherwise federate (dial
-  `toDest`), even when the server operates `toDest` (a same-server recipient on a
-  different destination) - see "Local delivery ..." above. This is the rule, not an
-  optimisation; a fast local path for a different-destination recipient is a
-  co-location timing leak.
+- `toServer` -> `toDest`; the sending client dials `toDest` directly.
+- **No local short-circuit**: every message is federated, even between two users
+  the same server hosts - see "No local delivery at all" above. This is the rule,
+  not an optimisation; a fast local path for a co-located recipient is a timing
+  leak.
 - Accept side is unchanged in shape: home / personal destinations each
   already run an accept loop into the shared `DeliveryEngine`; add per-dest
   serving-sealing-key selection.
@@ -264,8 +251,8 @@ mapping.
 - **Accountability** stays per-connecting-destination (`FederationRateLimiter`,
   implemented). The server root key **never** signs live federation traffic;
   destinations are self-standing and the root only certifies offline. Each
-  destination signs its own `delivered-ack`s with its own per-destination signing
-  key (above), so the signer is never server-wide.
+  destination signs its own delivery confirmations with its own per-destination
+  signing key (above), so the signer is never server-wide.
 
 ## Honest accounting (what still leaks)
 
@@ -277,7 +264,7 @@ mapping.
 
 The strongest cross-user clustering field (the shared server fingerprint and the
 byte-identical root-signed card) is gone, and live federation now carries no
-server-wide signer either (the `delivered-ack` is signed per destination).
+server-wide signer either (a delivery confirmation is signed per destination).
 
 ## Implementation (all phases done)
 

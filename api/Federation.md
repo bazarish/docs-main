@@ -43,18 +43,13 @@ Over the connected stream, one delivery is:
 
 ```
 request:  {"op":"deliver","sealed":<base64>,"len":<N>}\n   then N raw payload bytes
-response: {"delivered":<bool>,"errorCode":...,"errorMessage":...}\n   (best-effort)
+response: {"delivered":<bool>,"errorCode":...,"errorMessage":...,
+           "deliveryId":<id>,"signerPub":<base64>,"sig":<base64>}\n
 ```
 
-The recipient runs the same delivery pipeline as a local send (dedup -> token -> size/quota -> store), so local and federated deliveries share one code path.
+The recipient runs the same delivery pipeline whoever dialled (dedup -> token -> size/quota -> store), so a client's delivery and a discovery fetch share one served code path.
 
-The synchronous `response` is **best-effort**: its return leg over the recipient's *accepted* stream is unreliable (and on a single server it would require the sender's own destination to dial itself). The **authoritative** confirmation is a separate, reverse **`delivered-ack`** the recipient sends once it has stored the message:
-
-```
-delivered-ack:  {"op":"delivered-ack","deliveryId":<id>,"signerPub":<base64>,"sig":<base64>}\n
-```
-
-The recipient opens a **fresh outbound connection from the serving destination that received the delivery** back to the sender's serving destination, and signs `deliveryId` with that **serving destination's own per-destination signing key** (`signerPub` carries the public half; see *Authentication*) - never the server's root identity. The sender verifies the signature and that the `deliveryId` matches a pending send attempt - and since `deliveryId` is sealed inside the envelope, only a server that actually unsealed it can know it, so the ack doubles as a capability. On a verified ack the attempt is marked **delivered** (the yellow tick, `../Messages.md`) and the delivery job stops retrying. A `delivered-ack` gets no reply; the side that sent it keeps the connection open until the receiver closes, so the single line flushes before teardown.
+The confirmation **rides that reply**: on a store the recipient signs the `deliveryId` with the **serving destination's own per-destination signing key** (`signerPub` carries the public half; see *Authentication*) - never the server's root identity. It comes home this way because it can come home no other way: the dialler is a client on a one-time-ish address that publishes no leaseset, so nothing can dial it back. Since `deliveryId` is sealed inside the envelope, only a server that actually unsealed it can name it, and the signature ties that name to the destination that answered. The sending client believes a `delivered` **only** when the signature verifies against the id it sent; an unsigned or wrongly-signed claim is treated as no answer at all and the attempt is repeated.
 
 Operational note: a freshly created destination must publish its leaseset before peers can reach it; the first connect after startup may return `CANT_REACH_PEER` ("LeaseSet not found") and should be retried with backoff. Verified end to end against a live i2pd (`i2p-federation-smoke`, and the full cross-server `demo-federation-i2p.sh`).
 
@@ -62,34 +57,30 @@ Operational note: a freshly created destination must publish its leaseset before
 
 Routing is **by destination**, not by server fingerprint. The recipient's
 serving destination (its b33) travels end to end in the recipient's contact card
-(`../Identity.md`), so the sender's server **dials that destination directly**
-over I2P. There is no fingerprint->endpoint resolver and no `peers.json` - a
-destination is self-routing.
+(`../Identity.md`), so the sender **dials that destination directly** over I2P.
+There is no fingerprint->endpoint resolver and no `peers.json` - a destination is
+self-routing.
 
 **A server has no single, shared federation destination** (fundamental rule). Each
 user is served by their own serving destination (never shared with another
-k-anonymity set, or a personal per-user dest - see `InviteAnonymity.md`), and *all*
-that user's federation flows over it: inbound delivery is served on it, and an
-outbound delivery dials the recipient **from the sender's own serving destination**
-- there is no server-wide address to dial from. Discovery (the `card` request
-below) is answered on the users' own destinations and dialled from a one-time
-transient, so nothing in federation is attributable to the server itself.
+k-anonymity set, or a personal per-user dest - see `InviteAnonymity.md`), and all
+*inbound* federation for that user is served on it. Nothing dials out from it: an
+outgoing message is dialled by the sender's own **client**, from a destination it
+holds for that one correspondent, and discovery (the `card` request below) is
+dialled from a one-time transient. So there is no address anywhere in federation
+that is attributable to a server, and no server that knows whom its users write to.
 
-A delivery whose `toDest` equals the **sender's own** serving destination (the two
-parties already share it) is stored locally; any other destination - including a
-co-located recipient the same server hosts on a *different* serving dest - is
-federated (the sender's serving dest dials the recipient's serving dest, two
-distinct destinations) so delivery latency cannot reveal co-location
-(`InviteAnonymity.md`).
+**Who a recipient's destination accepts from is not part of the check.** Admission
+is the envelope alone - sealed to that destination's serving key, naming a class, a
+mailbox and a delivery id, and carrying a token unless it is a contact request.
+Nothing asks whether the dialler is a server, which is exactly what lets a client
+deliver its own mail without a protocol of its own.
 
-For that shared-destination case the confirmation is also **synchronous and
-local**: the server marks the attempt **delivered** the instant it stores the
-message, with **no** federated `delivered-ack` (the yellow tick is immediate, no
-I2P round-trip). An ack here would be both pointless - the two parties share the
-destination by construction, so there is no co-location timing channel to mask -
-and impossible, since it would require the destination to dial itself. The
-federated `delivered-ack` below is therefore only for delivery to a *different*
-destination.
+Every message federates, including one between two users the same server hosts:
+there is no local short-circuit and no shortcut for co-located parties, so delivery
+latency reveals no co-location (`InviteAnonymity.md`). The one write that does not
+federate is a message to the sender's **own other devices**, which their server
+stores directly (`ClientApi.md`) - there is no second party for it to reach.
 
 ## Delivery envelope
 
@@ -120,15 +111,15 @@ DeliveryEnvelope:
 
 ## Message delivery flow
 
-1. Sender's client -> own server: `send` with the envelope (the client also passes the `deliveryId` in the clear so the server can correlate the recipient's later `delivered-ack` to this attempt). The server accepts it, **spools it on disk** and returns an attempt id at once; the client polls for the outcome (see `ClientApi.md`). The submit never blocks on federation, so the sender's "grey" tick is instant.
-2. Sender's server -> recipient's server over I2P: `deliver` with the envelope, **dialled from the sender's own serving destination**.
+1. Sender's **client** seals the envelope and dials the recipient's serving destination itself, over I2P, **from a destination it holds for that one correspondent** (one per correspondent, a ten-minute term, taken from a small warm pool it keeps ready). No server of the sender's is involved in a send at all, so none of them learns whom the sender writes to.
+2. Client -> recipient's server: `deliver` with the envelope and its payload, on that one stream.
 3. Recipient's server unseals and processes in strict order:
    1. **deliveryId dedup** - if the `deliveryId` is still pending in the mailbox, or is in the retained **seen-deliveryId set** (every admitted id, kept independently of the blob until the TTL sweep ages it out), respond success *without* consuming a token. This makes client retries idempotent and blocks replays of an already-delivered envelope - including tokenless `contact` requests that have since been fetched, acked and swept;
    2. **token check** - hash the presented token, look it up in the mailbox's registered set (`../Contacts.md`); no match -> `DELIVERY_REJECTED`;
    3. **size/quota checks** - explicit typed errors (`QUOTA_EXCEEDED`, `STORAGE_FULL`), revealed only past a valid token;
    4. **store** as pending content; the token is consumed atomically with the store, and the `deliveryId` is added to the seen set.
-4. Recipient's server -> sender's server: a signed **`delivered-ack`** for the stored `deliveryId` (see *Delivery framing*), dialled from the recipient's serving dest back to the sender's serving dest. The sender verifies it and marks the attempt **delivered**; the client sees this on its next poll (the yellow tick).
-5. The outcome propagates to the sender's client via polling. A definite rejection (token/size) is a **failed** state; an unconfirmed delivery (no ack, recipient unreachable) **stays grey** rather than reporting a false failure - the envelope may have been stored while only its ack was lost - and the spooled copy is retried on the schedule in `ClientApi.md`. Once the last attempt is spent the envelope is dropped and the sender is told: their client shows that message as failed and sending it again is the user's decision. A resend produces the same delivery id, so a recipient's server that did store the first copy recognises it and spends no second token.
+4. Recipient's server -> sender's client: the confirmation rides **the reply on the same stream**, signed over the stored `deliveryId` with the signing key of the destination that took it. It can come home no other way - the client dialled from an address nobody can dial back - and the client believes a `delivered` only when that signature verifies (the yellow tick). An unsigned claim is treated as no answer at all.
+5. A reply is an answer: a typed refusal (token, size, quota, contact rate limit) fails the message at once, with its reason on the bubble. Only a failure to *get* a reply is retried, and the client makes **four attempts inside about a minute** before it stops and turns the message red with a **Resend** the user presses. Nothing is spooled anywhere and nothing retries by itself. A resend produces the same delivery id, so a recipient's server that did store the first copy recognises it, stores nothing twice and spends no second token.
 
 `contact-request` deliveries skip the token check, are capped in payload size (default 8192 bytes, server-configurable - large enough for the bootstrap prekey + a full reply-token batch), and are subject to a separate quota and per-origin-server rate limiting.
 
@@ -137,7 +128,6 @@ DeliveryEnvelope:
 | Request | Purpose |
 |---|---|
 | `deliver` | Deliver an envelope (message or contact request) for a local mailbox |
-| `delivered-ack` | Signed confirmation, sent back to the sender's serving dest, that a delivered `deliveryId` was stored (drives the yellow tick) |
 | `card` | Return a local user's contact card for a sealed fingerprint query - the first-contact card fetch (`FederatedResolve.md`) |
 
 Username resolution (`alias` -> descriptor) is **not** an operator-to-operator
@@ -198,7 +188,7 @@ coordinate into the client) remains.
   dest) carries its own signing keypair, persisted **bound to the destination**
   together with its serving sealing key - a `(destination, signing key, serving
   sealing key)` group, never reused on another destination. It signs that
-  destination's `delivered-ack`s and nothing else. The **server root identity** is
+  destination's delivery confirmations and nothing else. The **server root identity** is
   a separate crypto-identity used only **outside** federation - the server card /
   `bazarish://server` configuration link (`Facade.md`) and the service-node
   binding - and never signs a federated message. Consequently two users the same

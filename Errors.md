@@ -28,9 +28,7 @@ HTTP transports map typed errors onto appropriate status codes; the JSON body is
 |---|---|---|
 | `QUOTA_EXCEEDED` | Blob is larger than the receiving server accepts; the error must explicitly explain the problem to the sender | server |
 | `STORAGE_FULL` | User's pending-content quota is exhausted | server |
-| `RECIPIENT_SERVER_UNREACHABLE` | Internal/transient: the recipient's server could not be reached this round. After retries are exhausted the attempt becomes `unconfirmed` (the message stays **grey**, not a failure - it may have been stored while only the `delivered-ack` was lost), so this is **not** surfaced as a red failed state | server |
-| `DELIVERY_TIMEOUT` | Delivery attempt did not complete in time; the attempt becomes `unconfirmed` (stays grey) while the sender's server goes on retrying the spooled envelope | server |
-| `ATTEMPT_UNKNOWN` | Polled send attempt is not known (state expired or server restarted); the client stops tracking it (the message stays grey and is resendable) - the spooled envelope is retried regardless, and if the server gives up on it the client is told (`api/ClientApi.md`) | server |
+| `RECIPIENT_SERVER_UNREACHABLE` | The recipient's server did not answer: it could not be dialled, the stream failed, or it claimed a delivery it would not sign. The sending client repeats the attempt on its schedule and, when the last one is spent, shows the message **red** with this reason and a resend the user presses (`Messages.md`) | client |
 | `DELIVERY_REJECTED` | Delivery refused. Deliberately collapses "invalid/consumed token", "unknown mailbox", and "recipient not served here" - externally indistinguishable (anti-enumeration, see `Contacts.md`). A tokenless contact request is the only alternative path | server |
 | `CONTACT_REQUEST_TOO_LARGE` | Attached contact-request message exceeds the limit (default 8192 bytes, server-configurable) | server |
 | `ALIAS_TAKEN` | Requested alias is already registered | service node |

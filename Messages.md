@@ -125,13 +125,14 @@ after it, this is the number a migration steps from.
 
 A message and an envelope are named separately, and the two names are known to
 different sides. The **e2e id** is what the two *ends* call the message; the
-**delivery id** is what the two *servers* call one envelope carrying it:
+**delivery id** is what the sending *client* and the recipient's *server* call one
+envelope carrying it:
 
 | | **e2e id** (`id` in the layer-2 envelope) | **delivery id** (`deliveryId` everywhere) |
 |---|---|---|
 | Names | the message | one envelope handed to a server |
-| Who knows it | the two clients, and the sender's other devices - it is sealed | both servers - it is in the clear |
-| Used for | replies, reactions, edits, read receipts, deletes; the recipient's client recognising a redelivery | the mailbox blob name, the recipient server's dedup and seen-set, the `delivered-ack` correlation |
+| Who knows it | the two clients, and the sender's other devices - it is sealed | the sending client and the recipient's server - it is in the clear |
+| Used for | replies, reactions, edits, read receipts, deletes; the recipient's client recognising a redelivery | the mailbox blob name, the recipient server's dedup and seen-set, and what its confirmation is signed over |
 | Chosen by | the sending client, at random, once per message | derived by the sending client: `HMAC(account secret, e2e id + mailbox)` |
 
 The delivery id being **derived** is what makes sending the same message again
@@ -385,10 +386,12 @@ Every content envelope carries `sentAt` as a **unix millisecond** timestamp,
 stamped by the sending client from its own clock at send time. It is the single
 source of truth for both the message's displayed time and its position in the
 conversation: the recipient shows `sentAt`, never the moment the message was
-received. Because sending is asynchronous and store-and-forwarded
-(`api/Federation.md`), several messages written in quick succession can arrive in
-a different order than they were sent; ordering by `sentAt` rather than by arrival
-repairs that.
+received. Because a send takes as long as I2P takes and a recipient's mailbox is fetched on
+its own schedule (`api/Federation.md`), several messages written in quick
+succession can arrive in a different order than they were sent; ordering by
+`sentAt` rather than by arrival repairs that. (The sending client does deliver one
+correspondent's messages one at a time, in the order they were written, so what
+reorders them is the far side, not the near one.)
 
 Placement on arrival of a message with timestamp `t`, where `T` is the
 recipient's local clock at the moment it is received, follows one rule:
@@ -415,14 +418,15 @@ old arrivals are pinned at the bottom, recent ones are sorted among themselves.
 
 ## Delivery status
 
-An outgoing message advances through three observable states, each from a
-distinct source - so the tick a user sees reflects exactly how far the message
-actually travelled:
+An outgoing message advances through four observable states, each from a distinct
+source - so the tick a user sees reflects exactly how far the message actually
+travelled:
 
 | Tick | State | Source |
 |---|---|---|
-| **grey** (single) | Accepted by the **sender's own server** (it took the sealed envelope into its outbound buffer). | The sender's client, when its `submit` is accepted (local knowledge). Instant on the LAN facade - the submit never blocks on federation. |
-| **yellow** (double) | Stored by the **recipient's server** (handed into the recipient's mailbox). | The recipient's server, via a **signed `delivered-ack`** it federates back to the sender's server (`api/Federation.md`); the sender's client learns it by polling the send attempt. When the recipient shares the sender's own destination the store is local and this is set **synchronously**, with no federated ack. |
+| **hollow grey ring** | The sender's client is preparing the address this message leaves from: taking the destination it holds for this correspondent, or building one and waiting for its tunnels. | The sender's client (local knowledge). |
+| **grey** (solid) | On its way: the client is dialling the recipient's server and handing the envelope over. | The sender's client (local knowledge). |
+| **yellow** (double) | Stored by the **recipient's server** (handed into the recipient's mailbox). | The recipient's server, **signed in the reply on the same stream** the client delivered over (`api/Federation.md`) - the only leg a confirmation can come home on, since the client dialled from an address nobody can dial back. |
 | **green** (double) | **Read** by the recipient - the chat is open, focused and the message scrolled into view. | The recipient's client (a read `receipt` content message). Toggleable - a client may decline to send receipts. |
 
 Grey and yellow are transport facts the sender learns without the recipient's
@@ -434,13 +438,25 @@ sent that peer **that reached the recipient's server** - reading one message say
 the earlier ones were seen, and says nothing at all about one that never arrived,
 which stays grey rather than being painted read by the message after it.
 
-A message still grey is one the sender's server is still carrying. It says so on
-itself: while the spool is retrying, the sender's client shows the attempt it is
-on ("retrying delivery 6 of 8", from `GET /v1/messaging/outbound`). Once the last
-attempt is spent the server gives up, tells the sender, and the message turns
-**red** - "the recipient could not be reached" - with a resend the user triggers
-when they choose. Nothing resends by itself, and a definite refusal (token, size)
-is red immediately without any of the waiting.
+No server carries a send. The sending client makes **four attempts inside about a
+minute** - a dial and one frame each, with widening waits between them - and then
+stops: the message turns **red** with the reason, and a **Resend** the user presses
+when they choose. Nothing resends by itself. A definite refusal (token, size,
+quota) is an answer rather than a failure to reach anyone, so it is red at once
+without any of the waiting. While the attempts run, the bubble says which one it is
+on ("trying again (3 of 4)").
+
+Two consequences worth stating plainly:
+
+- A client closed while a send was still being tried comes back with that message
+  **red**. There is no outbound queue on disk - by design, since a queue would be
+  the client's record of who its user writes to - so on the next start an
+  unfinished send is one that did not happen, and sending it again is the user's
+  decision.
+- A message the recipient's server did store but whose confirmation was lost also
+  ends red. Pressing Resend costs nothing: the delivery id is derived from the
+  message and the mailbox, so the recipient's server recognises the repeat, stores
+  no second copy and spends no second token.
 
 ## Media: announced, transferred directly
 

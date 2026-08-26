@@ -1,14 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1560" viewBox="0 0 1600 1560">
-<rect width="1600" height="1560" fill="#16191c"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1413" viewBox="0 0 1600 1413">
+<rect width="1600" height="1413" fill="#16191c"/>
 <text x="40" y="54" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="23" fill="#d7dbd8" font-weight="bold" text-anchor="start">One message, A to B: what is wrapped in what, and who knows which name</text>
 <text x="40" y="82" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="15" fill="#8b948c" font-weight="normal" text-anchor="start">A = Alice&#x27;s client  ·  SA = Alice&#x27;s server  ·  SB = Bob&#x27;s server  ·  B = Bob&#x27;s client</text>
 <text x="40" y="130" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#39ff14" font-weight="bold" text-anchor="start">NESTING</text>
 <rect x="40" y="146" width="1520" height="330" rx="12" fill="#1b2026" stroke="#2a3038" stroke-width="1.5"/>
-<text x="64" y="178" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="16" fill="#d7dbd8" font-weight="bold" text-anchor="start">POST /v1/messaging/send</text>
-<text x="300" y="178" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#8b948c" font-weight="normal" text-anchor="start">A -&gt; SA over the facade; SA reads this layer</text>
+<text x="64" y="178" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="16" fill="#d7dbd8" font-weight="bold" text-anchor="start">federation deliver frame</text>
+<text x="380" y="178" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#8b948c" font-weight="normal" text-anchor="start">A dials SB over I2P; SB reads this layer</text>
 <text x="64" y="206" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="15" fill="#d7dbd8" font-weight="normal" text-anchor="start">toDest    = &quot;&lt;SB serving destination&gt;.b32.i2p&quot;</text>
 <text x="64" y="230" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="15" fill="#f0b429" font-weight="normal" text-anchor="start">deliveryId = &lt;this envelope&#x27;s name&gt;</text>
-<text x="560" y="230" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">in the clear, so SA can match the ack that comes back</text>
+<text x="560" y="230" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">in the frame header, in the clear</text>
 <rect x="64" y="250" width="1472" height="208" rx="10" fill="#1e2228" stroke="#f0b429" stroke-width="1.5"/>
 <text x="88" y="282" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="16" fill="#f0b429" font-weight="bold" text-anchor="start">sealed envelope</text>
 <text x="290" y="282" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#8b948c" font-weight="normal" text-anchor="start">sealed to SB&#x27;s serving key - only SB opens it</text>
@@ -16,7 +16,7 @@
 <text x="88" y="334" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="15" fill="#d7dbd8" font-weight="normal" text-anchor="start">mailbox    = &lt;B&#x27;s fingerprint&gt;</text>
 <text x="560" y="334" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">which mailbox this belongs in</text>
 <text x="88" y="358" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="15" fill="#f0b429" font-weight="normal" text-anchor="start">deliveryId = &lt;the same name again&gt;</text>
-<text x="560" y="358" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">dedup, seen-set, and what SB signs its ack over</text>
+<text x="560" y="358" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">dedup, seen-set, and what SB signs for</text>
 <text x="88" y="382" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="15" fill="#d7dbd8" font-weight="normal" text-anchor="start">token      = &lt;one-time, issued by B&gt;</text>
 <rect x="88" y="400" width="1424" height="44" rx="10" fill="#1a2320" stroke="#39ff14" stroke-width="1.5"/>
 <text x="112" y="428" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="15" fill="#39ff14" font-weight="bold" text-anchor="start">payload</text>
@@ -25,33 +25,31 @@
 <text x="40" y="520" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#39ff14" font-weight="bold" text-anchor="start">HOP BY HOP</text>
 <rect x="60" y="566" width="150" height="52" rx="10" fill="#1b2026" stroke="#2a3038" stroke-width="1.5"/>
 <text x="135" y="599" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="20" fill="#d7dbd8" font-weight="bold" text-anchor="middle">A</text>
-<rect x="440" y="566" width="150" height="52" rx="10" fill="#1b2026" stroke="#2a3038" stroke-width="1.5"/>
-<text x="515" y="599" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="20" fill="#d7dbd8" font-weight="bold" text-anchor="middle">SA</text>
 <rect x="820" y="566" width="150" height="52" rx="10" fill="#1b2026" stroke="#2a3038" stroke-width="1.5"/>
 <text x="895" y="599" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="20" fill="#d7dbd8" font-weight="bold" text-anchor="middle">SB</text>
 <rect x="1200" y="566" width="150" height="52" rx="10" fill="#1b2026" stroke="#2a3038" stroke-width="1.5"/>
 <text x="1275" y="599" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="20" fill="#d7dbd8" font-weight="bold" text-anchor="middle">B</text>
-<line x1="218" y1="592" x2="430" y2="592" stroke="#8b948c" stroke-width="1.5" marker-end="url(#arrow)"/>
-<text x="325.0" y="532" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">POST /v1/messaging/send</text>
-<text x="325.0" y="549" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">deliveryId in the clear</text>
-<text x="325.0" y="566" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">+ sealed envelope + payload</text>
-<line x1="598" y1="592" x2="810" y2="592" stroke="#8b948c" stroke-width="1.5" marker-end="url(#arrow)"/>
-<text x="705.0" y="532" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">federation frame</text>
-<text x="705.0" y="549" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">deliveryId in its header</text>
-<text x="705.0" y="566" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">+ sealed envelope + payload</text>
+<line x1="218" y1="592" x2="810" y2="592" stroke="#8b948c" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="514" y="532" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">A dials SB over I2P, from the destination it holds for B</text>
+<text x="514" y="549" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">deliveryId in the frame header</text>
+<text x="514" y="566" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">+ sealed envelope + payload</text>
 <line x1="978" y1="592" x2="1190" y2="592" stroke="#8b948c" stroke-width="1.5" marker-end="url(#arrow)"/>
-<text x="1085.0" y="532" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">pending list, then fetch</text>
-<text x="1085.0" y="549" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">the blob is named by</text>
-<text x="1085.0" y="566" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">deliveryId; B unseals payload</text>
-<line x1="1204" y1="662" x2="206" y2="662" stroke="#8b948c" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arrow)"/>
-<text x="860" y="650" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="start">delivered-ack: SB signs deliveryId, SA marks the attempt delivered (yellow)</text>
-<text x="230" y="684" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="start">read receipt: B -&gt; SB -&gt; SA -&gt; A, ref = e2e id (green). Nothing on this path names the message to a server.</text>
+<text x="1085" y="532" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">pending list, then fetch</text>
+<text x="1085" y="549" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">the blob is named by</text>
+<text x="1085" y="566" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">deliveryId; B unseals payload</text>
+<line x1="810" y1="622" x2="222" y2="622" stroke="#8b948c" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arrow)"/>
+<text x="514" y="642" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="middle">signed confirmation, in the reply on that same stream (yellow)</text>
+<rect x="60" y="676" width="150" height="52" rx="10" fill="#1b2026" stroke="#2a3038" stroke-width="1.5"/>
+<text x="135" y="709" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="20" fill="#d7dbd8" font-weight="bold" text-anchor="middle">SA</text>
+<line x1="135" y1="618" x2="135" y2="670" stroke="#8b948c" stroke-width="1.5" stroke-dasharray="4 4"/>
+<text x="230" y="700" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="start">SA = A&#x27;s inbox: what arrives for A, and A&#x27;s own devices. It is never handed a send, and never dials anyone.</text>
+<text x="230" y="722" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="12" fill="#8b948c" font-weight="normal" text-anchor="start">read receipt: B&#x27;s client dials SA, ref = e2e id (green). Nothing on this path names the message to a server.</text>
 <text x="40" y="760" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#39ff14" font-weight="bold" text-anchor="start">WHERE EACH NAME IS BORN AND READ</text>
-<rect x="40" y="778" width="1520" height="640" rx="12" fill="none" stroke="#2a3038" stroke-width="1.5"/>
-<line x1="280" y1="778" x2="280" y2="1418" stroke="#2a3038" stroke-width="1"/>
-<line x1="600" y1="778" x2="600" y2="1418" stroke="#2a3038" stroke-width="1"/>
-<line x1="920" y1="778" x2="920" y2="1418" stroke="#2a3038" stroke-width="1"/>
-<line x1="1240" y1="778" x2="1240" y2="1418" stroke="#2a3038" stroke-width="1"/>
+<rect x="40" y="778" width="1520" height="493" rx="12" fill="none" stroke="#2a3038" stroke-width="1.5"/>
+<line x1="280" y1="778" x2="280" y2="1271" stroke="#2a3038" stroke-width="1"/>
+<line x1="600" y1="778" x2="600" y2="1271" stroke="#2a3038" stroke-width="1"/>
+<line x1="920" y1="778" x2="920" y2="1271" stroke="#2a3038" stroke-width="1"/>
+<line x1="1240" y1="778" x2="1240" y2="1271" stroke="#2a3038" stroke-width="1"/>
 <text x="62" y="812" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="15" fill="#8b948c" font-weight="bold" text-anchor="start">identifier</text>
 <text x="300" y="812" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="19" fill="#d7dbd8" font-weight="bold" text-anchor="start">A</text>
 <text x="620" y="812" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="19" fill="#d7dbd8" font-weight="bold" text-anchor="start">SA</text>
@@ -86,54 +84,38 @@
 <text x="300" y="1035" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">HMAC(account seed,</text>
 <text x="300" y="1054" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">e2e id + mailbox);</text>
 <text x="300" y="1073" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">same message, same name</text>
-<circle cx="626" cy="1004" r="7" fill="none" stroke="#f0b429" stroke-width="2"/>
-<text x="644" y="1009" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#d7dbd8" font-weight="normal" text-anchor="start">reads</text>
-<text x="620" y="1035" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">attempt and spool key,</text>
-<text x="620" y="1054" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">matches the signed</text>
-<text x="620" y="1073" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">delivered-ack</text>
+<line x1="619" y1="1004" x2="633" y2="1004" stroke="#8b948c" stroke-width="2"/>
+<text x="644" y="1009" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#8b948c" font-weight="normal" text-anchor="start">not involved</text>
+<text x="620" y="1035" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">the envelope never</text>
+<text x="620" y="1054" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">passes through it</text>
 <circle cx="946" cy="1004" r="7" fill="none" stroke="#f0b429" stroke-width="2"/>
 <text x="964" y="1009" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#d7dbd8" font-weight="normal" text-anchor="start">reads</text>
 <text x="940" y="1035" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">mailbox blob name,</text>
 <text x="940" y="1054" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">dedup + seen-set,</text>
-<text x="940" y="1073" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">signs its ack over it</text>
+<text x="940" y="1073" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">signs its confirmation</text>
 <circle cx="1266" cy="1004" r="7" fill="none" stroke="#f0b429" stroke-width="2"/>
 <text x="1284" y="1009" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#d7dbd8" font-weight="normal" text-anchor="start">reads</text>
 <text x="1260" y="1035" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">only as the pending id</text>
 <text x="1260" y="1054" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">it acks; never names</text>
 <text x="1260" y="1073" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">the message</text>
 <line x1="40" y1="1124" x2="1560" y2="1124" stroke="#2a3038" stroke-width="1"/>
-<text x="62" y="1160" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="17" fill="#5aa9e6" font-weight="bold" text-anchor="start">attempt id</text>
-<text x="62" y="1182" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">SA and A only</text>
-<circle cx="306" cy="1151" r="7" fill="none" stroke="#5aa9e6" stroke-width="2"/>
+<text x="62" y="1160" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="17" fill="#ff6b5a" font-weight="bold" text-anchor="start">delivery token</text>
+<text x="62" y="1182" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">one-time</text>
+<circle cx="306" cy="1151" r="7" fill="none" stroke="#ff6b5a" stroke-width="2"/>
 <text x="324" y="1156" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#d7dbd8" font-weight="normal" text-anchor="start">reads</text>
-<text x="300" y="1182" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">polls it: grey /</text>
-<text x="300" y="1201" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">yellow / failed</text>
-<circle cx="626" cy="1151" r="7" fill="#5aa9e6"/>
-<text x="644" y="1156" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#5aa9e6" font-weight="bold" text-anchor="start">creates</text>
-<text x="620" y="1182" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">16 random bytes,</text>
-<text x="620" y="1201" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">in memory, short-lived</text>
-<line x1="939" y1="1151" x2="953" y2="1151" stroke="#8b948c" stroke-width="2"/>
-<text x="964" y="1156" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#8b948c" font-weight="normal" text-anchor="start">not involved</text>
-<line x1="1259" y1="1151" x2="1273" y2="1151" stroke="#8b948c" stroke-width="2"/>
-<text x="1284" y="1156" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#8b948c" font-weight="normal" text-anchor="start">not involved</text>
-<line x1="40" y1="1271" x2="1560" y2="1271" stroke="#2a3038" stroke-width="1"/>
-<text x="62" y="1307" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="17" fill="#ff6b5a" font-weight="bold" text-anchor="start">delivery token</text>
-<text x="62" y="1329" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">one-time</text>
-<circle cx="306" cy="1298" r="7" fill="none" stroke="#ff6b5a" stroke-width="2"/>
-<text x="324" y="1303" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#d7dbd8" font-weight="normal" text-anchor="start">reads</text>
-<text x="300" y="1329" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">spends one of B&#x27;s</text>
-<line x1="619" y1="1298" x2="633" y2="1298" stroke="#8b948c" stroke-width="2"/>
-<text x="644" y="1303" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#8b948c" font-weight="normal" text-anchor="start">not involved</text>
-<circle cx="946" cy="1298" r="7" fill="none" stroke="#ff6b5a" stroke-width="2"/>
-<text x="964" y="1303" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#d7dbd8" font-weight="normal" text-anchor="start">reads</text>
-<text x="940" y="1329" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">verifies and consumes it</text>
-<text x="940" y="1348" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">with the store</text>
-<circle cx="1266" cy="1298" r="7" fill="#ff6b5a"/>
-<text x="1284" y="1303" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#ff6b5a" font-weight="bold" text-anchor="start">creates</text>
-<text x="1260" y="1329" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">issued to A in the</text>
-<text x="1260" y="1348" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">contact bootstrap</text>
-<text x="40" y="1458" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#39ff14" font-weight="bold" text-anchor="start">THE COPY A KEEPS</text>
-<text x="40" y="1486" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#d7dbd8" font-weight="normal" text-anchor="start">The same message also goes to A&#x27;s own devices, wrapped in device.message and delivered to A&#x27;s own mailbox.</text>
-<text x="40" y="1508" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#d7dbd8" font-weight="normal" text-anchor="start">Same e2e id, different delivery id - the name is bound to the mailbox, and that mailbox is A&#x27;s - so SA and SB hold</text>
-<text x="40" y="1530" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#d7dbd8" font-weight="normal" text-anchor="start">two copies of one message under two unrelated names, with nothing to match them on.</text>
+<text x="300" y="1182" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">spends one of B&#x27;s</text>
+<line x1="619" y1="1151" x2="633" y2="1151" stroke="#8b948c" stroke-width="2"/>
+<text x="644" y="1156" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#8b948c" font-weight="normal" text-anchor="start">not involved</text>
+<circle cx="946" cy="1151" r="7" fill="none" stroke="#ff6b5a" stroke-width="2"/>
+<text x="964" y="1156" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#d7dbd8" font-weight="normal" text-anchor="start">reads</text>
+<text x="940" y="1182" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">verifies and consumes it</text>
+<text x="940" y="1201" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">with the store</text>
+<circle cx="1266" cy="1151" r="7" fill="#ff6b5a"/>
+<text x="1284" y="1156" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#ff6b5a" font-weight="bold" text-anchor="start">creates</text>
+<text x="1260" y="1182" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">issued to A in the</text>
+<text x="1260" y="1201" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="13" fill="#8b948c" font-weight="normal" text-anchor="start">contact bootstrap</text>
+<text x="40" y="1311" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#39ff14" font-weight="bold" text-anchor="start">THE COPY A KEEPS</text>
+<text x="40" y="1339" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#d7dbd8" font-weight="normal" text-anchor="start">The same message also goes to A&#x27;s own devices, wrapped in device.message and delivered to A&#x27;s own mailbox.</text>
+<text x="40" y="1361" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#d7dbd8" font-weight="normal" text-anchor="start">Same e2e id, different delivery id - the name is bound to the mailbox, and that mailbox is A&#x27;s - so SA and SB hold</text>
+<text x="40" y="1383" font-family="DejaVu Sans Mono, Roboto Mono, monospace" font-size="14" fill="#d7dbd8" font-weight="normal" text-anchor="start">two copies of one message under two unrelated names, with nothing to match them on.</text>
 </svg>
