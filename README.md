@@ -46,9 +46,14 @@ One repository per component, developed side by side:
 
 ## Cryptography
 
-Identity is a mandatory post-quantum hybrid (ECDSA P-256 + ML-DSA-65); every
-identity statement is dual-signed. Containers are OpenSSL-native standards
-(PEM, DER, CMS). No custom cryptographic constructions.
+The post-quantum hybrid is not the signatures alone - it is everything.
+**Signing** is ECDSA P-256 + ML-DSA-65: every identity statement carries both and
+is valid only when both verify. **Sealing** is ECDH P-256 + ML-KEM-768: every
+encrypted thing in the project - a message body end to end, a delivery envelope's
+header, a federation query - goes through the same `cms::seal`, and opening one
+needs both private halves. Breaking one scheme alone forges nothing and reveals
+nothing. Containers are OpenSSL-native standards (PEM, DER, CMS). No custom
+cryptographic constructions.
 
 ## Status and near-term plan
 

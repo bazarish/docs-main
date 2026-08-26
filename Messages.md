@@ -212,6 +212,26 @@ should say so plainly.
 | `call.ring` | content | A device of the callee's is showing the call: `callId`. What turns the caller's "invitation delivered" into "their device is ringing". See `api/Calls.md`. |
 | `call.taken` | contact | Self-sync: the device that answered or refused an incoming call, so the account's other devices stop ringing - `callId`, `device`. See `api/Calls.md`, `DeviceSync.md`. |
 
+### Forwarding
+
+A message can be passed on to another chat. The forward is a **new message of the
+forwarder's own**: their id, their signature, their delivery - carrying the same
+content and one additive field:
+
+```
+"forwarded": true
+```
+
+That is the whole of it. It names no original sender, carries no chain of who
+passed it on before, and proves nothing about who wrote the content: a client can
+set the field on anything it sends. Recipients render it as a "Forwarded" mark on
+the bubble, which is exactly as much as it means - this was passed on rather than
+typed here.
+
+What travels is what the forwarding device holds: text always; a voice message and
+a picture, which ride inside the message; a file only while its bytes are still on
+that device, since a file is announced from a path and served from it.
+
 One further field is additive and may ride on any content message:
 
 - **`replyTo`** - the `id` of the message this one replies to. The recipient
