@@ -140,9 +140,8 @@ AES-256-GCM seal/open (including tamper/wrong-key rejection), and the full
 audio pipeline over an
 in-memory loopback are covered by unit tests.
 
-The embedded `libi2pd_bazarish` provides RAW datagrams and the datagram-to-b33
-routing patch in-process - no external i2pd, no SAM bridge, and no datagram UDP
-port are involved.
+Call media requires RAW datagrams addressed to a b33 destination. Any router that
+carries both serves this protocol; how a client obtains one is its own business.
 
 ## Open / not done
 
