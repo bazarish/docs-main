@@ -418,43 +418,43 @@ old arrivals are pinned at the bottom, recent ones are sorted among themselves.
 
 ## Delivery status
 
-An outgoing message advances through four observable states, each from a distinct
-source - so the tick a user sees reflects exactly how far the message actually
-travelled:
+An outgoing message passes through four states. Each is asserted by a different
+party, so a state reports exactly how far the message has travelled and on whose
+authority.
 
-| State | Means | Source |
+| State | Definition | Asserted by |
 |---|---|---|
-| **preparing** | The sender's client is making ready the address this message leaves from. | The sender's client (local knowledge). |
-| **in flight** | On its way: the client is dialling the recipient's server and handing the envelope over. | The sender's client (local knowledge). |
-| **stored** | Held by the **recipient's server** in the recipient's mailbox. | The recipient's server, **signed in the reply on the same stream** the client delivered over (`api/Federation.md`) - the only leg a confirmation can come home on, since the client dialled from an address nobody can dial back. |
-| **read** | **Read** by the recipient. | The recipient's client (a read `receipt` content message). Toggleable - a client may decline to send receipts. |
+| **preparing** | The sending client is making ready the address the message will be sent from. | The sending client (local knowledge). |
+| **in flight** | The sending client is dialling the recipient's serving destination and transferring the envelope. | The sending client (local knowledge). |
+| **stored** | The envelope is held in the recipient's mailbox. | The recipient's server, in a confirmation signed over the delivery id and returned in the reply on the same stream (`api/Federation.md`). The client dials from an address that accepts no inbound connections, so the reply is the only path available to a confirmation. |
+| **read** | The recipient has read the message. | The recipient's client, in a read `receipt` content message. Optional: a client may be configured not to send receipts. |
 
-How a client draws these is its own business; the two ends agree on the states,
-not on the ticks.
+The presentation of these states is a matter for each implementation; what is
+common is the states and their sources.
 
-The first three are transport facts the sender learns without the recipient's
-client cooperating (**stored** is the recipient *server's* authenticated
-confirmation, not the recipient *user*); only **read** requires the recipient's
-client to opt in and reflects an actual read, not mere arrival. The read receipt
-carries the newest read message's `id`, so the sender marks that message and every
-earlier one it sent that peer **that reached the recipient's server** - reading one
-message says the earlier ones were seen, and says nothing at all about one that
-never arrived, which is left where it was rather than painted read by the message
-after it.
+The first three states are established by the sender without cooperation from the
+recipient's client. **stored** is an authenticated statement by the recipient's
+*server*, not by the recipient. Only **read** requires the recipient's client to
+participate, and it denotes a read rather than an arrival. A read receipt carries
+the `id` of the newest message read; the sender applies it to that message and to
+every earlier message it sent that peer **which reached the recipient's server**.
+A message that never reached it retains its state: a later message being read is
+not evidence about an earlier one that was never delivered.
 
-No server carries a send, so how long to keep trying is the sending client's
-decision and nobody else's. What the protocol fixes is the rest:
+No server carries a send, so the number of attempts and the interval between them
+are determined by the sending client. The protocol fixes the following:
 
-- A refusal is an answer. A typed error (token, size, quota, contact rate limit)
-  is final - repeating it changes nothing - while a failure to *reach* the
-  recipient's server is not, and may be tried again.
-- An unsigned "delivered" is not a delivery. A client that cannot verify the
-  confirmation against the delivery id it sent treats the attempt as unanswered.
-- Sending the same message again is free and safe: the delivery id is derived from
-  the message and the mailbox, so a recipient's server that already stored it
-  recognises the repeat, stores no second copy and spends no second token. This is
-  what lets a client give up and leave the decision to its user - including after
-  a restart, where a send it was carrying is simply one that did not happen.
+- A typed refusal (invalid token, size, quota, contact rate limit) is final;
+  repeating the delivery does not change the outcome. A failure to reach the
+  recipient's server is not final and may be retried.
+- A `delivered` response that carries no verifiable signature over the delivery id
+  that was sent is not a delivery. The attempt is treated as unanswered.
+- Repeating a delivery is idempotent. The delivery id is derived from the message
+  and the recipient mailbox, so a server that has already stored the envelope
+  recognises the repetition, stores no second copy and consumes no second token.
+  This is what permits a client to stop retrying and leave the decision to its
+  user, including after a restart, when a delivery that was in progress is
+  reported as not performed.
 
 ## Media: announced, transferred directly
 

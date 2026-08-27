@@ -71,21 +71,23 @@ Aliases are global on the single resolver, so the `@server` form is unnecessary;
 the protocol stays federation-capable (descriptor + signed records are general)
 even though v1 runs one resolver (`AliasResolver.md`).
 
-## Transport: the client dials, and nothing relays
+## Transport: direct dialling, without a relay
 
 Mirrors the direct file-transfer fetch (`FileTransfer.md`).
 
-The client dials `srv` (card fetch) or the resolver's b32 (alias resolve) itself
-over a **fresh transient I2P destination**. I2P encrypts the stream end-to-end to
-the destination and the `.b32.i2p` address *is* a commitment to the destination
-key, so there is no relay to MITM, no relay metadata and no extra key needed, and
-the target sees only an unlinkable transient. This is why a `.b32.i2p` host (not a
-facade) is the unit of cross-server reachability (`Facade.md`).
+The client dials `srv` (card fetch) or the resolver's b32 (alias resolve) itself,
+over a **fresh transient I2P destination**. I2P encrypts the stream end to end to
+the destination, and the `.b32.i2p` address is itself a commitment to the
+destination key; there is consequently no relay to interpose, no relay metadata
+and no additional key, and the target observes only an unlinkable transient. This
+is why a `.b32.i2p` host, rather than a facade, is the unit of cross-server
+reachability (`Facade.md`).
 
-**There is no proxy fallback.** Relaying a lookup through one's own server would
-tell it exactly who is being added - the one thing this design withholds - so a
-client with no working I2P router is told so plainly instead of being quietly
-downgraded. The route that once did this (`POST /v1/messaging/fetch`) is gone.
+**No proxy fallback exists.** Relaying a lookup through the requester's own server
+would disclose to it the identity being added, which this design withholds; a
+client without a working I2P router is therefore informed of that condition rather
+than downgraded silently. The route that formerly provided the relay
+(`POST /v1/messaging/fetch`) has been removed.
 
 ## Card-fetch protocol (`fp` -> contact card)
 
@@ -135,7 +137,7 @@ above with the descriptor. A free/unknown name returns `ALIAS_UNKNOWN`.
 
 | Party | Card fetch | Alias resolve |
 |---|---|---|
-| The asker's own server | nothing: it is not on the path, and there is no path through it | nothing: it is not on the path |
+| The requester's own server | Nothing: it is not on the path, and no path through it exists | Nothing: it is not on the path |
 | I2P network | two opaque sealed blobs | two opaque sealed blobs |
 | Target (the serving server / resolver) | the `fp` (it serves that card) and that someone holding the descriptor asked | the alias (it owns the namespace); requester unlinkable on direct path |
 | Client | the verified card | the verified descriptor -> card |

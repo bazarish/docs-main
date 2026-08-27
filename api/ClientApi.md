@@ -23,7 +23,7 @@ Status: draft skeleton. The single client-facing API, reached through a facade (
 | Endpoint | Purpose |
 |---|---|
 | `POST /v1/account/card` | Publish the user-signed **contact card** (`{card}`): the sealing **prekey** plus the serving **destination** + **serving sealing key** the client fetched from `GET /v1/messaging/destination` (see `../Identity.md`, `InviteAnonymity.md`). The card names no server and carries no validity window. This call is also what turns a portal registration into an account - the first one redeems the grant (`ServicePortal.md`) - and it is repeated whenever the routing changes; a repeat grants nothing. The destination can only be delegated once the account exists, so the first card carries no routing: the client delegates its transient and publishes again straight after. Responds `{quotaBytes, serverCard, approval, registrationMessage}` |
-| `DELETE /v1/account/registration` | End the account. The destination is revoked, the node drops the record and the grants, and the messaging server is told to drop the mailbox and everything else it held for that fingerprint (`DELETE /v1/messaging/account`, operator-signed). Signed with the account's own identity key, which is the only thing that can authorise it - so a client deletes on the server first and removes its profile only once that succeeded. **Idempotent**: a key this node holds nothing for is answered exactly like a deletion, without revoking or dropping anything, because a client whose account an operator already removed must still be able to finish and clean up its own copy. A client reads any 4xx the same way - the server has nothing of this account left to end, so it removes its own copy and stops. Only silence (or a 5xx) leaves everything as it was, with the reason put to the user |
+| `DELETE /v1/account/registration` | Terminate the account. The destination is revoked, the node discards the account record and the grants, and the messaging server is instructed to discard the mailbox and all other state held for that fingerprint (`DELETE /v1/messaging/account`, operator-signed). The request is signed with the account's own identity key, the only credential that can authorise it; a client therefore performs this call before removing its local profile and removes it only on success. **Idempotent**: a key for which the node holds nothing receives the same response as a deletion, with nothing revoked or discarded, so that a client whose account an operator has already removed can still complete the operation locally. A client treats any 4xx response likewise: no state for the account remains on the server, and it removes its local copy. Only the absence of a response (or a 5xx) leaves both sides unchanged, with the reason reported to the user |
 | `POST /v1/account/i2p-dest` | Upload a signed offline **transient** (`{transient, expiresUnix}`; empty revokes). Every account owns a destination - it is the base protocol, not a purchase - so the only gates are that the account exists here and, on a moderated node, that it is approved (`ACCOUNT_PENDING_APPROVAL` until then). The node hands the transient to the messaging server, which operates the destination, and records its validity |
 | `GET /v1/account/i2p-status` | `{approval, registrationMessage, transientExpires, transientUpdatedAt, ...}` - the client polls this to drive transient re-issue and to see whether a moderated account is still awaiting approval |
 | `GET /v1/account/card?user=X&view=V` | The contact card behind a descriptor: returns `{user, card}`. `V` is the descriptor's `view` capability (32 hex characters, issued by the node when the account is created and reported with every card publish); a wrong one is refused **identically** to an unknown user, so this cannot be used to ask whether a server hosts a fingerprint. Reached from the messaging server, which serves a peer's query on the user's own destination - there is no lookup by fingerprint alone. The `username` namespace lives on the central resolver (`api/AliasResolver.md`, `api/FederatedResolve.md`) |
@@ -34,18 +34,18 @@ Implemented in the `service-node` repository (`SubscriptionStore`, `AccountApi`;
 
 ### Sending
 
-**There is no send endpoint.** A client delivers its own outgoing mail: it dials
-the recipient's serving destination over I2P itself and speaks the federation
-frame to it (`Federation.md`), from a destination it holds for that one
-correspondent. The account's own server is never asked to dial anyone, so it
-never learns who its users write to - which is the whole reason the endpoint is
-gone rather than merely unused.
+**There is no send endpoint.** A client delivers its own outgoing messages: it
+dials the recipient's serving destination over I2P and performs the federation
+exchange with it (`Federation.md`), from a destination held for that one
+correspondent. The account's own server is never asked to dial a correspondent and
+therefore does not learn who its users write to; this is the reason the endpoint
+was removed rather than left unused.
 
-What that leaves this server doing for a send: nothing. What it still does is
-receive - it operates the destination a correspondent dials, admits the envelope
-and holds it in the mailbox until the recipient's devices have taken it - and it
-carries one write of the sender's own, `POST /v1/messaging/self`, which is a
-message to the account's other devices and reaches no one else.
+The server performs no part of a delivery. Its remaining functions are receipt -
+it operates the destination a correspondent dials, admits the envelope and holds
+it in the mailbox until the recipient's devices have collected it - and the single
+write a device makes to its own account, `POST /v1/messaging/self`, which reaches
+no other party.
 
 A **tokenless contact request** is capped by the protocol at **4096 sealed
 bytes** (`kMaxContactRequestBytes`) - not by any operator setting. Measured
@@ -55,12 +55,12 @@ the cap is that worst case rounded up. The greeting a person may write is capped
 at **100 bytes** (`kMaxContactGreetingBytes`) and the client refuses more, so the
 limit is met where it can be explained rather than at the recipient's server.
 
-- A contact accept is not a separate endpoint either: it is an ordinary content
-  message spending a token received in the request (see `../Contacts.md`).
-  Declining a request sends nothing.
-- A resend is the same delivery: the delivery id is derived from the message and
-  the mailbox (`../Messages.md`), so the recipient's server recognises the repeat,
-  stores nothing twice and spends no second token.
+- A contact acceptance is not a separate endpoint: it is an ordinary content
+  message that spends a token received in the request (see `../Contacts.md`).
+  Declining a request transmits nothing.
+- A repeated delivery is the same delivery: the delivery id is derived from the
+  message and the recipient mailbox (`../Messages.md`), so the recipient's server
+  recognises the repetition, stores no second copy and consumes no second token.
 
 ### Own destination
 
@@ -105,7 +105,7 @@ and so identify itself as Bazarish - to any scanner.
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /v1/messaging/tokens` | Register a batch of one-time token hashes for this user's mailbox. There is no delete: a hash is spent, aged out, or goes with the account |
+| `POST /v1/messaging/tokens` | Register a batch of one-time token hashes for this user's mailbox. No deletion endpoint exists: a hash is spent, expires, or is discarded with the account |
 
 ### Client registry (see `../DeviceSync.md`)
 

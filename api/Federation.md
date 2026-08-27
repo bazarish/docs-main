@@ -49,7 +49,7 @@ response: {"delivered":<bool>,"errorCode":...,"errorMessage":...,
 
 The recipient runs the same delivery pipeline whoever dialled (dedup -> token -> size/quota -> store), so a client's delivery and a discovery fetch share one served code path.
 
-The confirmation **rides that reply**: on a store the recipient signs the `deliveryId` with the **serving destination's own per-destination signing key** (`signerPub` carries the public half; see *Authentication*) - never the server's root identity. It comes home this way because it can come home no other way: the dialler is a client on a one-time-ish address that publishes no leaseset, so nothing can dial it back. Since `deliveryId` is sealed inside the envelope, only a server that actually unsealed it can name it, and the signature ties that name to the destination that answered. The sending client believes a `delivered` **only** when the signature verifies against the id it sent; an unsigned or wrongly-signed claim is treated as no answer at all and the attempt is repeated.
+The confirmation is carried **in that reply**: on storing the envelope the recipient signs the `deliveryId` with the **serving destination's own per-destination signing key** (`signerPub` carries the public half; see *Authentication*), never with the server's root identity. The reply is the only available path, the dialling party being a client on an address that publishes no leaseset and accepts no inbound connections. As `deliveryId` is sealed inside the envelope, only a server that unsealed it can state it, and the signature binds that statement to the destination that answered. The sending client accepts a `delivered` result **only** when the signature verifies against the id it sent; an unsigned or incorrectly signed claim is treated as no answer and the attempt is repeated.
 
 Operational note: a freshly created destination must publish its leaseset before peers can reach it; the first connect after startup may return `CANT_REACH_PEER` ("LeaseSet not found") and should be retried with backoff. Verified end to end against a live i2pd (`i2p-federation-smoke`, and the full cross-server `demo-federation-i2p.sh`).
 
@@ -70,11 +70,11 @@ holds for that one correspondent, and discovery (the `card` request below) is
 dialled from a one-time transient. So there is no address anywhere in federation
 that is attributable to a server, and no server that knows whom its users write to.
 
-**Who a recipient's destination accepts from is not part of the check.** Admission
-is the envelope alone - sealed to that destination's serving key, naming a class, a
-mailbox and a delivery id, and carrying a token unless it is a contact request.
-Nothing asks whether the dialler is a server, which is exactly what lets a client
-deliver its own mail without a protocol of its own.
+**The identity of the dialling party is not part of admission.** Admission is
+determined by the envelope alone: sealed to that destination's serving key, naming
+a class, a mailbox and a delivery id, and carrying a token unless it is a contact
+request. No check distinguishes a server from a client, which is what allows a
+client to deliver its own messages over the same frame.
 
 Every message federates, including one between two users the same server hosts:
 there is no local short-circuit and no shortcut for co-located parties, so delivery
@@ -111,15 +111,15 @@ DeliveryEnvelope:
 
 ## Message delivery flow
 
-1. Sender's **client** seals the envelope and dials the recipient's serving destination itself, over I2P, **from a destination it holds for that one correspondent** and never from its own serving destination. How long it holds one and where it takes it from is the client's own affair; what the protocol asks is that one address never carries mail to two correspondents. No server of the sender's is involved in a send at all, so none of them learns whom the sender writes to.
+1. The sending **client** seals the envelope and dials the recipient's serving destination over I2P, **from a destination held for that one correspondent** and never from its own serving destination. The term of that destination and its provenance are implementation matters; the requirement is that a single outbound address never carries traffic to two correspondents. No server of the sender's participates in a delivery, so none of them learns the sender's correspondents.
 2. Client -> recipient's server: `deliver` with the envelope and its payload, on that one stream.
 3. Recipient's server unseals and processes in strict order:
    1. **deliveryId dedup** - if the `deliveryId` is still pending in the mailbox, or is in the retained **seen-deliveryId set** (every admitted id, kept independently of the blob until the TTL sweep ages it out), respond success *without* consuming a token. This makes client retries idempotent and blocks replays of an already-delivered envelope - including tokenless `contact` requests that have since been fetched, acked and swept;
    2. **token check** - hash the presented token, look it up in the mailbox's registered set (`../Contacts.md`); no match -> `DELIVERY_REJECTED`;
    3. **size/quota checks** - explicit typed errors (`QUOTA_EXCEEDED`, `STORAGE_FULL`), revealed only past a valid token;
    4. **store** as pending content; the token is consumed atomically with the store, and the `deliveryId` is added to the seen set.
-4. Recipient's server -> sender's client: the confirmation rides **the reply on the same stream**, signed over the stored `deliveryId` with the signing key of the destination that took it. It can come home no other way - the client dialled from an address nobody can dial back - and the client believes a `delivered` only when that signature verifies (the yellow tick). An unsigned claim is treated as no answer at all.
-5. A reply is an answer: a typed refusal (token, size, quota, contact rate limit) fails the message at once and repeating it changes nothing. Only a failure to *get* a reply is worth another attempt, and how many to make is the sending client's own policy - nothing is spooled anywhere and no server retries on anyone's behalf. Sending again produces the same delivery id, so a recipient's server that did store the first copy recognises it, stores nothing twice and spends no second token.
+4. Recipient's server -> sending client: the confirmation is returned **in the reply on the same stream**, signed over the stored `deliveryId` with the signing key of the destination that admitted it. No other path is available, the client having dialled from an address that accepts no inbound connections. The client accepts a `delivered` result only when that signature verifies against the delivery id it sent; an unsigned claim is treated as no answer.
+5. A reply constitutes an answer. A typed refusal (invalid token, size, quota, contact rate limit) fails the delivery immediately and repetition does not change the outcome. Only the absence of a reply warrants a further attempt; the number of attempts is the sending client's policy, as nothing is spooled anywhere and no server retries on another party's behalf. A repeated delivery carries the same delivery id, so a recipient's server that stored the first copy recognises it, stores no second copy and consumes no second token.
 
 `contact-request` deliveries skip the token check, are capped in payload size (default 8192 bytes, server-configurable - large enough for the bootstrap prekey + a full reply-token batch), and are subject to a separate quota and per-origin-server rate limiting.
 

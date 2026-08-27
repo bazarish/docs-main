@@ -14,16 +14,16 @@ An account has **no term**. Registration opens an unbounded channel; the only cl
 
 ## Service node -> Server (implemented)
 
-Signed with the node's own identity, which the server authorises by fingerprint;
-no shared secret.
+Requests are signed with the node's own identity and authorised by the server on
+that fingerprint; no shared secret is used.
 
 | Request | Purpose |
 |---|---|
-| `PUT /v1/messaging/i2p-dest` | Hand over the user's signed offline transient, or revoke the destination with an empty one |
-| `PUT /v1/messaging/quota` | Set the mailbox quota the account grants, so the server stops answering with its own default |
-| `PUT /v1/messaging/serving-key` | Rotate a destination's serving sealing key, in two phases (prepare, then commit) |
-| `GET /v1/messaging/account?user=` | What the server holds for one account: devices, bytes used, quota (the panel shows it) |
-| `DELETE /v1/messaging/account?user=` | The account is gone: drop the mailbox, the replay markers, the token hashes, the device registry and the quota override. Sent when an account is deleted, whether by its owner or by the operator, and idempotent - a fingerprint the server holds nothing for is already in the state this asks for |
+| `PUT /v1/messaging/i2p-dest` | Supply the user's signed offline transient; an empty transient revokes the destination |
+| `PUT /v1/messaging/quota` | Set the mailbox quota granted by the account, in place of the server's default |
+| `PUT /v1/messaging/serving-key` | Rotate a destination's serving sealing key in two phases: prepare, then commit |
+| `GET /v1/messaging/account?user=` | State held for one account: registered devices, bytes in use, effective quota; displayed by the administration panel |
+| `DELETE /v1/messaging/account?user=` | The account has been deleted: discard the mailbox, the replay markers, the token hashes, the device registry and the quota override. Issued whenever an account is deleted, by its owner or by an operator. Idempotent: a fingerprint for which the server holds no state is already in the requested condition |
 
 ## Client-ID registry
 

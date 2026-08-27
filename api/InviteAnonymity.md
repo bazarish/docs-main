@@ -109,31 +109,31 @@ The sender's own server still learns only "user U sent something to destination
 D" - which, since D is the recipient's own destination, is as strong as a
 server fingerprint, not stronger.
 
-### No local delivery at all (no co-location timing channel)
+### No local delivery (no co-location timing channel)
 
-There is no short-circuit anywhere. Every message is dialled over I2P by the
-sender's **client** to the recipient's serving destination, including when the
-same server hosts both parties - it is not asked to deliver, so it has nothing to
-short-circuit. The one write that stays local is a message to the sender's **own
-other devices**, where there is no second party and no destination to dial.
+No short-circuit exists. Every message is dialled over I2P by the sending
+**client** to the recipient's serving destination, including where the same server
+hosts both parties: the server is not asked to deliver and therefore has nothing to
+short-circuit. The only local write is a message addressed to the sender's **own
+other devices**, for which there is no second party and no destination to dial.
 
-Rationale: if a co-located recipient were served locally (fast) while a remote one
-went over I2P (slow), the **delivery latency** would reveal whether the two parties
-share a server - a timing side-channel that re-introduces exactly the co-location
-signal destination routing removes. With delivery in the client's hands the
-question does not arise: the client knows a destination and dials it, and cannot
-tell (or leak) whose server is behind it.
+Rationale: if a co-located recipient were served locally and a remote one over
+I2P, the difference in **delivery latency** would indicate whether the two parties
+share a server - a timing side channel that reintroduces the co-location signal
+destination routing removes. With delivery performed by the client the question
+does not arise: the client holds a destination and dials it, and cannot determine
+which server operates it.
 
 ## The destination knob (`dest_U`)
 
 **Fundamental rule: a server has no single, shared federation destination.** Every
-user is served by `dest_U` (their own personal per-user dest), which is where their
-mail arrives and where their server signs for it (`Federation.md`). It dials
-nobody: outgoing mail is dialled by the sender's own client, from a destination the
-client holds for that one correspondent. A server-wide "home" address is never used
-for user traffic (it serves only first-contact card discovery); a shared federation
-source would both leak a common address and, when sender and recipient share a
-server, make one user's destination dial another's.
+user is served by `dest_U` (their own per-user destination), at which their mail
+arrives and on whose key their server signs for it (`Federation.md`). It initiates
+no connections: outgoing mail is dialled by the sending client, from a destination
+held for that one correspondent. A server-wide "home" address is never used for
+user traffic (it serves first-contact card discovery only); a shared federation
+source would both expose a common address and, where sender and recipient share a
+server, cause one user's destination to dial another's.
 
 - Every user's `dest_U` is their own: an offline-key master held by the client,
   delegated to the server as a time-boxed transient. There is deliberately no
