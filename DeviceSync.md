@@ -7,8 +7,8 @@ A user runs several clients (devices); each has a unique random **client ID**. C
 ## Model
 
 - **Shared identity keys.** All clients of a user hold the same hybrid identity keypair set (see `Identity.md`); a new device receives it during enrollment. Senders never need to know how many devices a user has.
-- **Explicit client registry.** Client IDs are registered and retired via the API (see `api/ClientApi.md`). The "delete when all clients received" rule operates on this definite set - no races from implicit discovery, no dead IDs pinning quota.
-- **Sync channel = own mailbox.** Sync data travels as ordinary E2E deliveries to the user's own mailbox through the standard send/pending/ack path. No dedicated server mechanism; the server cannot distinguish sync from regular messages, and the "all clients acked -> delete immediately" rule provides cleanup for free.
+- **Explicit client registry.** Client IDs are registered and retired via the API (see `api/ClientApi.md`). The "delete when all clients received" rule operates on this definite set; implicit discovery would admit races and leave retired identifiers holding quota.
+- **Sync channel = own mailbox.** Sync data travels as ordinary E2E deliveries to the user's own mailbox through the standard send/pending/ack path. No dedicated server mechanism; the server cannot distinguish sync traffic from ordinary messages, and the "all clients acked -> delete immediately" rule performs the cleanup without an additional mechanism.
 - With a **single registered client**, no sync traffic is produced at all.
 
 ## Sync journal
@@ -35,11 +35,11 @@ Two devices may race to spend the same token from the shared per-contact stash. 
 2. If another device already burned it, delivery fails with `DELIVERY_REJECTED` -> retry with another token.
 3. deliveryId dedup on the recipient's server guarantees a successfully delivered message is never duplicated.
 
-`token-spent` events keep the known-unspent sets converging, making collisions rare; no strict stash partitioning is needed.
+`token-spent` events converge the known-unspent sets, so collisions are infrequent; strict partitioning of the stash is not required.
 
 ## Enrollment (adding a device)
 
-1. An existing device displays a QR code containing: the identity private keys (classical + post-quantum), the home server fingerprint + facade secret URI, and the user-owned destination key. The new device re-fetches the user's current routing (destination + serving sealing key) from the server (`GET /v1/messaging/destination`). The ML-DSA private key (~4 KB) pushes the payload beyond comfortable QR capacity - the enrollment bundle may need a QR-carried one-time secret plus a local-channel transfer; settle at client design time.
+1. An existing device displays a QR code containing: the identity private keys (classical + post-quantum), the home server fingerprint + facade secret URI, and the user-owned destination key. The new device re-fetches the user's current routing (destination + serving sealing key) from the server (`GET /v1/messaging/destination`). The ML-DSA private key (~4 KB) exceeds practical QR capacity; the enrollment bundle may therefore require a QR-carried one-time secret together with a transfer over a local channel. To be determined in client design.
 2. The new device authenticates as the user and **registers its client ID**.
 3. It announces itself with a sync event; an existing device responds with a `snapshot` (contacts, token bookkeeping, settings, recent history).
 4. Content delivered and fully acked *before* registration is gone by design and is not replayed; prior history arrives via the snapshot.
@@ -47,7 +47,7 @@ Two devices may race to spend the same token from the shared per-contact stash. 
 ## Retirement (removing a device)
 
 - Any device can retire a client ID (lost/stolen device included). The server immediately **re-evaluates ack-completeness** of pending content: blobs that were waiting only on the retired client are deleted.
-- **Honest limitation:** with a shared identity key, a stolen device keeps the identity forever - retirement stops deliveries to it but cannot revoke the key. A token epoch reset limits mailbox abuse; the identity itself is unrecoverable. Per-device keys with cross-signing are the known evolution path if this risk proves unacceptable in practice.
+- **Limitation:** with a shared identity key, a stolen device retains the identity indefinitely. Retirement stops deliveries to it but does not revoke the key. A token epoch reset limits mailbox abuse; the identity itself is unrecoverable. Per-device keys with cross-signing are the known evolution path if this risk proves unacceptable in practice.
 
 ## Account sync (avatar & contact names)
 
@@ -65,10 +65,10 @@ A self-message is named by a **delivery id of its own**, unrelated to the one th
 
 ## Quota interplay
 
-`message-echo` with attachments doubles outgoing traffic and transiently occupies the user's own quota: echo blobs live only until all registered clients fetch them, so with normally-online devices the pressure is brief. An offline device accumulates echoes up to the retention period - heavy attachment use on the free tier (20 MB) will hit the quota; this is an accepted tradeoff, to be revisited if practice shows pain.
+`message-echo` with attachments doubles outgoing traffic and temporarily occupies the user's own quota: echo blobs are retained only until every registered client has fetched them, so for devices that are normally online the occupancy is brief. An offline device accumulates echoes for the retention period; substantial attachment traffic on the free tier (20 MB) will exhaust the quota. This is an accepted trade-off, to be reviewed against operational experience.
 
 ## Open questions
 
 - **Snapshot size vs quota** - a long-lived account's snapshot may exceed the free quota; chunked snapshots or an explicit size bound needed.
-- Client-side policy knobs for `message-echo` (e.g. skip attachments above a threshold) - protocol allows partial echo with an attachment stub; decide defaults at client design time.
+- Client-side policy for `message-echo` (for example, omitting attachments above a threshold). The protocol permits a partial echo carrying an attachment stub; defaults to be determined in client design.
 - Per-device keys as a future identity model (see Retirement).

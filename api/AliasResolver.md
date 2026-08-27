@@ -256,7 +256,7 @@ required), so a freshly built or local resolver is exercised without a rebuild.
 No runtime coupling to operator service nodes - the resolver runs its **own**
 instance of the shared payment module (`PaymentGateway` monerod/mock, `LedgerStore`,
 `GrantStore`, `LoginChallenge`/HMAC, captcha; config-driven) with the **developer's**
-wallet, prices and ledger. Buying a username pays the developer directly over the
+wallet, prices and ledger. Purchasing a username transfers payment to the developer over the
 portal; the buyer's home operator is never involved (no inter-operator settlement).
 The payment code is **shared as a library, not a shared backend** - the same module
 is also used by operator service nodes for their own services. (Operator service

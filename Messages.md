@@ -4,8 +4,8 @@ Status: design draft (decided direction).
 
 ## Types
 
-A message says what it is, and the type decides what the other side does with
-it - never the file name, and never a mime the sender wrote:
+A message declares its type, and the type determines the recipient's handling of
+it; neither the file name nor a sender-supplied MIME value has that role:
 
 | `type` | What it carries | What the recipient does |
 |---|---|---|
@@ -22,11 +22,11 @@ other message. The sender shrinks it first (long edge 1600, re-encoded, at most
 256 KiB) so that its base64 and the envelope around it stay inside the 512 KiB
 message limit.
 
-Before it is drawn it must decode as an image; a decoder that refuses it is the
-answer. Such a message is not quietly turned back into a file card - the bubble
-says it is broken, because a fallback would be the client second-guessing what it
-was handed. The bytes live in the account database, encrypted with everything
-else, and "Save as" is how they leave it.
+Before it is rendered it must decode as an image; a decoder that rejects it is the
+answer. Such a message is not reclassified as a file: it is reported as broken,
+a fallback amounting to the client reinterpreting what it received. The bytes are
+held in the account database, encrypted with the remainder of its contents, and
+are exported by an explicit save action.
 
 A `file` is the other path and keeps the announcement: the metadata travels in
 the message, the bytes travel client to client on demand, and nothing is bounded
@@ -40,14 +40,14 @@ progress bar belongs to the transfer that follows it, not to the announcement.
 The body inside the seal is **CBOR**, not JSON text: the same document with the
 same field names, but binary values travel as themselves. That is what lets a
 picture or a voice message ride inside the message rather than being announced
-and fetched - base64 would have cost a third of every such payload (measured at
-1.333x), and compressing it buys nothing, because both JPEG/PNG and Opus are
-already entropy-coded (gzip on a JPEG: 0.986x; on a PNG: 1.000x).
+and fetched. Base64 would add a third to every such payload (measured at 1.333x),
+and compression yields nothing, both JPEG/PNG and Opus being already
+entropy-coded (gzip on a JPEG: 0.986x; on a PNG: 1.000x).
 
-A voice message is Opus at the call format - 48 kHz mono, 20 ms frames, each one
-length-prefixed - and nothing else: no container, because both ends of this
-protocol are the same client and an Ogg header would be bytes spent telling
-ourselves what we already know.
+A voice message is Opus in the call format - 48 kHz mono, 20 ms frames, each
+length-prefixed - and nothing further. No container is used: both ends implement
+this protocol, so an Ogg header would carry only parameters already fixed by the
+specification.
 
 ## Size
 
@@ -73,7 +73,7 @@ A message has **two** type discriminators that must never be conflated:
    encrypted payload. An **open** registry. The server, facades and federation
    relays never see it.
 
-The invariant this buys:
+The resulting invariant:
 
 > Adding a new kind of content (a file, a photo, a voice note, a call signal,
 > a read receipt) touches **only the client protocol and the content-type
@@ -141,7 +141,7 @@ stored it recognises it, stores nothing twice and spends no second token. Bindin
 it to the mailbox is what keeps it from linking anything: the copy a sender keeps
 for their own devices and the copy the recipient gets are the same message under
 two unrelated names, so the two servers holding them have nothing to match on.
-Keying it with a secret only the sender holds means nobody else can work out what
+Keying it with a secret held only by the sender means no other party can determine what
 a message of theirs will be called - and so cannot poison a recipient's seen-set
 with that name before the real envelope arrives.
 
@@ -178,11 +178,11 @@ on to a third person. It grants the holder nothing they do not already have -
 the card it reads is the destination and keys they are already talking on - and
 it is what makes "share this contact" work in both directions.
 
-The rule this leaves for people is short: **change your address, write first.**
-Nothing else recovers a pair whose stored routing has gone stale, because the
-only path to a contact is the destination we hold for them; a request for their
-new address would go to the dead one. A client that regenerates its destination
-should say so plainly.
+The resulting rule is: **after changing an address, send first.** No other
+mechanism restores a pair whose stored routing is stale, because the only path to
+a contact is the destination currently held for them, and a request for a new
+address would be sent to the address that is no longer served. A client that
+regenerates its destination should state this to its user.
 
 ### Content-type registry (v1)
 
@@ -226,7 +226,7 @@ content and one additive field:
 That is the whole of it. It names no original sender, carries no chain of who
 passed it on before, and proves nothing about who wrote the content: a client can
 set the field on anything it sends. Recipients render it as a "Forwarded" mark on
-the bubble, which is exactly as much as it means - this was passed on rather than
+the message, which is the whole of its meaning: the content was passed on rather than
 typed here.
 
 What travels is what the forwarding device holds: text always; a voice message and
@@ -286,9 +286,9 @@ A sender can revise a message it already sent with an `edit` (above): the
 recipient finds the message whose `id` equals `ref` and replaces its `text` and
 `keyboard` in place, marking it edited. It is the same primitive for two cases:
 
-- **Bots** edit their own keyboard message on a callback - the Telegram-style
-  "the message updates when you tap a button" - by sending an `edit` whose `ref`
-  is the callback's `ref`.
+- **Bots** edit their own keyboard message on a callback - the behaviour in which
+  a message changes in response to a button press - by sending an `edit` whose
+  `ref` is the callback's `ref`.
 - **Users** edit their own line: the client updates its local copy and sends an
   `edit` so the peer updates theirs.
 
@@ -316,11 +316,11 @@ because each recipient receives its own sealed copy.
 ### Reactions
 
 A `reaction` sets the sender's emoji on a target message (`ref`).
-Each user has at most one reaction per message: a new emoji overwrites their
-previous one, and an **empty** emoji removes it (clients implement tapping the
-emoji you already set as a toggle-off). Reactions are state, not history -
+Each user has at most one reaction per message: a new emoji replaces the previous
+one, and an **empty** emoji removes it (a client may implement selecting the
+current emoji again as removal). Reactions are state rather than history:
 recipients store them keyed by `(conversation, target, reactor)` and render them
-as chips on the target bubble, never as a chat line. A reaction is a single
+on the target message, never as a separate entry in the conversation. A reaction is a single
 sealed delivery to the peer.
 
 ### Clearing a conversation
@@ -337,8 +337,8 @@ deleting device (the peer is not told).
 ### Avatars and display names
 
 A contact's **display name** and **avatar** are local, recipient-side facts.
-Neither is part of the live message stream, and a peer is never an authority on
-how you label or picture them.
+Neither is part of the message stream, and a peer is never an authority on the
+label or picture a recipient assigns to it.
 
 **Display name.** A name is captured **once, at add time** and kept as a local
 label:
@@ -373,8 +373,8 @@ stored as the sender's picture, never rendered as a chat bubble:
 
 A client that receives a `type` it does not know **must not** crash or drop the
 message. It acknowledges receipt and surfaces a neutral placeholder
-("unsupported message - update your app"), preserving the envelope so a later
-client version can render it. `v` gates breaking changes to the envelope shape
+(indicating that the message type is unsupported by this version), preserving the
+envelope so that a later client version can render it. `v` gates breaking changes to the envelope shape
 itself; unknown `type` within a known `v` is a soft, recoverable condition.
 
 Namespacing is dotted (`call.invite`, not `call-invite`) so related signals
@@ -474,7 +474,7 @@ one-time I2P destination (full design in `api/FileTransfer.md`):
    `offset`-based resume, verifies the announced digest and decrypts. Each
    attempt dials from a **fresh** destination, so a resumed transfer is
    unlinkable to the one it continues.
-4. `file.unavailable` is the honest answer when the sender no longer holds the
+4. `file.unavailable` is returned when the sender no longer holds the
    file.
 
 There is no client-side size threshold: a client sends normally and falls back to
@@ -483,9 +483,9 @@ is the server's own advertised limit.
 
 Why announce rather than store: the messaging server never carries the bulk
 bytes, so a **quota-constrained recipient can receive arbitrarily large
-content**, and no third party ever holds the ciphertext. The cost, stated
-plainly: a file is available only while the sender is online and still has it,
-which is what `TransferState` reports instead of implying delivery.
+content**, and no third party holds the ciphertext at any point. The constraint
+that follows: a file is available only while the sender is online and still holds
+it, which `TransferState` reports rather than implying delivery.
 
 ## Calls
 

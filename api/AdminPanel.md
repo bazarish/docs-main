@@ -1,21 +1,21 @@
 # Admin panel
 
-The `admin-panel` is one web interface to monitor and manage Bazarish
-deployments. A deployment is the unit that scales: **one messaging server, the
-service node bound to it, and the facades in front of the pair** - a registration
-certificate names one messaging server, and the node that issues it is bound to
-that server's card, so the two do not scale apart. Facades do: several may front
-one pair, and different facades may front different pairs. The central alias
-service is not managed here at all - it belongs to the project, not to an
-operator's server. It is a
-co-located operations tool: it reaches each service on its private listen address
-and is never exposed through the facade or over I2P.
+The `admin-panel` is a web interface for monitoring and managing Bazarish
+deployments. A deployment is the unit of scaling: **one messaging server, the
+service node bound to it, and the facades placed in front of the pair**. A
+registration certificate names one messaging server, and the node that issues it
+is bound to that server's card, so the two do not scale independently. Facades do:
+several may front one pair, and different facades may front different pairs. The
+central alias service is not managed here; it belongs to the project rather than
+to an operator's deployment. The panel is a co-located operations tool: it reaches
+each service on its private listen address and is never exposed through a facade
+or over I2P.
 
 ## Sign-in-with-key (panel access)
 
-Access is gated to the configured **admin identities** - no passwords, no
-account store. `admin` is one fingerprint or a list of them, so a fleet with
-several operators does not have to share a key. Login reuses the portal sign-in-with-key wire contract, but the
+Access is restricted to the configured **admin identities**; there are no
+passwords and no account store. `admin` is a fingerprint or a list of
+fingerprints, so a deployment with several operators need not share one key. Login reuses the portal sign-in-with-key wire contract, but the
 panel is the self-contained verifier, so **no backend has to be online to log
 in**.
 
@@ -72,18 +72,18 @@ endpoint is operator-signed, so it discloses nothing to an unauthenticated calle
 Every service but one serves it on the same private listener as its API, which is
 already unreachable from the clearnet. The exception is **facade-http**, whose API
 listener *is* the clearnet one: there `/healthz` would answer a caller who does not
-know the secret prefix and thereby identify the host as a facade, so it lives on a
-separate private ops socket (`--ops-listen <host> <port>`) and the panel is
+know the secret prefix and would thereby identify the host as a facade, so it is
+served on a separate private operations socket (`--ops-listen <host> <port>`) and the panel is
 configured with that address, not the published facade URL (`Facade.md`).
 The panel probes every configured service concurrently and renders status,
 version, uptime, current/peak RAM and round-trip latency.
 
 ## The panel itself
 
-Past the sign-in page the panel is a small script talking to a JSON API of its
-own. It is an operator tool on an operator's own perimeter, so it assumes
-JavaScript; the sign-in page does not, because a fleet that is down must still be
-loggable into.
+Past the sign-in page the panel is a small script communicating with a JSON API of
+its own. It is an operator tool within an operator's perimeter and therefore
+requires JavaScript; the sign-in page does not, so that an operator can still sign
+in when the deployment is down.
 
 A sidebar carries the views:
 
@@ -91,15 +91,15 @@ A sidebar carries the views:
   concurrently (status, version, uptime, current/peak RAM, latency), grouped by
   deployment and re-probed every few seconds. A facade also reports what it is
   carrying: requests over the last minute, hour and day, and how many are in
-  flight. Those are sampled from bucketed counters (one per second for the last
-  minute, one per minute for the last day) - a reading, not a history: nothing is
-  stored and nothing has to be pruned.
+  flight. These are sampled from bucketed counters (one per second for the last
+  minute, one per minute for the last day): a current reading rather than a
+  history, so nothing is stored and nothing requires pruning.
 - **Users** - the accounts on the service node. Search by fingerprint or by the
   address the account is served at, filter by approval state, and scroll: the
   list loads a page at a time. Each row carries whether the account is approved
-  and whether its destination is delegated right now - the two say different
-  things, and an account can be approved and unreachable. Open one to read its
-  terms and act on it: set the storage quota (in whole megabytes), approve it,
+  and whether its destination is currently delegated; the two are independent, and
+  an account may be approved and unreachable. Opening an account shows its terms
+  and the available actions: set the storage quota (in whole megabytes), approve it,
   undelegate it (the address is revoked and the account waits again, with a
   message its owner is shown in place of the node-wide one), delete it, or ban
   the key. The open account is in the address bar (`#/users/<fingerprint>`), so a
@@ -108,12 +108,12 @@ A sidebar carries the views:
   registration, the message a waiting account is shown, and the storage a new
   account gets. Beside them, the two numbers that say whether those settings
   still fit: what the quotas have promised, and what the messaging server's disk
-  actually holds (`GET /v1/messaging/storage`, measured by walking its state
-  directory - quotas are a promise, the filesystem is the fact).
+  actually holds (`GET /v1/messaging/storage`, measured by traversing its state
+  directory; a quota is an allocation, the measured figure is consumption).
 
-The **search runs on the service node**, not in the browser: the panel passes
-`q`, `state`, `limit` and `offset` through and shows what comes back, so a node
-with many accounts never has to ship them all to find one.
+The **search is performed on the service node**, not in the browser: the panel
+passes `q`, `state`, `limit` and `offset` through and displays the result, so a
+node with many accounts does not transfer the whole set to locate one.
 
 | Panel route | Passed through to |
 |---|---|
@@ -125,18 +125,19 @@ with many accounts never has to ship them all to find one.
 | `POST /api/undelegate`, `POST /api/delete`, `POST /api/ban`, `POST /api/unban` | the matching service-node operator endpoints |
 | `GET /api/settings`, `PUT /api/settings` | service-node `/v1/account/settings`, plus server-core `GET /v1/messaging/storage` for the disk figure |
 
-The quota is set **on the service node**, which is the component that grants it
-and pushes it to server-core. Setting it straight on server-core (as an earlier
-panel did) would have been overwritten by the node's next push.
+The quota is set **on the service node**, which is the component that grants it and
+pushes it to server-core. Setting it directly on server-core, as an earlier
+revision of the panel did, is overwritten by the node's next push.
 
 The panel serves its web files from `--assets <dir>` (mandatory): the page shell,
-the sign-in page, the stylesheet, the script and the logo, read once and answered
-from memory. An operator restyles the panel by editing them and restarting it.
+the sign-in page, the stylesheet, the script and the logo, read once at startup and
+served from memory. An operator changes the presentation by editing these files and
+restarting the panel.
 
-There is no hand-driven I2P destination form. A user's destination is delegated
-by their own client and published by the service node
-(`PUT /v1/messaging/i2p-dest` on server-core is that push, and stays); an
-operator poking at it by hand had no place in that flow.
+No manual I2P destination form is provided. A user's destination is delegated by
+their own client and published by the service node (`PUT /v1/messaging/i2p-dest`
+on server-core is that push and is retained); manual operator intervention has no
+place in that flow.
 
 ## Configuration
 
@@ -152,5 +153,6 @@ operator poking at it by hand had no place in that flow.
 }
 ```
 
-No secrets live in the config. The panel prints its own operator fingerprint at
-startup; add it to each service's `--operator-fingerprint`.
+The configuration contains no secrets. The panel prints its own operator
+fingerprint at startup; that fingerprint is added to each service's
+`--operator-fingerprint`.

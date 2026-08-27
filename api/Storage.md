@@ -39,5 +39,5 @@ Content is opaque ciphertext; the interface never interprets blob contents.
 ## Open questions
 
 - Where delivery-state metadata lives for the object-storage backend (object tags vs sidecar objects vs a small local index).
-- Encryption at rest: content is already E2E ciphertext; decide whether backend-level encryption adds anything worth the complexity.
+- Encryption at rest: content is already end-to-end ciphertext; to be decided whether backend-level encryption adds sufficient value to justify the complexity.
 - Crash consistency of the ack-set -> delete rule (avoid resurrecting acked content after restart).

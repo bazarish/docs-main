@@ -8,11 +8,11 @@ The **messaging server (server-core)** stays a pure delivery layer: it never
 registers anyone. A client can sign and fetch, but **cannot self-register** -
 registration is a human/web flow guarded by a captcha.
 
-**Nothing on this node is for sale.** There is no balance, no ledger, no payment
-gateway and no paid service: the only paid component of the project is the alias
-service, which is a separate (private) deployment with its own portal and its own
-payment layer (`AliasResolver.md`). Everything a messaging account gets - its
-storage quota, its own I2P destination - it gets for free.
+**This node sells nothing.** It maintains no balance, no ledger and no payment
+gateway, and offers no paid service. The only paid component of the project is the
+alias service, a separate deployment with its own portal and payment layer
+(`AliasResolver.md`). What a messaging account receives - a storage quota and its
+own I2P destination - is included.
 
 ```
             +----------- browser -----------+         +---- Client (holds key) ----+
@@ -160,14 +160,14 @@ An operator chooses one of two modes (`registration.requireApproval`):
 
 - **open** - the account is servable the moment it is created.
 - **approval** - the account is created but **frozen**: its transient is refused
-  with `ACCOUNT_PENDING_APPROVAL`, so its destination is never brought up and it
-  can neither send nor receive. The error carries the operator's
-  `registration.message`, which is where they say how to reach them to finish
-  registration. The operator approves by hand from the admin panel. An account
-  nobody approves within `registration.ttlDays` (default 7) is deleted, so a dead
-  registration does not hold a fingerprint forever.
+  with `ACCOUNT_PENDING_APPROVAL`, so its destination is never brought up and the
+  account can neither send nor receive. The error carries the operator's
+  `registration.message`, which states how to contact the operator to complete
+  registration. Approval is performed by an operator from the admin panel. An
+  account not approved within `registration.ttlDays` (default 7) is deleted, so an
+  abandoned registration does not hold a fingerprint indefinitely.
 
-This is moderation, not a paywall.
+This mechanism is moderation, not a charge.
 
 | Endpoint | Purpose |
 |---|---|
@@ -223,20 +223,20 @@ rest of the site.
 
 ## 6. Web frontend (JS-free)
 
-The portal is **one page** at `/`, server-rendered with no JavaScript (forms,
-full-page reloads, post-redirect-get). It shows one thing to do at a time and
-nothing else - there is no account area to visit, because with nothing for sale
-there is nothing to manage:
+The portal is **a single page** at `/`, server-rendered without JavaScript (forms,
+full-page reloads, post-redirect-get). It presents one action at a time; there is
+no account area, as the node offers nothing to purchase or manage:
 
-1. **your key** - the page renders a challenge; the user signs it in their client
+1. **the user's key** - the page renders a challenge; the user signs it in their client
    and pastes the blob back. `POST /login` verifies it and sets the session
    cookie.
-2. **register** - a signed-in user without an account is shown a captcha.
-   `POST /register` verifies the answer and issues the grant: reading the captcha
-   *is* the registration. When the node is configured without a captcha, proving
-   the key is the registration and the grant is issued as the page loads.
+2. **register** - a signed-in user without an account is presented with a captcha.
+   `POST /register` verifies the answer and issues the grant; solving the captcha
+   constitutes the registration. Where the node is configured without a captcha,
+   proof of the key constitutes the registration and the grant is issued when the
+   page loads.
 
-Afterwards the same page states the account (quota, term) and hands over the
+Thereafter the same page reports the account (quota, term) and provides the
 server descriptor to paste into a client, or - on a moderated node - the
 "waiting for the operator" notice with the operator's instructions.
 `POST /logout` drops the session.

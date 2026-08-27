@@ -3,7 +3,7 @@
 Status: **design** (supersedes the earlier draft of this document). Specifies how
 a client discovers a contact it knows only by a small scannable identifier or by
 name, over I2P, with the home server learning nothing about it - it is not on the
-path - and nobody able to forge the result. The central username registry/daemon is specified in
+path - and no party able to forge the result. The central username registry/daemon is specified in
 `AliasResolver.md`; the identity/certificate formats in `../Identity.md`; the I2P
 transport in `Federation.md`.
 
@@ -40,9 +40,10 @@ home server never sees who is being added (below).
    verified against `fp`, so the serving server can only withhold, never forge.
 
    The fetch is **direct over I2P and nothing else**: the client dials `dest`
-   from a fresh transient destination. There is no relayed fallback, because a
-   lookup relayed through one's own server would tell it exactly who is being
-   added. No router, no fetch - the client says so instead of downgrading.
+   from a fresh transient destination. No relayed fallback exists: a lookup relayed
+   through the requester's own server would disclose to it the identity being
+   added. Without a router there is no fetch, and the client reports that condition
+   rather than downgrading.
 
    Query and answer travel **in the clear**: the I2P stream is already encrypted
    and authenticated to the destination, and there is no third party on the path

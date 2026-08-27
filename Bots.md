@@ -93,7 +93,7 @@ control content, not user-visible lines.
 
 Rather than reply with a new message, a bot can edit the keyboard message the
 button belongs to (an `edit`, `Messages.md`), keyed by the callback's `ref` -
-the familiar "the message changes when you tap a button" behaviour. The same
+the behaviour in which a message changes in response to a button press. The same
 `edit` primitive lets ordinary users revise their own messages, so it is not a
 bot-only feature. A bot edits only messages it sent; a client enforces that on
 receipt.
@@ -123,5 +123,5 @@ logic the CLI and GUI use, plus a demo bot (`bazarish-bot`):
 - replies are sent with the normal `content` path, spending delivery tokens
   exactly as a human client does.
 
-Because the bot is just a registered identity, the same framework runs against a
+Because a bot is an ordinary registered identity, the same framework runs against a
 single server or across a federation with no change.

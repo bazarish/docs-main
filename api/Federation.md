@@ -16,7 +16,8 @@ Status: draft skeleton.
   **warm pool of single-use transient destinations** (`WarmDestPool`): each lookup
   leaves from a fresh one-time dest that is **never reused** (so successive lookups
   are unlinkable, and none is tied to the server), and the pool
-  keeps a few dests pre-built so the lookup pays no cold tunnel-build latency. The
+  keeps several destinations pre-built so that a lookup does not incur cold
+  tunnel-build latency. The
   pool size adapts from demand between a floor and `--warm-pool-max` (default 2..10;
   `--warm-pool-max 0` disables the pool, and a fetch then builds its own one-time
   dest and waits for it - slower, never a shared address. Delivery
@@ -105,7 +106,7 @@ DeliveryEnvelope:
   the server as a time-boxed transient. There is no shared address to fall back
   on, because a shared one would make every user behind it provably co-located.
   A user whose transient has lapsed - or whose account a moderated server has not
-  approved - simply has no destination and is not served; the server never
+  approved - has no destination and is not served; the server never
   silently re-points a live, already-shared address.
 - The recipient's server learns only "something arrived from destination X into mailbox V with a valid token" - never the sender identity (see `../Contacts.md`).
 

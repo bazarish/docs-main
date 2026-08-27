@@ -50,7 +50,7 @@ no other party.
 A **tokenless contact request** is capped by the protocol at **4096 sealed
 bytes** (`kMaxContactRequestBytes`) - not by any operator setting. Measured
 against a real request, the body is 3776 bytes with no greeting and 3910 with a
-100-byte one, nearly all of it the 64-token reply batch the requester hands over;
+100-byte one, the greater part of it the 64-token reply batch the requester supplies;
 the cap is that worst case rounded up. The greeting a person may write is capped
 at **100 bytes** (`kMaxContactGreetingBytes`) and the client refuses more, so the
 limit is met where it can be explained rather than at the recipient's server.

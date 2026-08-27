@@ -16,7 +16,7 @@ The facade is the "last mile" between the client and the server infrastructure. 
   and streaming behave identically on both fronts. The stream is torn down only
   after the client has read the reply (or a bounded drain elapses): closing it
   straight after the last write truncates the reply, and the client then sees an
-  empty stream rather than a response. The log says when each destination's
+  empty stream rather than a response. The log records when each destination's
   leaseset has actually published ("i2p facade ready"), because until then a dial
   fails for reasons that have nothing to do with the facade.
 - **A facade is an I2P address, and the API is spoken over nothing else.** A
@@ -24,8 +24,8 @@ The facade is the "last mile" between the client and the server infrastructure. 
   clear either - which is when a client would otherwise show its address to the
   server it is about to register with. Where a stand on a LAN has no I2P at all,
   the client is started with `--allow-facade-without-i2p-for-dev-purposes` and
-  the node's config key of the same name; both say what they cost, and both are
-  off by default.
+  the node's configuration key of the same name; both state their consequences, and
+  both are disabled by default.
 - **Clearnet is the bootstrap, and only the bootstrap.** A client with no netDb
   cannot dial anything on I2P, so the descriptor carries **reseed** addresses
   beside the facades: clearnet, asked for exactly one thing (`GET
@@ -34,11 +34,11 @@ The facade is the "last mile" between the client and the server infrastructure. 
   facade is never a reseed.
 - **i2pd's built-in reseed hosts are off** in the client. They are allowed in
   exactly one case: this server's descriptor carries no reseed address, or none
-  of them answered - the only situation with nobody to ask. Otherwise the
+  of them answered - the only case in which there is no one to ask. Otherwise the
   bootstrap stays between the user and their own server.
 - This is the **only** I2P address the server side publishes. Federation runs on
   the users' own destinations (`InviteAnonymity.md`), never a shared one, so a
-  facade address says nothing about which users a server hosts.
+  facade address discloses nothing about which users a server hosts.
 - Published under a **secret URI** known only to clients of this server, and that secrecy is **mandatory, not a deployment option**: `bazarish-facade-http` refuses to start without `--base-path <secret>`, which it requires on every request and strips before forwarding. The single exception is an explicit `--public`, and it means one thing only - a fronting reverse proxy (Caddy, nginx, ...) already publishes this facade under a secret URI of its own. The secret reaches a client solely inside the facade URL of the server descriptor (below); it is never advertised, never derived from the server fingerprint, and never sent anywhere else.
 - The whole clearnet API therefore lives under the secret prefix, **including the unauthenticated `GET /v1/messaging/reseed`** (`ClientApi.md`), whose only gate this is: a client fetching its first netDb has no I2P transport and no delivery token yet, so the prefix is what keeps the request - and the fact that this host serves Bazarish at all - out of a scan.
 - A single catch-all handler relays every request **transparently** - method, headers, body and query string verbatim - to backends over the **operator private channel** (localhost/unix socket/VPN), routing by path prefix once the secret prefix is stripped:
@@ -60,7 +60,7 @@ http[s]://host[:port]/secret-path
 
 - **scheme** - `http` or `https`. `https` is for facades fronted by a
   TLS-terminating reverse proxy; the client does **not** verify the TLS
-  certificate (a self-signed or proxy cert is fine), because the facade is the
+  certificate (a self-signed or reverse-proxy certificate is acceptable), because the facade is the
   untrusted last mile - all security is end-to-end and anchored in the server
   fingerprint, not in TLS PKI.
 - **host[:port]** - the facade's address. The port defaults to `443` (https) /
@@ -78,8 +78,8 @@ http[s]://host[:port]/secret-path
 Over I2P a client dials its facade from **one destination per account**, shared
 by everything that account sends: a destination carries many streams at once,
 and every dial takes its own stream with its own receive queue. A second
-destination would mean a second set of tunnels and a second leaseset for the
-same user, which is metadata for nothing.
+destination would require a second set of tunnels and a second leaseset for the
+same user, producing additional metadata to no benefit.
 
 The connection is **kept between requests** (`Connection: keep-alive`; the
 facade relays bytes and the backend's HTTP engine holds the connection open).
@@ -133,7 +133,7 @@ A server may publish **several** facade URLs (different hosts, proxies, or
 secret paths). The client holds them as an ordered list and **fails over** across
 it: it sends to the current facade, and on an *unreachable* facade (transport
 failure) advances to the next, cycling without end across attempts; an
-HTTP error *response* is final (the facade is reachable, the request simply
+HTTP error *response* is final (the facade is reachable and the request was
 failed) and does not trigger failover. The client remembers the last facade that
 worked and starts there next time, so a healthy facade is preferred. Facades can
 be added or edited at any time without touching the server.
@@ -154,17 +154,18 @@ this exact string in the user's cabinet after sign-in, so a client reads back
 precisely what the server published. Facade URLs ride verbatim, so they must not
 contain `&`.
 
-This is the **only** artifact that carries facade URLs, and it has a single,
-narrow purpose: configuring **your own** server. Its audience is the prospective
-clients of *this* server (an operator publishes it, e.g. on the server's site),
-and it is consumed solely to populate the local facade list. It is never used to
-reach another user - sharing it as if it were a contact would leak your server's
-facades. To avoid that confusion the two shareable artifacts are kept distinct:
+This is the **only** artifact that carries facade URLs, and it has a single
+purpose: configuring the client's **own** server. Its audience is the prospective
+clients of *that* server (an operator publishes it, for example on the server's
+site), and it is consumed solely to populate the local facade list. It is never
+used to reach another user; distributing it as though it were a contact would
+disclose the server's facades. The two shareable artifacts are therefore kept
+distinct:
 
 | Artifact | Carries | Audience | Facade? |
 |---|---|---|---|
 | `bazarish://server?...` | server fingerprint + facade URLs | prospective clients of **this** server | **yes** - own server only |
-| `bazarish://invite?...` (descriptor) | fingerprint + own destination + card-read capability (`fp:b32` + `view`) | anyone, to add **you** as a contact | no |
+| `bazarish://invite?...` (descriptor) | fingerprint + own destination + card-read capability (`fp:b32` + `view`) | anyone, to add the holder as a contact | no |
 
 The descriptor carries no facade URL; the contact card it points at is fetched
 over I2P and is user-signed, so it is verified against the fingerprint and

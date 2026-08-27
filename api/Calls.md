@@ -1,13 +1,14 @@
 # Calls (audio)
 
-Status: audio calls implemented (client-to-client). There is no video: it costs
-a codec, frame fragmentation and reassembly for a picture an I2P tunnel cannot
-carry anyway.
+Status: audio calls implemented (client-to-client). Video is not supported: it
+would require a codec together with frame fragmentation and reassembly, for a
+picture rate an I2P tunnel cannot sustain.
 
 ## Principle
 
-No direct contact attempt between peers - direct connections harm privacy. A
-call is negotiated through ordinary E2E messaging and the media is carried over a
+No direct contact is attempted between peers, direct connections being harmful to
+privacy. A call is negotiated through ordinary E2E messaging and the media is
+carried over a
 one-time hidden-network tunnel, so no server or facade ever sees call traffic.
 
 ## Transport
@@ -82,7 +83,7 @@ Server-side components see only opaque blobs of a generic message.
 | Type | Direction | Payload |
 |---|---|---|
 | `call.invite` | caller -> callee | `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b33 routing address), `key` (base64 per-call media key) |
-| `call.ring` | callee -> caller | `callId`. Sent the moment a device of the callee's shows the call. Until it arrives the caller only knows the invitation reached their server; from it, the caller's screen says their device is ringing and the ringing tone starts |
+| `call.ring` | callee -> caller | `callId`. Sent when a device of the callee presents the call. Until it arrives the caller only knows the invitation reached their server; from it, the caller's screen says their device is ringing and the ringing tone starts |
 | `call.accept` | callee -> caller | `callId`, `media` (`audio`), `dest` (the callee's media b33 routing address) |
 | `call.decline` | callee -> caller | `callId`, `reason` (`declined` / `busy` / `refused`). Honoured only while the caller is still calling: with several devices on one account, one of them answering and another refusing must not end the call that was answered |
 | `call.end` | either | `callId` |
@@ -90,10 +91,11 @@ Server-side components see only opaque blobs of a generic message.
 
 Adding or evolving a call signal is a client-only change.
 
-Both sides run their own ring timeout, so a call nobody answers ends on its own:
-the caller's window runs from the moment their peer's device said it was ringing
-(from delivery to their server, when it never did), and the callee's from when the
-invitation arrived. Neither side needs the other's signal to stop ringing.
+Both sides run their own ring timeout, so an unanswered call terminates without
+user action. The caller's interval starts when the peer's device reported ringing,
+or, if no such report arrived, when the invitation was delivered to the peer's
+server; the callee's starts when the invitation arrived. Neither side requires a
+signal from the other in order to stop ringing.
 
 ## Flow (I2P)
 
@@ -101,17 +103,18 @@ invitation arrived. Neither side needs the other's signal to stop ringing.
    (strict: I2P unavailable -> `I2P_UNAVAILABLE`), generates a per-call AES key, and
    sends a `call.invite` carrying its media b33 and the key over the normal E2E
    delivery path.
-2. **Callee** receives the invite (on sync), rings, and answers the caller with
-   `call.ring` so their screen stops guessing. On accept it builds its own RAW
-   datagram destination and replies with `call.accept` carrying its media b33,
-   and tells its own other devices with `call.taken`.
+2. **Callee** receives the invite (on sync), alerts the user, and answers the
+   caller with `call.ring` so that the caller's state is known rather than
+   inferred. On acceptance it builds its own RAW datagram destination, replies
+   with `call.accept` carrying its media b33, and notifies its own other devices
+   with `call.taken`.
 3. Both sides now know each other's media destination and the shared key. Each
    captures the microphone, encodes Opus, AES-256-GCM-seals each datagram and
    sends it to the peer's b33; received datagrams are opened, decoded and played.
-   Nothing is played until media is proven in **both** directions - what arrives
-   before that is half of a path still being opened, and playing it is heard as a
-   burst of broken audio just before the call starts. Mute keeps the capture loop
-   running but transmits nothing.
+   Nothing is played until media has been observed in **both** directions: what
+   arrives before that belongs to a path still being established, and playing it
+   produces broken audio immediately before the call starts. Muting keeps the
+   capture loop running and transmits nothing.
 4. Either side hangs up with `call.end`; the media engine and the one-time
    datagram destination are torn down.
 
@@ -150,6 +153,6 @@ port are involved.
 - **Calls turned off** - an account may refuse incoming calls entirely (a privacy
   setting, on by default). An invitation is then answered at once with
   `reason: refused`, so the caller learns it instead of ringing into nothing. The
-  caller's call button stays where it is: the setting can be turned back on at any
-  moment, and there is nothing to publish about it - the refusal is the only
-  signal, and it says nothing beyond "not now".
+  caller's call control is unchanged: the setting may be re-enabled at any time and
+  is not published. The refusal is the only signal, and it conveys nothing beyond
+  unavailability at that moment.

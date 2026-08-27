@@ -138,7 +138,7 @@ server, cause one user's destination to dial another's.
 - Every user's `dest_U` is their own: an offline-key master held by the client,
   delegated to the server as a time-boxed transient. There is deliberately no
   shared fallback - a shared address would let anyone holding two contact cards
-  prove their owners are hosted together, which is exactly the metadata the
+  prove their owners are hosted together, which is the metadata the
   project treats as a critical bug.
 
 Per-user destinations already exist in `server-core`; this revision is what
@@ -196,13 +196,14 @@ statement - and told both which server serves the user. Both halves are gone:
   subscribe here" told the node nothing it had not already verified. The only
   clock is the **delegation** of the destination, which the I2P network itself
   enforces, and an account with none for the node's idle window is deleted.
-- The card fetch asks for the descriptor's `view` capability back, so a card
-  cannot be requested by fingerprint alone: a server never confirms whom it
-  hosts. The fetch is direct over I2P only - relaying it would tell the asker's
-  own server who is being added - and therefore needs no app-layer sealing.
+- The card fetch requires the descriptor's `view` capability, so a card cannot be
+  requested by fingerprint alone and a server never confirms which users it hosts.
+  The fetch is performed directly over I2P, since relaying it would disclose to the
+  requester's own server which identity is being added; being direct, it requires
+  no application-layer sealing.
 
-No expiry on the card either - routing that moved is repaired by the `routing`
-field every message carries.
+The card carries no expiry either: routing that has changed is repaired by the
+`routing` field carried in every message.
 
 ## How the user learns `dest_U` and the serving sealing key
 
@@ -254,7 +255,7 @@ mapping.
   destination signs its own delivery confirmations with its own per-destination
   signing key (above), so the signer is never server-wide.
 
-## Honest accounting (what still leaks)
+## Residual disclosure
 
 - No two users ever share a `dest` or a serving sealing key, so a pair of
   contact cards can never prove their owners are hosted together.

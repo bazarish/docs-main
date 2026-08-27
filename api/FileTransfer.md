@@ -56,13 +56,14 @@ All three are ordinary sealed E2E messages, silent (never a chat bubble):
 **Devices.** A user's devices share one mailbox, so every one of them sees both
 messages. A request names the device that made it; the offer names the same
 device, and the others ignore it - the one-time destination in it was raised for
-that device alone. A device that wants the file too asks for its own copy, and
-the sender serves it over a destination of its own: several serves run at once,
+that device alone. A second device requiring the file issues its own request, and
+the sender serves it over a separate destination: several transfers proceed
+concurrently,
 each with its own address, its own progress and its own cancel. On the sending
 side only the device that announced the file (and still holds the bytes) answers
 at all; the others stay silent rather than reporting it unavailable.
 
-`file.unavailable` is the honest answer when the sender no longer has the file -
+`file.unavailable` is returned when the sender no longer holds the file -
 it was unsent, or the user moved it. Without it the recipient would wait on a
 transfer that can never start.
 
@@ -101,13 +102,13 @@ assembles the ciphertext, verifies that digest, and only then decrypts
 file-to-file: a tampered or truncated transfer never yields cleartext.
 
 The whole path is streamed. Neither side ever holds the file whole in memory, so
-a file far larger than available RAM transfers fine.
+a file substantially larger than available memory transfers without difficulty.
 
-## The cost, stated plainly
+## Availability constraint
 
-A file is available only while the sender is online **and** the file is still at
-the path it was announced from. This is the deliberate price of having no storage
-service, and the client must show it rather than implying delivery:
+A file is available only while the sender is online **and** the file remains at
+the path from which it was announced. This is the consequence of operating no
+storage service, and a client must report it rather than imply delivery:
 
 - `eRequested` - asked; waiting for the sender to come up
 - `eRunning` - bytes moving (progress is over the ciphertext stream)
