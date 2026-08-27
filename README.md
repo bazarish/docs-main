@@ -44,6 +44,11 @@ One repository per component, developed side by side:
 | Username registry (signed resolve + portal; the one paid component) | [alias-resolver](https://github.com/bazarish/alias-resolver) |
 | Specification | this repository |
 
+This repository is the protocol: what goes on the wire, what each side may know,
+what an implementation must and must not do. What one implementation chose where
+the protocol left a choice belongs with it - the desktop client's own settings and
+policies are in `client-qt6/docs/`.
+
 ## Cryptography
 
 The post-quantum hybrid is not the signatures alone - it is everything.

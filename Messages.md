@@ -422,41 +422,39 @@ An outgoing message advances through four observable states, each from a distinc
 source - so the tick a user sees reflects exactly how far the message actually
 travelled:
 
-| Tick | State | Source |
+| State | Means | Source |
 |---|---|---|
-| **hollow grey ring** | The sender's client is preparing the address this message leaves from: taking the destination it holds for this correspondent, or building one and waiting for its tunnels. | The sender's client (local knowledge). |
-| **grey** (solid) | On its way: the client is dialling the recipient's server and handing the envelope over. | The sender's client (local knowledge). |
-| **yellow** (double) | Stored by the **recipient's server** (handed into the recipient's mailbox). | The recipient's server, **signed in the reply on the same stream** the client delivered over (`api/Federation.md`) - the only leg a confirmation can come home on, since the client dialled from an address nobody can dial back. |
-| **green** (double) | **Read** by the recipient - the chat is open, focused and the message scrolled into view. | The recipient's client (a read `receipt` content message). Toggleable - a client may decline to send receipts. |
+| **preparing** | The sender's client is making ready the address this message leaves from. | The sender's client (local knowledge). |
+| **in flight** | On its way: the client is dialling the recipient's server and handing the envelope over. | The sender's client (local knowledge). |
+| **stored** | Held by the **recipient's server** in the recipient's mailbox. | The recipient's server, **signed in the reply on the same stream** the client delivered over (`api/Federation.md`) - the only leg a confirmation can come home on, since the client dialled from an address nobody can dial back. |
+| **read** | **Read** by the recipient. | The recipient's client (a read `receipt` content message). Toggleable - a client may decline to send receipts. |
 
-Grey and yellow are transport facts the sender learns without the recipient's
-client cooperating (yellow is the recipient *server's* authenticated confirmation,
-not the recipient *user*); only green requires the recipient's client to opt in
-and reflects an actual read, not mere arrival. The read receipt carries the newest
-read message's `id`, so the sender greens that message and every earlier one it
-sent that peer **that reached the recipient's server** - reading one message says
-the earlier ones were seen, and says nothing at all about one that never arrived,
-which stays grey rather than being painted read by the message after it.
+How a client draws these is its own business; the two ends agree on the states,
+not on the ticks.
 
-No server carries a send. The sending client makes **four attempts inside about a
-minute** - a dial and one frame each, with widening waits between them - and then
-stops: the message turns **red** with the reason, and a **Resend** the user presses
-when they choose. Nothing resends by itself. A definite refusal (token, size,
-quota) is an answer rather than a failure to reach anyone, so it is red at once
-without any of the waiting. While the attempts run, the bubble says which one it is
-on ("trying again (3 of 4)").
+The first three are transport facts the sender learns without the recipient's
+client cooperating (**stored** is the recipient *server's* authenticated
+confirmation, not the recipient *user*); only **read** requires the recipient's
+client to opt in and reflects an actual read, not mere arrival. The read receipt
+carries the newest read message's `id`, so the sender marks that message and every
+earlier one it sent that peer **that reached the recipient's server** - reading one
+message says the earlier ones were seen, and says nothing at all about one that
+never arrived, which is left where it was rather than painted read by the message
+after it.
 
-Two consequences worth stating plainly:
+No server carries a send, so how long to keep trying is the sending client's
+decision and nobody else's. What the protocol fixes is the rest:
 
-- A client closed while a send was still being tried comes back with that message
-  **red**. There is no outbound queue on disk - by design, since a queue would be
-  the client's record of who its user writes to - so on the next start an
-  unfinished send is one that did not happen, and sending it again is the user's
-  decision.
-- A message the recipient's server did store but whose confirmation was lost also
-  ends red. Pressing Resend costs nothing: the delivery id is derived from the
-  message and the mailbox, so the recipient's server recognises the repeat, stores
-  no second copy and spends no second token.
+- A refusal is an answer. A typed error (token, size, quota, contact rate limit)
+  is final - repeating it changes nothing - while a failure to *reach* the
+  recipient's server is not, and may be tried again.
+- An unsigned "delivered" is not a delivery. A client that cannot verify the
+  confirmation against the delivery id it sent treats the attempt as unanswered.
+- Sending the same message again is free and safe: the delivery id is derived from
+  the message and the mailbox, so a recipient's server that already stored it
+  recognises the repeat, stores no second copy and spends no second token. This is
+  what lets a client give up and leave the decision to its user - including after
+  a restart, where a send it was carrying is simply one that did not happen.
 
 ## Media: announced, transferred directly
 

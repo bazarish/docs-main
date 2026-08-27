@@ -32,14 +32,6 @@ The facade is the "last mile" between the client and the server infrastructure. 
   /v1/messaging/reseed`), and never asked again once the router is up. They are a
   separate list because they are a different job; a reseed serves no API and a
   facade is never a reseed.
-- **The router's clearnet side can go through a SOCKS5 proxy** (I2P router
-  settings, off by default): its connections to other routers and the built-in
-  reseeds. SOCKS only, and no credentials - i2pd's SOCKS client offers none.
-  Setting one switches the datagram transport (SSU2) **off**, always: its
-  datagrams cannot go through a SOCKS proxy that has no UDP support, and i2pd
-  would then send them around it. The client's own clearnet request - the reseed
-  above - does **not** go through it: that is a separate stack, and proxying it is
-  not implemented.
 - **i2pd's built-in reseed hosts are off** in the client. They are allowed in
   exactly one case: this server's descriptor carries no reseed address, or none
   of them answered - the only situation with nobody to ask. Otherwise the

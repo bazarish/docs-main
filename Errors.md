@@ -28,7 +28,7 @@ HTTP transports map typed errors onto appropriate status codes; the JSON body is
 |---|---|---|
 | `QUOTA_EXCEEDED` | Blob is larger than the receiving server accepts; the error must explicitly explain the problem to the sender | server |
 | `STORAGE_FULL` | User's pending-content quota is exhausted | server |
-| `RECIPIENT_SERVER_UNREACHABLE` | The recipient's server did not answer: it could not be dialled, the stream failed, or it claimed a delivery it would not sign. The sending client repeats the attempt on its schedule and, when the last one is spent, shows the message **red** with this reason and a resend the user presses (`Messages.md`) | client |
+| `RECIPIENT_SERVER_UNREACHABLE` | The recipient's server did not answer: it could not be dialled, the stream failed, or it claimed a delivery it would not sign. Not a refusal - the sending client may try again, and when it stops trying this is the reason it reports (`Messages.md`) | client |
 | `DELIVERY_REJECTED` | Delivery refused. Deliberately collapses "invalid/consumed token", "unknown mailbox", and "recipient not served here" - externally indistinguishable (anti-enumeration, see `Contacts.md`). A tokenless contact request is the only alternative path | server |
 | `CONTACT_REQUEST_TOO_LARGE` | Attached contact-request message exceeds the limit (default 8192 bytes, server-configurable) | server |
 | `ALIAS_TAKEN` | Requested alias is already registered | service node |

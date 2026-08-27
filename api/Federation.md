@@ -111,7 +111,7 @@ DeliveryEnvelope:
 
 ## Message delivery flow
 
-1. Sender's **client** seals the envelope and dials the recipient's serving destination itself, over I2P, **from a destination it holds for that one correspondent** (one per correspondent, a ten-minute term, taken from a small warm pool it keeps ready). No server of the sender's is involved in a send at all, so none of them learns whom the sender writes to.
+1. Sender's **client** seals the envelope and dials the recipient's serving destination itself, over I2P, **from a destination it holds for that one correspondent** and never from its own serving destination. How long it holds one and where it takes it from is the client's own affair; what the protocol asks is that one address never carries mail to two correspondents. No server of the sender's is involved in a send at all, so none of them learns whom the sender writes to.
 2. Client -> recipient's server: `deliver` with the envelope and its payload, on that one stream.
 3. Recipient's server unseals and processes in strict order:
    1. **deliveryId dedup** - if the `deliveryId` is still pending in the mailbox, or is in the retained **seen-deliveryId set** (every admitted id, kept independently of the blob until the TTL sweep ages it out), respond success *without* consuming a token. This makes client retries idempotent and blocks replays of an already-delivered envelope - including tokenless `contact` requests that have since been fetched, acked and swept;
@@ -119,7 +119,7 @@ DeliveryEnvelope:
    3. **size/quota checks** - explicit typed errors (`QUOTA_EXCEEDED`, `STORAGE_FULL`), revealed only past a valid token;
    4. **store** as pending content; the token is consumed atomically with the store, and the `deliveryId` is added to the seen set.
 4. Recipient's server -> sender's client: the confirmation rides **the reply on the same stream**, signed over the stored `deliveryId` with the signing key of the destination that took it. It can come home no other way - the client dialled from an address nobody can dial back - and the client believes a `delivered` only when that signature verifies (the yellow tick). An unsigned claim is treated as no answer at all.
-5. A reply is an answer: a typed refusal (token, size, quota, contact rate limit) fails the message at once, with its reason on the bubble. Only a failure to *get* a reply is retried, and the client makes **four attempts inside about a minute** before it stops and turns the message red with a **Resend** the user presses. Nothing is spooled anywhere and nothing retries by itself. A resend produces the same delivery id, so a recipient's server that did store the first copy recognises it, stores nothing twice and spends no second token.
+5. A reply is an answer: a typed refusal (token, size, quota, contact rate limit) fails the message at once and repeating it changes nothing. Only a failure to *get* a reply is worth another attempt, and how many to make is the sending client's own policy - nothing is spooled anywhere and no server retries on anyone's behalf. Sending again produces the same delivery id, so a recipient's server that did store the first copy recognises it, stores nothing twice and spends no second token.
 
 `contact-request` deliveries skip the token check, are capped in payload size (default 8192 bytes, server-configurable - large enough for the bootstrap prekey + a full reply-token batch), and are subject to a separate quota and per-origin-server rate limiting.
 
