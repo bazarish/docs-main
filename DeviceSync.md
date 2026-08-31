@@ -57,6 +57,11 @@ Two pieces of account state propagate to the user's other devices as dedicated *
 - `device.contact-name` - a local contact rename, carrying `peer` (fingerprint) and the new `name`.
 - `device.message` - what this device just sent a contact, so the conversation reads the same on all of them.
 - `device.delegation-term` - the term this account delegates its destination for; the shortest choice wins.
+- `device.saved` - a message the user kept for themselves, carrying it in `message`. The chat it belongs to is the account's own fingerprint, which no contact can hold.
+- `device.saved-clear` - that chat, emptied on every device.
+- `device.contact-remove` - a contact removed, carrying `peer`. Every device drops the contact and its conversation; the device that sent it is also the one that revoked their tokens.
+- `device.contact-block` - `peer` and `blocked`: mail and contact requests from them are dropped as they are read, on every device. The conversation is not touched.
+- `device.contact-prefs` - `peer`, `notifications` and `allowCalls`: what one contact may do here.
 - `call.taken` - the device that answered or refused an incoming call, stopping the others ringing (`api/Calls.md`).
 
 All are local-only facts that must never reach a contact, so they travel the self-channel exclusively. The routing-key sibling `device.i2p-master` (preserving the user's I2P address across devices, see `Identity.md`) uses the same mechanism. Wire shapes are in `Messages.md`.

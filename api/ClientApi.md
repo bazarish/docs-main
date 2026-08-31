@@ -105,7 +105,8 @@ and so identify itself as Bazarish - to any scanner.
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /v1/messaging/tokens` | Register a batch of one-time token hashes for this user's mailbox. No deletion endpoint exists: a hash is spent, expires, or is discarded with the account |
+| `POST /v1/messaging/tokens` | Register a batch of one-time tokens for this user's mailbox. The tokens themselves, not their hashes: revoking a correspondent's tokens (below) is a sweep over their shape |
+| `POST /v1/messaging/tokens/revoke` | Drop every token this user holds that was minted under the given mask - one correspondent's, all of them. Answers before the sweep, which the node runs on one thread for all its users (`../Contacts.md`) |
 
 ### Client registry (see `../DeviceSync.md`)
 

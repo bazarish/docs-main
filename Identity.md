@@ -74,7 +74,7 @@ Routing-staleness policy for contacts: the last known card remains the routing t
 
 A user is served by **exactly one server at a time**. Migration S1 -> S2:
 
-1. Register on S2, register fresh token hashes there, close the account on S1 (or let it go idle).
+1. Register on S2, register fresh delivery tokens there, close the account on S1 (or let it go idle).
 2. Push the new contact card (S2 destination + serving sealing key + prekey) + fresh token batches to all contacts over E2E.
 3. Contacts switch as the card arrives. Deliveries that race the cutover **fail and stay on the sender's client** (standard send semantics) and are retried after the new card arrives - messages are delayed, not lost.
 

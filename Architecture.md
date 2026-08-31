@@ -60,7 +60,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 
 - **Facade compromise must not damage server infrastructure.** The facade knows only the private-channel addresses of its backends and the traffic passing through it. It holds no keys and no content at rest.
 - **Server sees only ciphertext.** All message content is E2E-encrypted by clients; server-side components store and relay opaque blobs.
-- **A user's own server receives; it does not send.** Its functions for its user are: accept deliveries on that user's destination, hold them until the user's devices have collected them, carry a write addressed to those devices, and register token hashes. It is never given an outgoing message and never dials a correspondent, so the set of a user's correspondents is not available to it.
+- **A user's own server receives; it does not send.** Its functions for its user are: accept deliveries on that user's destination, hold them until the user's devices have collected them, carry a write addressed to those devices, and register delivery tokens. It is never given an outgoing message and never dials a correspondent, so the set of a user's correspondents is not available to it.
 - **Metadata minimization is a core requirement.** Any new endpoint or stored field must be evaluated for what it reveals about users and their contact graph. Collectable metadata is a critical bug by definition.
 
 ## Repositories

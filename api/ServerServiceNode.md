@@ -23,7 +23,7 @@ that fingerprint; no shared secret is used.
 | `PUT /v1/messaging/quota` | Set the mailbox quota granted by the account, in place of the server's default |
 | `PUT /v1/messaging/serving-key` | Rotate a destination's serving sealing key in two phases: prepare, then commit |
 | `GET /v1/messaging/account?user=` | State held for one account: registered devices, bytes in use, effective quota; displayed by the administration panel |
-| `DELETE /v1/messaging/account?user=` | The account has been deleted: discard the mailbox, the replay markers, the token hashes, the device registry and the quota override. Issued whenever an account is deleted, by its owner or by an operator. Idempotent: a fingerprint for which the server holds no state is already in the requested condition |
+| `DELETE /v1/messaging/account?user=` | The account has been deleted: discard the mailbox, the replay markers, the delivery tokens, the device registry and the quota override. Issued whenever an account is deleted, by its owner or by an operator. Idempotent: a fingerprint for which the server holds no state is already in the requested condition |
 
 ## Client-ID registry
 
