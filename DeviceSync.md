@@ -64,7 +64,7 @@ Two pieces of account state propagate to the user's other devices as dedicated *
 - `device.contact-prefs` - `peer`, `notifications` and `allowCalls`: what one contact may do here.
 - `device.chat-clear` - `peer`: this account's copy of one conversation, emptied. Distinct from the `chat.clear` sent to a correspondent, which asks *them* to empty theirs.
 - `device.account-name` - `name`: the account renamed itself.
-- `device.account-prefs` - `acceptCalls`: an account-wide answer, which must be the same wherever a caller reaches it.
+- `device.account-prefs` - `acceptCalls` and `sendReceipts`: the account's own answers, which must be the same wherever it is reached from. A notice carries what it knows about; a field it omits is left as it was.
 - `call.taken` - the device that answered or refused an incoming call, stopping the others ringing (`api/Calls.md`).
 
 `device.message` carries what this device did in a conversation, so every device shows the same one: a message sent, a picture, a voice message, an edit, a deletion, a reaction, and a request to a correspondent to clear the chat. What a device does *not* echo is its own errands - read receipts, call signalling, token refills and the file-transfer handshake - which are between it and the correspondent, and the read state, which is per device by design: a message read here is not read there.
