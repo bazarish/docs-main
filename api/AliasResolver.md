@@ -83,8 +83,12 @@ bypassing the resolver entirely (`Identity.md`, `FederatedResolve.md`).
 Two faces, one daemon:
 
 1. **Web portal - plain HTTP on `127.0.0.1`.** Authentication is **sign-in-with-key**
-   (the client signs a challenge; the key never enters the browser - same model as
-   `ServicePortal.md`). The operator (the developer) fronts this localhost server
+   (the client signs a challenge; the key never enters the browser - the one
+   contract in `SignInWithKey.md`). The registry names itself in the challenge -
+   "Bazarish alias registry" at the address the operator fronts it under, role
+   `Alias owner` - and the client shows those words before signing. Not yet
+   implemented here: this daemon still builds against an older core and issues
+   the previous challenge envelope. The operator (the developer) fronts this localhost server
    to **i2p (i2pd server tunnel) + clearnet (TLS) + tor (onion)** with their own
    infrastructure; the daemon itself knows nothing about multi-network exposure.
    The portal is the human-facing surface (search, buy, balance, manage).

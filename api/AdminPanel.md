@@ -15,27 +15,35 @@ or over I2P.
 
 Access is restricted to the configured **admin identities**; there are no
 passwords and no account store. `admin` is a fingerprint or a list of
-fingerprints, so a deployment with several operators need not share one key. Login reuses the portal sign-in-with-key wire contract, but the
-panel is the self-contained verifier, so **no backend has to be online to log
+fingerprints, so a deployment with several operators need not share one key.
+
+Login is the project's one sign-in-with-key contract (`SignInWithKey.md`), with
+the panel as a self-contained verifier: **no backend has to be online to log
 in**.
 
 1. The operator puts their own fingerprint (`bazarish-client whoami`) in the
    panel config `admin` field.
-2. `GET /login` issues a challenge: base64(JSON `{nonce, ts, aud}`), where `aud`
-   is the panel's audience.
-3. The operator signs it with their client: `bazarish-client sign-login <account>
-   <challenge>`, producing the standard login blob (base64(JSON `{k,t,c,p}`) - the
-   four request-auth headers over the canonical `BZ-LOGIN` / `/portal/login`
-   request whose body is the challenge).
-4. `POST /login` verifies both signatures locally (common `auth::verifyRequest`),
-   requires the recovered fingerprint to be one of the configured admins, then consumes
-   the challenge and sets a session cookie (`HttpOnly; SameSite=Strict`).
+2. `GET /login` issues a challenge naming this panel as the consumer.
+3. The operator signs it with their client (`bazarish-client sign-login <account>
+   <challenge>`, or the Signature window), which shows those words before it
+   signs.
+4. `POST /login` verifies the challenge and the blob, requires the recovered
+   fingerprint to be one of the configured admins, consumes the challenge, and
+   sets a session cookie (`HttpOnly; SameSite=Strict`).
 
-The challenge is **single-use** and bound to the panel audience. The panel only
-accepts challenges it issued, so a login blob captured from any other verifier
-(e.g. a service-node portal) carries a challenge the panel never minted and is
-rejected even though its signature is valid; conversely a panel challenge cannot
-be replayed at a portal (it has no portal HMAC tag).
+What the panel puts in the consumer:
+
+| Field | Value |
+|---|---|
+| `name` | `consumer.name`, or "Bazarish admin panel" plus the fleet name when the config names exactly one |
+| `place` | `consumer.place`, or the address the panel listens on |
+| `role` | `Administrator` |
+
+The challenge is **single-use** and names the panel. A login blob captured from
+any other verifier (a service-node portal, say) carries a challenge the panel
+never minted and is rejected even though its signature is valid; conversely a
+panel challenge cannot be replayed at a portal, and an operator who is sent one
+sees a name that is not the panel's before signing anything.
 
 ## Operator authentication (panel <-> services)
 

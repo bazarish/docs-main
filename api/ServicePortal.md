@@ -34,27 +34,24 @@ A portal session is bound to a **userId = the user's key fingerprint**, proven b
 a signature - the same identity used for messaging. The private key never enters
 the browser.
 
-1. The portal renders a **challenge**:
-   `challenge = { v, purpose:"bazarish-login", nonce, ts, audience }`
-   where `audience` is the service node's fingerprint and `nonce` is bound by an
-   HMAC under a portal secret (`tag = HMAC(secret, nonce||ts||audience)`), so the
-   portal can later confirm it issued the challenge and that `ts` is fresh
-   **without server-side state**.
-2. The user signs the challenge with their Client (`bazarish-client sign-login
-   <challenge>`), producing a **hybrid signature** (classical + PQ, the common
-   `Auth`/CMS primitive) over the canonical challenge. The Client emits an
-   opaque base64 blob; the user pastes it back into the portal.
-3. The portal verifies: signature valid; `ts` within the freshness window
-   (e.g. +/-300 s); `audience` == this node; HMAC tag matches; `nonce` not already
-   consumed (a short-lived used-nonce cache stops in-window replay). The
-   **signer fingerprint = userId**.
-4. On success the portal sets a session (a signed cookie carrying `userId` and an
-   expiry; HttpOnly, SameSite=Strict). All subsequent account actions - top-ups
-   and buying services - are logged under that `userId`.
+The wire contract is one for the whole project and lives in
+`SignInWithKey.md`: the portal mints a challenge naming its **consumer**, the
+user signs it in their client, the portal verifies the blob and consumes the
+challenge, and the signer's fingerprint is the userId. On success the portal sets
+a session cookie carrying `userId` and an expiry (HttpOnly, SameSite=Strict).
 
-Rationale: the key stays in the Client; the browser only relays a one-shot
-signature. `purpose` and `audience` stop the signed blob being replayed against
-another protocol surface or another server.
+What this node puts in the consumer:
+
+| Field | Value |
+|---|---|
+| `name` | `portal.name`, or "Bazarish service node" |
+| `place` | `portal.address`, or the first advertised portal link |
+| `role` | `Account owner` |
+
+`place` is what the user has in their address bar, so a node fronted under a name
+of its own says so in the config; a node that can name no address at all does not
+start. The client shows those words before it signs, and a user who is on one
+site while the challenge names another can stop there.
 
 ## 2. Portal discovery (server -> links)
 

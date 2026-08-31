@@ -25,6 +25,7 @@ component implements.
   - [Facade](api/Facade.md) - the last-mile contract
   - [Federation](api/Federation.md) - server <-> server over I2P (destination-routed)
   - [InviteAnonymity](api/InviteAnonymity.md) - destination-routed contact cards
+  - [SignInWithKey](api/SignInWithKey.md) - the login challenge and blob, and who consumes a signature
   - [ServicePortal](api/ServicePortal.md) - sign-in-with-key portal, payments, grants
   - [ServerServiceNode](api/ServerServiceNode.md) - internal server <-> service node API
   - [FileTransfer](api/FileTransfer.md) - direct client-to-client file transfer over I2P
