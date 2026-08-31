@@ -62,7 +62,12 @@ Two pieces of account state propagate to the user's other devices as dedicated *
 - `device.contact-remove` - a contact removed, carrying `peer`. Every device drops the contact and its conversation; the device that sent it is also the one that revoked their tokens.
 - `device.contact-block` - `peer` and `blocked`: mail and contact requests from them are dropped as they are read, on every device. The conversation is not touched.
 - `device.contact-prefs` - `peer`, `notifications` and `allowCalls`: what one contact may do here.
+- `device.chat-clear` - `peer`: this account's copy of one conversation, emptied. Distinct from the `chat.clear` sent to a correspondent, which asks *them* to empty theirs.
+- `device.account-name` - `name`: the account renamed itself.
+- `device.account-prefs` - `acceptCalls`: an account-wide answer, which must be the same wherever a caller reaches it.
 - `call.taken` - the device that answered or refused an incoming call, stopping the others ringing (`api/Calls.md`).
+
+`device.message` carries what this device did in a conversation, so every device shows the same one: a message sent, a picture, a voice message, an edit, a deletion, a reaction, and a request to a correspondent to clear the chat. What a device does *not* echo is its own errands - read receipts, call signalling, token refills and the file-transfer handshake - which are between it and the correspondent, and the read state, which is per device by design: a message read here is not read there.
 
 All are local-only facts that must never reach a contact, so they travel the self-channel exclusively. The routing-key sibling `device.i2p-master` (preserving the user's I2P address across devices, see `Identity.md`) uses the same mechanism. Wire shapes are in `Messages.md`.
 
