@@ -66,6 +66,20 @@ Two pieces of account state propagate to the user's other devices as dedicated *
 - `device.account-name` - `name`: the account renamed itself.
 - `device.account-prefs` - `acceptCalls` and `sendReceipts`: the account's own answers, which must be the same wherever it is reached from. A notice carries what it knows about; a field it omits is left as it was.
 - `call.taken` - the device that answered or refused an incoming call, stopping the others ringing (`api/Calls.md`).
+- `device.contacts-request` - `device`: the asking device wants the address book. Sent once, automatically, on a device's first sync that reaches the server, and by hand from the account window. A device ignores its own request; with no other device the mailbox simply holds it.
+- `device.contacts` - `forDevice`, `seq`, `last`, `contacts`: the book, or a part of it. Every other device that has contacts answers, so several answers may arrive; each is taken in turn.
+
+### The address book
+
+A device that has just joined cannot learn a contact from the network: a correspondent is reached by destination and their card is read with a capability, and nothing turns a fingerprint into either. The account's other devices are the only place the book can come from - so it is asked for, over the same self-channel.
+
+One entry carries what a contact **is**: their fingerprint, their identity keys (what every message of theirs is checked against, `Messages.md`), their sealing key, destination, serving key and view capability, whether they refused to be passed on, the local display name, the per-contact switches, whether this account has issued to them, whether they are blocked, and their avatar.
+
+It carries nothing that belongs to one device or one exchange in flight - above all **no delivery tokens**: they are one-time, and two devices spending the same one is a message lost. A device that receives a contact this way asks for its own batch through the ordinary path when it first needs to write.
+
+Answers are **chunked**: one contact is never split across two messages, and an entry whose avatar would not fit is sent without it (the correspondent sends their face again the next time they write; the address they are reached at is what cannot be re-derived). `last` marks the final chunk of one device's answer.
+
+Merging **fills gaps only**. A contact this device already has is not overwritten: routing learned from the correspondent themselves is fresher than a copy of it, and a second answer from another device must not undo a rename or a move. Missing fields - keys, avatar, name, switches - are taken from the book.
 
 `device.message` carries what this device did in a conversation, so every device shows the same one: a message sent, a picture, a voice message, an edit, a deletion, a reaction, and a request to a correspondent to clear the chat. What a device does *not* echo is its own errands - read receipts, call signalling, token refills and the file-transfer handshake - which are between it and the correspondent, and the read state, which is per device by design: a message read here is not read there.
 

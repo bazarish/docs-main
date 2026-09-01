@@ -158,9 +158,10 @@ versioned envelope:
   "sentAt": <unix milliseconds>,   // client send clock; drives ordering and the displayed time
   "replyTo": <id>,            // optional
   "routing": { "dest": <sender b32>, "servingKey": <base64 SPKI>, "view": <32 hex> },
-  "auth": { "k": <base64 JSON {c, pq} of the author's identity public keys>,
-            "c": <base64 ECDSA P-256 signature>,
-            "p": <base64 ML-DSA-65 signature> },
+  "auth": { "c": <ECDSA P-256 signature, CBOR bytes>,
+            "p": <ML-DSA-65 signature, CBOR bytes>,
+            "kc": <author's EC public key, SPKI DER - only with a bootstrap>,
+            "kp": <author's ML-DSA public key, SPKI DER - only with a bootstrap> },
   ... type-specific fields ...
 }
 ```
@@ -179,10 +180,19 @@ that fails either test is consumed before it reaches a chat, a contact entry or
 the user. Without this an admitted contact could put another contact's name on a
 message and have it filed in that other conversation.
 
-It costs 8224 bytes on every message - a reaction and a read receipt as much as
-a letter - almost all of it the ML-DSA-65 public key and signature. That is why
-the tokenless contact-request cap is 20 KiB: a request carries no token and no
-card, so its signature is the only thing that names the sender.
+The keys travel only where the reader may not have them yet: a contact request,
+and any message carrying a bootstrap. Everywhere else the block is the two
+signatures alone, and the reader checks them against the keys it kept when the
+correspondent introduced themselves - from their card when it added them, or
+from the request that started the dialog. A message from somebody it has no keys
+for is one it cannot check, and it is dropped exactly like a message from a
+stranger.
+
+Measured: **3396 bytes** for the two signatures, **5471** when the keys ride
+along. Every message pays the first figure - a reaction and a read receipt as
+much as a letter. That is why the tokenless contact-request cap is 20 KiB: a
+request carries no token and no card, so its signature is the only thing that
+names the sender.
 
 **`routing` - where to answer, on every message.** A destination is not for life:
 regenerating the I2P key changes the address, and the serving sealing key that
