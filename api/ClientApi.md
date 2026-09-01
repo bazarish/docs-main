@@ -47,11 +47,14 @@ it in the mailbox until the recipient's devices have collected it - and the sing
 write a device makes to its own account, `POST /v1/messaging/self`, which reaches
 no other party.
 
-A **tokenless contact request** is capped by the protocol at **4096 sealed
-bytes** (`kMaxContactRequestBytes`) - not by any operator setting. Measured
-against a real request, the body is 3776 bytes with no greeting and 3910 with a
-100-byte one, the greater part of it the 64-token reply batch the requester supplies;
-the cap is that worst case rounded up. The greeting a person may write is capped
+A **tokenless contact request** is capped by the protocol at **20480 sealed
+bytes** (`kMaxContactRequestBytes`) - not by any operator setting. The body was
+measured at 3776 bytes with no greeting and 3910 with a 100-byte one, the greater
+part of it the 64-token reply batch the requester supplies; on top of that sits
+the 8224-byte authorship block every message now carries (`Messages.md`), which a
+request needs more than any other message - it holds no token and no card, so its
+signature is the only thing naming the sender. The cap is that sum with room to
+spare. The greeting a person may write is capped
 at **100 bytes** (`kMaxContactGreetingBytes`) and the client refuses more, so the
 limit is met where it can be explained rather than at the recipient's server.
 
