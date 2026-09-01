@@ -160,8 +160,8 @@ versioned envelope:
   "routing": { "dest": <sender b32>, "servingKey": <base64 SPKI>, "view": <32 hex> },
   "auth": { "c": <ECDSA P-256 signature, CBOR bytes>,
             "p": <ML-DSA-65 signature, CBOR bytes>,
-            "kc": <author's EC public key, SPKI DER - only with a bootstrap>,
-            "kp": <author's ML-DSA public key, SPKI DER - only with a bootstrap> },
+            "kc": <author's EC public key, SPKI DER - contact request only>,
+            "kp": <author's ML-DSA public key, SPKI DER - contact request only> },
   ... type-specific fields ...
 }
 ```
@@ -180,9 +180,10 @@ that fails either test is consumed before it reaches a chat, a contact entry or
 the user. Without this an admitted contact could put another contact's name on a
 message and have it filed in that other conversation.
 
-The keys travel only where the reader may not have them yet: a contact request,
-and any message carrying a bootstrap. Everywhere else the block is the two
-signatures alone, and the reader checks them against the keys it kept when the
+The keys travel in one place only: the **contact request**. Adding a contact
+goes through their card, so the adder holds the added party's keys before the
+first word is sent, and the added party takes the adder's from the request that
+started the dialog. Everywhere else the block is the two signatures alone, and the reader checks them against the keys it kept when the
 correspondent introduced themselves - from their card when it added them, or
 from the request that started the dialog. A message from somebody it has no keys
 for is one it cannot check, and it is dropped exactly like a message from a
@@ -190,9 +191,9 @@ stranger.
 
 Measured: **3396 bytes** for the two signatures, **5471** when the keys ride
 along. Every message pays the first figure - a reaction and a read receipt as
-much as a letter. That is why the tokenless contact-request cap is 20 KiB: a
-request carries no token and no card, so its signature is the only thing that
-names the sender.
+much as a letter. That is what the tokenless contact-request cap is
+measured against (`api/ClientApi.md`): a request carries no token and no card, so
+its signature is the only thing that names the sender.
 
 **`routing` - where to answer, on every message.** A destination is not for life:
 regenerating the I2P key changes the address, and the serving sealing key that

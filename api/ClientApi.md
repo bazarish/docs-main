@@ -47,16 +47,25 @@ it in the mailbox until the recipient's devices have collected it - and the sing
 write a device makes to its own account, `POST /v1/messaging/self`, which reaches
 no other party.
 
-A **tokenless contact request** is capped by the protocol at **20480 sealed
-bytes** (`kMaxContactRequestBytes`) - not by any operator setting. The body was
-measured at 3776 bytes with no greeting and 3910 with a 100-byte one, the greater
-part of it the 64-token reply batch the requester supplies; on top of that sits
-the 8224-byte authorship block every message now carries (`Messages.md`), which a
-request needs more than any other message - it holds no token and no card, so its
-signature is the only thing naming the sender. The cap is that sum with room to
-spare. The greeting a person may write is capped
-at **100 bytes** (`kMaxContactGreetingBytes`) and the client refuses more, so the
-limit is met where it can be explained rather than at the recipient's server.
+A **tokenless contact request** is capped by the protocol at **13910 sealed
+bytes** (`kMaxContactRequestBytes`) - not by any operator setting, and not with
+room to spare: this is the one thing a stranger may put in a mailbox, so the cap
+is the measured worst case and nothing above it.
+
+The worst case is **13878 bytes**, measured through the real path: the two hybrid
+sealing keys the bootstrap carries, the 64-token reply batch the requester hands
+over so the peer can answer, the ML-KEM ciphertext of the seal, the authorship
+block with the sender's keys in it (a request has no card and no token, so the
+signature is the only thing naming them), the longest greeting a user may write
+and the longest name an account may carry. The 32 bytes on top are what the
+variable-length parts can add - an ECDSA signature is 70 to 72 bytes, a CBOR
+integer is as wide as its value.
+
+Two client-side caps are what make that number a number: the greeting is at most
+**100 bytes** (`kMaxContactGreetingBytes`) and an account's own display name at
+most **64 bytes** (`kMaxAccountNameBytes`, about 32 characters of a non-Latin
+alphabet). Both are refused where they are typed rather than at the recipient's
+server.
 
 - A contact acceptance is not a separate endpoint: it is an ordinary content
   message that spends a token received in the request (see `../Contacts.md`).
