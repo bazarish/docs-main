@@ -182,7 +182,7 @@ This mechanism is moderation, not a charge.
 | `DELETE /v1/account/user?user=` | Operator-signed: delete the account (certificate, grants, destination) |
 | `POST /v1/account/ban` | Operator-signed: delete the account and refuse this key from now on (reason defaults to "Banned") |
 | `POST /v1/account/unban` | Operator-signed: lift a ban |
-| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed: registration mode, the message a waiting account is shown, the storage a new account gets, and `loginConsumer` (the name, place and role a user is shown before signing) - plus the account count and the sum of the quotas |
+| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed, and the whole of what an operator can change: registration mode and its two messages, captcha (on/off, `captchaLength`, `captchaTtlSeconds`), `loginConsumer`, `portalLinks`, `facades`, `reseeds`, `defaultQuotaBytes`, `idleDeleteDays`, `logLevel`, and the three addresses `listen`, `portalListen`, `messaging` - plus the account count and the sum of the quotas. Everything is written back into the node's config file, so a restart keeps it; `logLevel` and the portal's own words apply at once, the captcha numbers and the three addresses at the next start |
 
 A ban outlives the account it removed - it is what stops the same key from
 registering again - so it is stored apart from the record it deletes, and a

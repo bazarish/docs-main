@@ -112,16 +112,26 @@ A sidebar carries the views:
   message its owner is shown in place of the node-wide one), delete it, or ban
   the key. The open account is in the address bar (`#/users/<fingerprint>`), so a
   link points at one account.
-- **Settings** - what the service node does with new accounts: open or moderated
-  registration, the message a waiting account is shown, and the storage a new
-  account gets; and what a user sees before signing a login for the portal - the
-  name, the address and the role that make up its login consumer, which the
-  client shows and the user compares with their address bar. The three go to the
-  node as `loginConsumer` and are written back to its config file, so a restart
-  keeps them. Beside them, the two numbers that say whether those settings
-  still fit: what the quotas have promised, and what the messaging server's disk
-  actually holds (`GET /v1/messaging/storage`, measured by traversing its state
-  directory; a quota is an allocation, the measured figure is consumption).
+- **Settings** - every setting of the deployment, in five tabs, because one long
+  page of similar-looking blocks is where an operator loses the one they came
+  for. Each tab saves on its own and is in the address bar
+  (`#/settings/<tab>`), so a link points at one subject:
+
+  | Tab | What it holds |
+  |---|---|
+  | Registration | open or moderated, captcha on or off, its length and lifetime, the message a new client is told and the one a waiting account is shown |
+  | Portal | the login consumer (name, address, role) the client shows before a user signs, the portal's public links, and the socket the portal binds |
+  | Network | the facades and reseeds clients reach this server by, the descriptor built from them, the node's own operator API and the messaging server it is bound to, and the log level |
+  | Accounts | the storage a new account gets and how long an idle one is kept, beside the two numbers that say whether the promise still fits: what the quotas have allocated and what the disk actually holds (`GET /v1/messaging/storage`) |
+  | Panel | the panel's own file: who may sign in, the words it signs under, the services it manages, and where it listens - plus what it cannot change (its fingerprint, its config file, its state and web directories, its version) |
+
+  Two distinctions are made visually rather than in prose. A value the operator
+  owns is an input; a value the panel only knows is plain text against a rule,
+  never a box that invites typing. And a setting the service reads only at start
+  carries a **restart** mark beside the field - said next to the control, because
+  by the time the value has been typed the sentence under it has been read and
+  forgotten. The log level is the exception on the Network tab: it applies at
+  once, which is the point of having it there.
 
 The **search is performed on the service node**, not in the browser: the panel
 passes `q`, `state`, `limit` and `offset` through and displays the result, so a
@@ -136,6 +146,7 @@ node with many accounts does not transfer the whole set to locate one.
 | `PUT /api/quota` | service-node `PUT /v1/account/quota` |
 | `POST /api/undelegate`, `POST /api/delete`, `POST /api/ban`, `POST /api/unban` | the matching service-node operator endpoints |
 | `GET /api/settings`, `PUT /api/settings` | service-node `/v1/account/settings`, plus server-core `GET /v1/messaging/storage` for the disk figure |
+| `GET /api/panel`, `PUT /api/panel` | nothing - the panel's own configuration file |
 
 The quota is set **on the service node**, which is the component that grants it and
 pushes it to server-core. Setting it directly on server-core, as an earlier
@@ -168,3 +179,31 @@ place in that flow.
 The configuration contains no secrets. The panel prints its own operator
 fingerprint at startup; that fingerprint is added to each service's
 `--operator-fingerprint`.
+
+Everything above is also editable from the Panel tab, and the panel writes it
+back into this same file one value at a time - the operator's key order, spacing
+and comments survive a save.
+
+## First run
+
+A fresh install has no `admin` key at all (or an empty one), and that is not an
+error: it is an **unclaimed** panel. In that state `/` and `/login` redirect to
+`/setup`, which asks for one signature and hands the panel to the key that
+provides it. The panel says so on its console at startup, because that is where
+whoever just installed it is looking:
+
+```
+no administrator configured yet: open http://127.0.0.1:8460/setup and sign in -
+the first key to sign there administers this panel
+```
+
+The claim is first-come, checked and written under one lock, so two people
+opening the wizard at the same moment cannot both become the owner. The moment
+it succeeds `/setup` stops answering and redirects to `/login` for good; there
+is no second wizard and no way back to it except editing the config file by
+hand. **The window is open from the first start until that first signature**, so
+a panel that will be reachable from outside should be claimed before it is
+published, or published only after it is claimed.
+
+Removing the last administrator through the panel is refused for the same
+reason: an empty list would reopen the wizard to whoever found the page next.
