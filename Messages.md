@@ -108,9 +108,13 @@ Sealed envelope as the server sees it:
 { "class": "content" | "contact",
   "mailbox": <recipient fingerprint>,
   "deliveryId": <delivery id>,
-  "token": <base64 one-time token>      // present iff class == "content"
+  "tokens": [<base64 one-time token>]   // present iff class == "content"
 }
 ```
+
+`tokens` carries as many as the payload weighs - one per 30 KiB, never fewer
+than one (`Contacts.md`, token lifecycle). The recipient's server computes the
+same number from the payload and refuses an envelope that carries any other.
 
 The account database it all lands in carries a **schema version** of its own
 (SQLite's `user_version`, stamped when the tables are laid out and checked on
