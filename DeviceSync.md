@@ -67,7 +67,7 @@ Two pieces of account state propagate to the user's other devices as dedicated *
 - `device.account-prefs` - `acceptCalls` and `sendReceipts`: the account's own answers, which must be the same wherever it is reached from. A notice carries what it knows about; a field it omits is left as it was.
 - `call.taken` - the device that answered or refused an incoming call, stopping the others ringing (`api/Calls.md`).
 - `device.contacts-request` - `device`: the asking device wants the address book. Sent once, automatically, on a device's first sync that reaches the server, and by hand from the account window. A device ignores its own request; with no other device the mailbox simply holds it.
-- `device.contacts` - `forDevice`, `seq`, `last`, `contacts`: the book, or a part of it. Every other device that has contacts answers, so several answers may arrive; each is taken in turn.
+- `device.contacts` - `forDevice`, `contacts`: the book, or a part of it. Every other device that has contacts answers, so several answers may arrive; each is taken in turn.
 
 ### The address book
 
@@ -77,7 +77,7 @@ One entry carries what a contact **is**: their fingerprint, their identity keys 
 
 It carries nothing that belongs to one device or one exchange in flight - above all **no delivery tokens**: they are one-time, and two devices spending the same one is a message lost. A device that receives a contact this way asks for its own batch through the ordinary path when it first needs to write.
 
-Answers are **chunked**: one contact is never split across two messages, and an entry whose avatar would not fit is sent without it (the correspondent sends their face again the next time they write; the address they are reached at is what cannot be re-derived). `last` marks the final chunk of one device's answer.
+Answers are **chunked**: one contact is never split across two messages, and an entry whose avatar would not fit is sent without it (the correspondent sends their face again the next time they write; the address they are reached at is what cannot be re-derived). The chunks carry no sequence number and no end marker: the merge is per message and fills gaps, so the order they arrive in does not matter and there is nothing for the asker to wait for. An empty chunk is not sent.
 
 Merging **fills gaps only**. A contact this device already has is not overwritten: routing learned from the correspondent themselves is fresher than a copy of it, and a second answer from another device must not undo a rename or a move. Missing fields - keys, avatar, name, switches - are taken from the book.
 
@@ -90,6 +90,8 @@ All are local-only facts that must never reach a contact, so they travel the sel
 A `device.i2p-master` that carries a **different** master than the receiving device holds is not ignored either: the account's address has moved, and a device still announcing the old one in its outgoing routing keeps its contacts writing to an address nobody serves. It is adopted - replacing the stale master and the delegation signed by it - **only when the server confirms that address is the one it serves**, so a stale or replayed copy cannot take a working address away from a device.
 
 Until that question is settled a device **publishes nothing**: minting an address of its own and delegating it would take the account's address away from every contact holding it, and none of them would learn a replacement until the user wrote to them again. What a client does when nobody answers is its own choice (this implementation puts it to the user); what the protocol requires is that it not publish silently.
+
+**Every `device.*` type is a message from one of the account's own devices, and only that.** The channel is the account's own mailbox, but a mailbox is where correspondents write too: admission (a delivery token) is not authorship, so a receiver checks the signer of a device message against its own identity and drops it otherwise - before any field of it is read. Without that check an admitted contact could change an account setting or write into its address book, both of which these types do.
 
 A self-message is named by a **delivery id of its own**, unrelated to the one the same message carries to its recipient (`Messages.md`): the copy kept for the account's devices and the copy the contact receives share no name, so the two servers holding them cannot be matched against each other.
 
