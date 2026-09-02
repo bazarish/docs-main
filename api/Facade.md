@@ -45,6 +45,15 @@ The facade is the "last mile" between the client and the server infrastructure. 
   - `/v1/messaging/*` -> messaging server
   - `/v1/account/*` -> service node
   - anything else -> 404 (never forwarded)
+- The ops listener also carries the facade's **own configuration**, operator-signed
+  like `/healthz`: `GET /settings` and `PUT /settings` (the secret base path, the
+  two backends, both sockets, the I2P side, the log level) and `POST /restart`.
+  They are on the ops socket for the same reason `/healthz` is - on the public one
+  they would admit a facade is here. Only the log level applies at once; the rest
+  is written into the facade's config file and read at its next start, which is
+  what `POST /restart` is for. **Changing the base path invalidates every server
+  descriptor already handed out**, so the new prefix has to reach clients (a new
+  descriptor) before the old one stops answering.
 - Everything outside the secret prefix answers the same bare **404** - the API root, an unknown path, and the operator liveness endpoint alike - so a probe of the host learns nothing. `/healthz` is not on the client-facing socket at all: it is served on a separate private **ops listener** (`--ops-listen <host> <port>`) that is never published to clients (`AdminPanel.md`).
 - Nothing streams through the facade: the only large payload there ever was - a file upload - now goes directly between clients (see `FileTransfer.md`).
 - Holds no keys, parses no content (the auth signature is verified by the backends, not the facade), stores nothing. An unreachable backend yields a `FACADE_UPSTREAM` 502 - the facade is a dumb pipe.

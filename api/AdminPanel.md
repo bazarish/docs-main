@@ -123,7 +123,17 @@ A sidebar carries the views:
   | Portal | the login consumer (name, address, role) the client shows before a user signs, the portal's public links, and the socket the portal binds |
   | Network | the facades and reseeds clients reach this server by, the descriptor built from them, the node's own operator API and the messaging server it is bound to, and the log level |
   | Accounts | the storage a new account gets and how long an idle one is kept, beside the two numbers that say whether the promise still fits: what the quotas have allocated and what the disk actually holds (`GET /v1/messaging/storage`) |
+  | Messaging server | server-core's own file: log level and libi2pd's logging, its I2P privacy and tunnel count, the inbound federation rate limit, how long unacknowledged mail is kept, its private listener and the node it reports to |
+  | Facade | the facade's own file, read and written over its ops socket: the secret base path, both listeners, the two backends it forwards to, and its I2P side |
   | Panel | the panel's own file: who may sign in, the words it signs under, the services it manages, and where it listens - plus what it cannot change (its fingerprint, its config file, its state and web directories, its version) |
+
+  Every tab that holds a start-only setting also carries a **restart** control
+  for the service that owns it (and the Panel tab one for the panel itself).
+  Without it the rule this page exists for would not hold: a setting saved into a
+  config file is inert until the process reads it again, and the operator would
+  be back in a terminal. The service exits cleanly with a distinct code and its
+  unit starts it again; a service whose unit has no restart policy says so
+  instead of offering a button that does nothing.
 
   Two distinctions are made visually rather than in prose. A value the operator
   owns is an input; a value the panel only knows is plain text against a rule,
@@ -147,6 +157,9 @@ node with many accounts does not transfer the whole set to locate one.
 | `POST /api/undelegate`, `POST /api/delete`, `POST /api/ban`, `POST /api/unban` | the matching service-node operator endpoints |
 | `GET /api/settings`, `PUT /api/settings` | service-node `/v1/account/settings`, plus server-core `GET /v1/messaging/storage` for the disk figure |
 | `GET /api/panel`, `PUT /api/panel` | nothing - the panel's own configuration file |
+| `POST /api/panel/restart` | nothing - the panel's own process |
+| `GET /api/service-settings?kind=`, `PUT /api/service-settings?kind=` | server-core `/v1/messaging/settings`, service-node `/v1/account/settings`, facade `/settings` (ops socket) |
+| `POST /api/restart?kind=` | the matching service's restart endpoint |
 
 The quota is set **on the service node**, which is the component that grants it and
 pushes it to server-core. Setting it directly on server-core, as an earlier
@@ -183,6 +196,14 @@ fingerprint at startup; that fingerprint is added to each service's
 Everything above is also editable from the Panel tab, and the panel writes it
 back into this same file one value at a time - the operator's key order, spacing
 and comments survive a save.
+
+Between them, the tabs cover every value in all four config files except the
+ones that would let the panel lock itself out or move a service's data: the state
+and asset directories, the operator fingerprint lists, and a server's own
+identity. Those are shown read-only. **Everything else an operator would edit
+over SSH is editable here, and every service can be restarted from here**, which
+is the rule this page is built to: managing a Bazarish server should not require
+a shell on it.
 
 ## First run
 
