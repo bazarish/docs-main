@@ -57,12 +57,21 @@ What each of ours puts there:
 
 | Verifier | name | place | role |
 |---|---|---|---|
-| Service node portal | `portal.name`, else "Bazarish service node" | `portal.address`, else the first advertised portal link | Account owner |
+| Service node portal | `portal.name`, else "Bazarish service node" | `portal.address`, else the first advertised portal link | `portal.role`, else Account owner |
 | Alias registry | `portal.name`, else "Bazarish alias registry" | `portal.address` (required) | Alias owner |
 | Admin panel | `consumer.name`, else "Bazarish admin panel" plus the fleet name when one is named | `consumer.place`, else where it listens | Administrator |
 
 A deployment that cannot say where it lives does not start. An address nobody can
 compare is the same as no address at all.
+
+The service node's three are **live**: they are among the settings an operator
+edits in the admin panel, and a change takes effect on the next challenge and is
+written back to `portal.name` / `portal.address` / `portal.role` in the node's
+config file. A challenge issued before the change names the old consumer and
+stops verifying - it was shown to a user under words the portal no longer stands
+behind, and re-labelling it is what the tag exists to prevent. The user simply
+loads a fresh challenge. The other two verifiers keep their consumer in their own
+config and pick it up at start.
 
 The alias registry is specified here but has not adopted it yet: its build still
 carries an older core, and it moves to this envelope when that is caught up.

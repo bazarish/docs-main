@@ -46,7 +46,13 @@ What this node puts in the consumer:
 |---|---|
 | `name` | `portal.name`, or "Bazarish service node" |
 | `place` | `portal.address`, or the first advertised portal link |
-| `role` | `Account owner` |
+| `role` | `portal.role`, or `Account owner` |
+
+All three are also **live settings**: the operator edits them in the admin panel
+(`loginConsumer` on `/v1/account/settings`), the next challenge carries the new
+words, and they are written back to the config file so a restart keeps them.
+Challenges issued under the old words stop verifying, which is what the tag over
+the consumer is for; the user loads a fresh one.
 
 `place` is what the user has in their address bar, so a node fronted under a name
 of its own says so in the config; a node that can name no address at all does not
@@ -176,7 +182,7 @@ This mechanism is moderation, not a charge.
 | `DELETE /v1/account/user?user=` | Operator-signed: delete the account (certificate, grants, destination) |
 | `POST /v1/account/ban` | Operator-signed: delete the account and refuse this key from now on (reason defaults to "Banned") |
 | `POST /v1/account/unban` | Operator-signed: lift a ban |
-| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed: registration mode, the message a waiting account is shown, the storage a new account gets - plus the account count and the sum of the quotas |
+| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed: registration mode, the message a waiting account is shown, the storage a new account gets, and `loginConsumer` (the name, place and role a user is shown before signing) - plus the account count and the sum of the quotas |
 
 A ban outlives the account it removed - it is what stops the same key from
 registering again - so it is stored apart from the record it deletes, and a

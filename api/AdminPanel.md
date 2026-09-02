@@ -114,7 +114,11 @@ A sidebar carries the views:
   link points at one account.
 - **Settings** - what the service node does with new accounts: open or moderated
   registration, the message a waiting account is shown, and the storage a new
-  account gets. Beside them, the two numbers that say whether those settings
+  account gets; and what a user sees before signing a login for the portal - the
+  name, the address and the role that make up its login consumer, which the
+  client shows and the user compares with their address bar. The three go to the
+  node as `loginConsumer` and are written back to its config file, so a restart
+  keeps them. Beside them, the two numbers that say whether those settings
   still fit: what the quotas have promised, and what the messaging server's disk
   actually holds (`GET /v1/messaging/storage`, measured by traversing its state
   directory; a quota is an allocation, the measured figure is consumption).
