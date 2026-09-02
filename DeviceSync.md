@@ -85,6 +85,10 @@ Merging **fills gaps only**. A contact this device already has is not overwritte
 
 All are local-only facts that must never reach a contact, so they travel the self-channel exclusively. The routing-key sibling `device.i2p-master` (preserving the user's I2P address across devices, see `Identity.md`) uses the same mechanism. Wire shapes are in `Messages.md`.
 
+**`device.i2p-master-request` (`{device, host}`)** is the other half of that pair. An account has **one** address, and it is the address every contact holds; a device that finds its server serving an address it has no keys for asks for them here, naming the address it needs (`host`) and itself (`device`). Every device that holds a master answers with `device.i2p-master`; the asker takes the one whose address matches what the server serves and ignores the rest. A device answers its own request never, and a device that already holds the served address has nothing to ask.
+
+Until that question is settled a device **publishes nothing**: minting an address of its own and delegating it would take the account's address away from every contact holding it, and none of them would learn a replacement until the user wrote to them again. What a client does when nobody answers is its own choice (this implementation puts it to the user); what the protocol requires is that it not publish silently.
+
 A self-message is named by a **delivery id of its own**, unrelated to the one the same message carries to its recipient (`Messages.md`): the copy kept for the account's devices and the copy the contact receives share no name, so the two servers holding them cannot be matched against each other.
 
 ## Quota interplay
