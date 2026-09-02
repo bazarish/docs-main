@@ -97,6 +97,18 @@ or, if no such report arrived, when the invitation was delivered to the peer's
 server; the callee's starts when the invitation arrived. Neither side requires a
 signal from the other in order to stop ringing.
 
+An invitation is only good while it would still be ringing. A signal carries the
+`sentAt` every message carries, and a callee **must** ignore a `call.invite`
+older than its ring timeout: the mailbox holds what it is given until the device
+comes for it, so an invitation can arrive long after the caller stopped waiting,
+and ringing for it then is ringing at nobody.
+
+The end of a call and its beginning are two mailbox items, and the mailbox does
+not promise the order they are handed over in. A callee that has seen
+`call.end` or `call.decline` for a `callId` **must** ignore a `call.invite` for
+that same call, whenever it turns up. Neither rule needs a new field: `callId`
+and `sentAt` are already on the wire.
+
 ## Flow (I2P)
 
 1. **Caller** builds a one-time RAW datagram destination on the embedded router
