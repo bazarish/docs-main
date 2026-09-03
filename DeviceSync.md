@@ -63,6 +63,22 @@ Two pieces of account state propagate to the user's other devices as dedicated *
 - `device.contact-block` - `peer` and `blocked`: mail and contact requests from them are dropped as they are read, on every device. The conversation is not touched.
 - `device.contact-prefs` - `peer`, `notifications` and `allowCalls`: what one contact may do here.
 - `device.chat-clear` - `peer`: this account's copy of one conversation, emptied. Distinct from the `chat.clear` sent to a correspondent, which asks *them* to empty theirs.
+- `device.read` - `peer` and `ts`: this conversation has been read through the
+  message sent at that moment. Reading is the account's act, not the device's, so
+  a message read on one device is not offered as new on the next one. The mark is
+  the message's own **sent-at**, because a local row id is a different number on
+  every device, while the sender's stamp is the same everywhere.
+
+  A receiver folds it into its own read high-water **once, on arrival**: it takes
+  the newest incoming message it holds at or before that moment and marks through
+  it. It is deliberately not kept as a standing rule that anything older counts as
+  read - a `sentAt` is written by the sender, and a correspondent who back-dates a
+  message would otherwise have it arrive already read and never be seen. A message
+  that turns up after the mark is unread whatever it claims about when it was sent.
+
+  A device sends it while the user reads, coalesced rather than per message: one
+  notice per conversation after reading settles, and one when the conversation is
+  left.
 - `device.account-name` - `name`: the account renamed itself.
 - `device.account-prefs` - `acceptCalls` and `sendReceipts`: the account's own answers, which must be the same wherever it is reached from. A notice carries what it knows about; a field it omits is left as it was.
 - `call.taken` - the device that answered or refused an incoming call, stopping the others ringing (`api/Calls.md`).
@@ -81,7 +97,7 @@ Answers are **chunked**: one contact is never split across two messages, and an 
 
 Merging **fills gaps only**. A contact this device already has is not overwritten: routing learned from the correspondent themselves is fresher than a copy of it, and a second answer from another device must not undo a rename or a move. Missing fields - keys, avatar, name, switches - are taken from the book.
 
-`device.message` is sent **after** the recipient's server has signed for the delivery it echoes, not when the message is written. An echo that goes out first puts on every other device a message that may never arrive - and one copy per retry, all of them shown as still sending - which is a desync with no way back. What every device shows is therefore what at least one server holds. `device.message` carries what this device did in a conversation, so every device shows the same one: a message sent, a picture, a voice message, an edit, a deletion, a reaction, and a request to a correspondent to clear the chat. What a device does *not* echo is its own errands - read receipts, call signalling, token refills and the file-transfer handshake - which are between it and the correspondent, and the read state, which is per device by design: a message read here is not read there.
+`device.message` is sent **after** the recipient's server has signed for the delivery it echoes, not when the message is written. An echo that goes out first puts on every other device a message that may never arrive - and one copy per retry, all of them shown as still sending - which is a desync with no way back. What every device shows is therefore what at least one server holds. `device.message` carries what this device did in a conversation, so every device shows the same one: a message sent, a picture, a voice message, an edit, a deletion, a reaction, and a request to a correspondent to clear the chat. What a device does *not* echo is its own errands - read receipts, call signalling, token refills and the file-transfer handshake - which are between it and the correspondent. The read state is not among them: it is the account's, not the device's, and it travels as `device.read` above. Where a message has been read from is nobody's business, but *that* it has been read is the same fact on every device the account is open on - a second device that offered everything again as new was reporting something that is not true.
 
 All are local-only facts that must never reach a contact, so they travel the self-channel exclusively. The routing-key sibling `device.i2p-master` (preserving the user's I2P address across devices, see `Identity.md`) uses the same mechanism. Wire shapes are in `Messages.md`.
 
