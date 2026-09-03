@@ -31,17 +31,20 @@ The facade is the "last mile" between the client and the server infrastructure. 
   beside the facades: clearnet, fetched once, and never asked again once the
   router is up. They are a separate list because they are a different job; a
   reseed serves no API and a facade is never a reseed.
-- **A reseed address is a full https URL to an su3 archive.** It is not a facade
-  and speaks no Bazarish API: the client's I2P engine fetches it, unpacks it and
+- **A reseed address is an https base URL, and the archive under it is
+  `i2pseeds.su3`** - the shape every I2P reseed already has, so a router reads it
+  with no special case anywhere. It is not a facade and speaks no Bazarish API:
+  the client's I2P engine appends that name, fetches the archive, unpacks it and
   loads the routers, each of which carries its own signature. The archive's own
   signature is not required - a reseed an operator runs privately is signed by
   nobody a stock client trusts, so requiring it would mean no private reseeds -
   which is why the address must be **https**: the transport is what stands
   between the archive and the network.
-- **A server may pack its own.** `GET /v1/messaging/reseed.su3` hands out a
-  random sample of its netDb in that format, rebuilt at most hourly. An operator
-  who wants their own reseed points an address at it - through whatever fronting
-  they like - rather than at the server directly.
+- **A server may pack its own**, and its **portal** publishes it at
+  `i2pseeds.su3` - never a facade. A facade is an I2P address and this is the one
+  file a client needs before it has I2P; the portal is on the clearnet in any
+  case. An operator who wants their own reseed names the portal's address (or
+  whatever fronts it) in the descriptor.
 - **The reseed need not be the server.** Because it is an ordinary su3 URL, an
   operator may publish it anywhere - a page they already serve, a host with no
   other relationship to the server - so where a user bootstraps says nothing
