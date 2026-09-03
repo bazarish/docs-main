@@ -102,13 +102,18 @@ No call in this API is made over clearnet: every one of them goes to a facade
 over I2P. A server does publish one thing for a client that has no transport yet,
 and it is not an API:
 
-| Endpoint | Purpose |
+| Where | What |
 |---|---|
-| `GET /v1/messaging/reseed.su3` | This server's netDb as an **su3 reseed archive** - the ordinary I2P format, read by any router. Unauthenticated by necessity (a client fetching its first netDb holds nothing yet) and safe by construction (every RouterInfo inside carries its own router's signature). Packed from a random sample of about sixty routers and rebuilt no more than once an hour: one archive for everyone who asks within that hour, so repeated asking learns no more of the netDb than a single one |
+| `GET <portal>/i2pseeds.su3` | This server's netDb as an **su3 reseed archive** - the ordinary I2P format, under the name that format gives it, read by any router. Unauthenticated by necessity (a client fetching its first netDb holds nothing yet) and safe by construction (every RouterInfo inside carries its own router's signature). Packed from a random sample of about sixty routers and rebuilt no more than once an hour: one archive for everyone who asks within that hour, so repeated asking learns no more of the netDb than a single one |
 
-A server need not publish it at all, and a client never asks for it by that path:
-what a client is given is a reseed **address**, and that address may name this
-file or any other archive anywhere.
+It is published by the **portal**, not by a facade, and that is not an accident:
+a facade is an I2P address, and a client needs this file *before* it has I2P. The
+portal is on the clearnet anyway.
+
+A server need not publish it at all. What a client is given is a reseed
+**address** - a base URL, exactly as for any I2P reseed - and the router appends
+`i2pseeds.su3` to it. So the address may name this portal or any other reseed
+anywhere, and no client or router needs a special case to read it.
 
 A server descriptor may name **reseed addresses**, and each is a full `https://`
 URL to an **su3 archive** - the ordinary I2P reseed format. Nothing Bazarish is
