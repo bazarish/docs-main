@@ -91,6 +91,13 @@ Server-side components see only opaque blobs of a generic message.
 
 Adding or evolving a call signal is a client-only change.
 
+A media destination is real-time and is treated as such below the protocol: an
+implementation that pins destinations to worker threads **should** keep one for
+media alone. In this one, the embedded router runs each destination on a
+single-threaded lane, and a bulk transfer sharing that lane with a call is a call
+that stutters while the file moves; the lane the media destination is put on
+carries nothing else.
+
 Both sides run their own ring timeout, so an unanswered call terminates without
 user action. The caller's interval starts when the peer's device reported ringing,
 or, if no such report arrived, when the invitation was delivered to the peer's
