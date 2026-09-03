@@ -45,15 +45,16 @@ a transfer that needs both sides online.
 
 ## Service messages
 
-All three are ordinary sealed E2E messages, silent (never a chat bubble):
+All four are ordinary sealed E2E messages, silent (never a chat bubble):
 
 | Type | Direction | Payload |
 |---|---|---|
 | `file.request` | recipient -> sender | `fileId` (the announcing message's id), `device` (the requesting client id) |
 | `file.offer` | sender -> recipient | `offer` = `{fileId, host, key, sha256, size}`, `forDevice` (the client id that asked) |
 | `file.unavailable` | sender -> recipient | `fileId` |
+| `file.cancel` | either direction | `fileId`, `device` (the client id that is pulling the file) |
 
-**Devices.** A user's devices share one mailbox, so every one of them sees both
+**Devices.** A user's devices share one mailbox, so every one of them sees these
 messages. A request names the device that made it; the offer names the same
 device, and the others ignore it - the one-time destination in it was raised for
 that device alone. A second device requiring the file issues its own request, and
@@ -66,6 +67,25 @@ at all; the others stay silent rather than reporting it unavailable.
 `file.unavailable` is returned when the sender no longer holds the file -
 it was unsent, or the user moved it. Without it the recipient would wait on a
 transfer that can never start.
+
+## Stopping
+
+A transfer is stopped from **either** side, and stopping it ends **both** halves:
+the side that stops sends `file.cancel`, and the other side ends its half of the
+same transfer on receipt. A transfer costs both of them a destination and a set of
+tunnels, so a stop that ended only the half it was pressed on would leave the
+other serving nobody until its window ran out - which is up to half an hour of
+tunnels for a file nobody is receiving.
+
+`device` names the client that is pulling the file, in both directions, because
+that is what identifies the half: one contact may be pulling the same file onto
+two devices at once, each over its own one-time address. A stop that names one of
+them leaves the other transfer running, and a `file.cancel` naming a device that
+is not the recipient's own changes nothing there.
+
+A stop is reported as an ended transfer with its reason, not as a failure of the
+transport, and the side that pressed it and the side that was told are told
+apart: neither is left with a bar that goes on moving.
 
 ## The one-time destination
 
@@ -120,5 +140,5 @@ storage service, and a client must report it rather than imply delivery:
 | Component | Role |
 |---|---|
 | `client-qt6` | everything: announce, request, serve (one-time dest + temp ciphertext), fetch with resume, verify, decrypt, and report progress |
-| `server-core` | untouched - it only ever carries the small announcement and the three service messages |
+| `server-core` | untouched - it only ever carries the small announcement and the four service messages |
 | `facade-http` | untouched - nothing streams through the facade any more |
