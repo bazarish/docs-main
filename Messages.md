@@ -51,8 +51,7 @@ specification.
 
 ## Size
 
-One message carries at most **512 KiB** of payload (`common/Limits.hpp`,
-`kMaxMessagePayloadBytes`). The server checks it before spending a token and
+One message carries at most **512 KiB** of payload (`kMaxMessagePayloadBytes`). The server checks it before spending a token and
 answers `MESSAGE_TOO_LARGE`; the client checks the same number before sending,
 so a message a server would refuse is never built.
 

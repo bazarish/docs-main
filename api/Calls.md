@@ -14,7 +14,7 @@ one-time hidden-network tunnel, so no server or facade ever sees call traffic.
 ## Transport
 
 Media rides **I2P RAW datagrams** (UDP-like, low
-overhead) over the embedded i2pd router, one short-lived destination per call, torn down when the
+overhead), one short-lived destination per call, torn down when the
 call ends. RAW carries no per-packet source (so a frame stays small) and no
 I2P-layer authentication - the call layer authenticates every datagram itself
 (see Media encryption). Datagrams are the right fit for realtime media: a
@@ -34,12 +34,12 @@ cannot jump mid-call.
 ### Encrypted LeaseSet (b33)
 
 The call's media destination publishes an **encrypted LeaseSet2 (b33)**, like
-every other Bazarish destination. This requires routing RAW datagrams to blinded
-(b33) addresses: stock i2pd routes datagrams only by identity hash, so the
-datagram-to-b33 routing is a patch carried in the **embedded `libi2pd_bazarish`**
-(in-process; no external router). Without it the media never arrives. The
-destination is one-time and torn down with the call, and its b33 routing address
-is shared only with the peer inside the E2E-encrypted invite.
+every other Bazarish destination. An implementation must therefore be able to
+send RAW datagrams to a blinded address: routers that address datagrams by
+identity hash alone cannot carry this media, and how a given one is made to do it
+is that implementation's problem to record. The destination is one-time and torn
+down with the call, and its b33 routing address is shared only with the peer
+inside the E2E-encrypted invite.
 
 An I2P STREAM channel may be added later for in-call service messages; the media
 itself stays on datagrams.
@@ -91,12 +91,10 @@ Server-side components see only opaque blobs of a generic message.
 
 Adding or evolving a call signal is a client-only change.
 
-A media destination is real-time and is treated as such below the protocol: an
-implementation that pins destinations to worker threads **should** keep one for
-media alone. In this one, the embedded router runs each destination on a
-single-threaded lane, and a bulk transfer sharing that lane with a call is a call
-that stutters while the file moves; the lane the media destination is put on
-carries nothing else.
+Media is real-time and the rest of a client's traffic is not. How an
+implementation keeps the two from competing - for threads, for a router's
+workers, for anything else it shares - is its own business and belongs in its own
+documentation.
 
 Both sides run their own ring timeout, so an unanswered call terminates without
 user action. The caller's interval starts when the peer's device reported ringing,
@@ -137,30 +135,9 @@ and `sentAt` are already on the wire.
 4. Either side hangs up with `call.end`; the media engine and the one-time
    datagram destination are torn down.
 
-## Implementation
-
-- **common**: the embedded I2P RAW datagram endpoint (`bazarish::i2p::Endpoint`,
-  embedded `libi2pd_bazarish`) and `aeadSeal`/`aeadOpen` (AES-256-GCM).
-- **client lib**: `I2pCallTransport` (the per-call RAW datagram transport over the
-  embedded endpoint); `AudioCodec` (Opus); `AudioIo` (device interfaces +
-  synthetic backends for headless tests); `CallMedia` (the media engine: one
-  capture thread and one receive thread); and the call signaling + state machine
-  on `Session` (`startAudioCall` / `acceptCall` / `declineCall` / `endCall` /
-  `setCallMuted` / `currentCall`).
-- **CLI**: `bazarish-client call <account> <peer> [seconds]` and
-  `call-answer` (drive the signaling loop; with the synthetic backends they give
-  a headless end-to-end media path for integration testing).
-- **GUI**: `CallScreen.qml` (peer, state, mute / end controls) plus the Qt
-  Multimedia audio backends `QAudioSource` / `QAudioSink`.
-
-Live-validated: I2P RAW datagrams round-trip over real I2P between two
-destinations (b32 and b33). The audio codec round trip, the
-AES-256-GCM seal/open (including tamper/wrong-key rejection), and the full
-audio pipeline over an
-in-memory loopback are covered by unit tests.
-
 Call media requires RAW datagrams addressed to a b33 destination. Any router that
-carries both serves this protocol; how a client obtains one is its own business.
+carries both serves this protocol; how a client obtains one, and what it tests
+that against, is its own business to record.
 
 ## Open / not done
 

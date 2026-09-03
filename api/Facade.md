@@ -32,10 +32,11 @@ The facade is the "last mile" between the client and the server infrastructure. 
   /v1/messaging/reseed`), and never asked again once the router is up. They are a
   separate list because they are a different job; a reseed serves no API and a
   facade is never a reseed.
-- **i2pd's built-in reseed hosts are off** in the client. They are allowed in
-  exactly one case: this server's descriptor carries no reseed address, or none
-  of them answered - the only case in which there is no one to ask. Otherwise the
-  bootstrap stays between the user and their own server.
+- **A third-party reseed host is a last resort.** A client bootstraps from its
+  own server's reseed addresses and reaches for the public hosts its router knows
+  in exactly one case: this server's descriptor carries no reseed address, or
+  none of them answered - the only case in which there is no one to ask.
+  Otherwise the bootstrap stays between the user and their own server.
 - This is the **only** I2P address the server side publishes. Federation runs on
   the users' own destinations (`InviteAnonymity.md`), never a shared one, so a
   facade address discloses nothing about which users a server hosts.

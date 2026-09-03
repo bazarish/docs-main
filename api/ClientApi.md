@@ -85,7 +85,7 @@ server.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /v1/messaging/events` | Hold the request open until something is pending for this client (or `wait` seconds pass, capped at 30), then answer in the same shape as `pending`. The server parks it on an event gate rather than a thread, so a delivery wakes it directly: measured end to end, the receiver learns of a message **within a second** of its own server accepting it, against up to three seconds plus a fresh I2P stream when polling. A client that gets a 404 here falls back to polling `pending` |
+| `GET /v1/messaging/events` | Hold the request open until something is pending for this client (or `wait` seconds pass, capped at 30), then answer in the same shape as `pending`. How a server holds it open is its own business; what the protocol requires is that a delivery ends the wait. A client that gets a 404 here falls back to polling `pending` |
 | `GET /v1/messaging/pending` | List pending entries for this client ID: `{pending: [{id, class}]}` where `class` is the delivery class `content` or `contact` (the admission selector, not the content type - see `../Messages.md`) |
 | `GET /v1/messaging/pending/{blobId}` | Fetch the raw E2E payload bytes |
 | `POST /v1/messaging/ack` | Confirm receipt for this client ID; when all registered client IDs of the user have acked, the server deletes the content immediately |
@@ -107,8 +107,8 @@ half of the server descriptor - and it is the only thing those addresses serve.
 It bootstraps the transport every other request needs, and it is reached under
 that address's secret prefix (`Facade.md`), which the client already holds
 because the prefix is part of the URL in the descriptor. If it cannot be fetched -
-no reseed in the descriptor, or none answered - the client falls back to i2pd's
-built-in reseed hosts, and only then. Everything else the client asks for goes to
+no reseed in the descriptor, or none answered - the client falls back to whatever
+public reseed hosts its router knows, and only then. Everything else the client asks for goes to
 a facade, over I2P. Being unauthenticated, that prefix is
 the request's only gate: a facade published at a bare root would answer a reseed -
 and so identify itself as Bazarish - to any scanner.
@@ -118,7 +118,7 @@ and so identify itself as Bazarish - to any scanner.
 | Endpoint | Purpose |
 |---|---|
 | `POST /v1/messaging/tokens` | Register a batch of one-time tokens for this user's mailbox. The tokens themselves, not their hashes: revoking a correspondent's tokens (below) is a sweep over their shape |
-| `POST /v1/messaging/tokens/revoke` | Drop every token this user holds that was minted under the given mask - one correspondent's, all of them. Answers before the sweep, which the node runs on one thread for all its users (`../Contacts.md`) |
+| `POST /v1/messaging/tokens/revoke` | Drop every token this user holds that was minted under the given mask - one correspondent's, all of them. Answers before the sweep rather than after it (`../Contacts.md`) |
 
 ### Client registry (see `../DeviceSync.md`)
 
