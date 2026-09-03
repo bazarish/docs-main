@@ -28,20 +28,29 @@ The facade is the "last mile" between the client and the server infrastructure. 
   both are disabled by default.
 - **Clearnet is the bootstrap, and only the bootstrap.** A client with no netDb
   cannot dial anything on I2P, so the descriptor carries **reseed** addresses
-  beside the facades: clearnet, asked for exactly one thing (`GET
-  /v1/messaging/reseed`), and never asked again once the router is up. They are a
-  separate list because they are a different job; a reseed serves no API and a
-  facade is never a reseed.
-- **A third-party reseed host is a last resort.** A client bootstraps from its
-  own server's reseed addresses and reaches for the public hosts its router knows
-  in exactly one case: this server's descriptor carries no reseed address, or
-  none of them answered - the only case in which there is no one to ask.
-  Otherwise the bootstrap stays between the user and their own server.
+  beside the facades: clearnet, fetched once, and never asked again once the
+  router is up. They are a separate list because they are a different job; a
+  reseed serves no API and a facade is never a reseed.
+- **A reseed address is a full https URL to an su3 archive.** It is not a facade
+  and speaks no Bazarish API: the client's I2P engine fetches it, unpacks it and
+  loads the routers, each of which carries its own signature. The archive's own
+  signature is not required - a reseed an operator runs privately is signed by
+  nobody a stock client trusts, so requiring it would mean no private reseeds -
+  which is why the address must be **https**: the transport is what stands
+  between the archive and the network.
+- **The reseed need not be the server.** Because it is an ordinary su3 URL, an
+  operator may publish it anywhere - a page they already serve, a host with no
+  other relationship to the server - so where a user bootstraps says nothing
+  about where their server is. A server that names reseed addresses this way
+  needs no clearnet address of its own.
+- **A third-party reseed host is a last resort.** With no reseed address in the
+  descriptor the client's router falls back to the public hosts it carries - the
+  only case in which the bootstrap leaves the network the user chose.
 - This is the **only** I2P address the server side publishes. Federation runs on
   the users' own destinations (`InviteAnonymity.md`), never a shared one, so a
   facade address discloses nothing about which users a server hosts.
 - Published under a **secret URI** known only to clients of this server, and that secrecy is **mandatory, not a deployment option**: `bazarish-facade-http` refuses to start without `--base-path <secret>`, which it requires on every request and strips before forwarding. The single exception is an explicit `--public`, and it means one thing only - a fronting reverse proxy (Caddy, nginx, ...) already publishes this facade under a secret URI of its own. The secret reaches a client solely inside the facade URL of the server descriptor (below); it is never advertised, never derived from the server fingerprint, and never sent anywhere else.
-- The whole clearnet API therefore lives under the secret prefix, **including the unauthenticated `GET /v1/messaging/reseed`** (`ClientApi.md`), whose only gate this is: a client fetching its first netDb has no I2P transport and no delivery token yet, so the prefix is what keeps the request - and the fact that this host serves Bazarish at all - out of a scan.
+- The whole clearnet API therefore lives under the secret prefix. Nothing is left outside it: the reseed is no longer part of this API at all (`ClientApi.md`), so a facade answers only requests from a client that already holds the secret.
 - A single catch-all handler relays every request **transparently** - method, headers, body and query string verbatim - to backends over the **operator private channel** (localhost/unix socket/VPN), routing by path prefix once the secret prefix is stripped:
   - `/v1/messaging/*` -> messaging server
   - `/v1/account/*` -> service node

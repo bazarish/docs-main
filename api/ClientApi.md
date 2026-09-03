@@ -96,22 +96,22 @@ There is no storage service and no upload endpoint. A file is announced in the
 message and transferred directly between the two clients over a one-time I2P
 destination when the recipient asks for it.
 
-### Private reseed
+### Reseed
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /v1/messaging/reseed` | A random slice of the server's netDb as `{routers: [<base64 RouterInfo>]}`, so a client's first I2P start never reaches a public reseed host. Unauthenticated on purpose - the client has no transport yet - and safe, because every RouterInfo carries its own router's signature |
+There is no reseed endpoint in this API, and no clearnet request in it at all:
+every call here goes to a facade over I2P.
 
-The reseed is the one request that goes to a **reseed** address - the clearnet
-half of the server descriptor - and it is the only thing those addresses serve.
-It bootstraps the transport every other request needs, and it is reached under
-that address's secret prefix (`Facade.md`), which the client already holds
-because the prefix is part of the URL in the descriptor. If it cannot be fetched -
-no reseed in the descriptor, or none answered - the client falls back to whatever
-public reseed hosts its router knows, and only then. Everything else the client asks for goes to
-a facade, over I2P. Being unauthenticated, that prefix is
-the request's only gate: a facade published at a bare root would answer a reseed -
-and so identify itself as Bazarish - to any scanner.
+A server descriptor may name **reseed addresses**, and each is a full `https://`
+URL to an **su3 archive** - the ordinary I2P reseed format. Nothing Bazarish is
+spoken there: the client's own I2P engine fetches the archive, unpacks it and
+loads the routers, exactly as it would from any reseed. What the addresses buy is
+that a client's first start does not have to reach the public reseed hosts its
+router carries, and that the operator may publish them anywhere at all, which is
+what keeps the bootstrap from pointing at the server (`Facade.md`).
+
+With no reseed address in the descriptor, the router uses the public hosts it
+carries. That is the fallback, and the only case in which the bootstrap leaves
+the network the user chose.
 
 ### Delivery tokens (see `../Contacts.md`)
 
