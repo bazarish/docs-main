@@ -432,11 +432,11 @@ reorders them is the far side, not the near one.)
 Placement on arrival of a message with timestamp `t`, where `T` is the
 recipient's local clock at the moment it is received, follows one rule:
 
-- **Recent (`T - t <= 5000` ms)** - place the message in `sentAt` order. This is
+- **Recent (`T - t <= 20000` ms)** - place the message in `sentAt` order. This is
   the common case (a burst of messages whose hops scrambled their arrival), and
   reordering then only touches the last few lines, which are already in view, so
   nothing shifts outside the user's viewport.
-- **Late (`T - t > 5000` ms)** - **append** the message at the end as a fresh
+- **Late (`T - t > 20000` ms)** - **append** the message at the end as a fresh
   arrival; do **not** reposition it by `sentAt`. Its displayed time is still its
   own (older) `sentAt`, so the user still sees when it was written, but it lands at
   the bottom where an arrival is expected. A long-delayed message (the sender was
@@ -448,9 +448,18 @@ arrival, the local arrival time `T` for a late one. The conversation is kept
 sorted by the order key, which makes the two cases compose without conflict: a
 genuinely new message (order key ~= its `sentAt`, i.e. ~= now) always sorts after
 a late message anchored at its earlier arrival time, and the late message never
-jumps ahead of newer traffic. The 5 s window is precisely what stops the
+jumps ahead of newer traffic. The window is precisely what stops the
 "don't reorder old arrivals" rule from disturbing the live ordering of new ones -
 old arrivals are pinned at the bottom, recent ones are sorted among themselves.
+
+The width of it is set by how long a mailbox takes to drain, not by how long a
+message takes to arrive: every waiting item is fetched by a request of its own and
+a client takes them a few at a time, so a burst reaches the reader over tens of
+seconds. A window narrower than that drain reorders nothing, because by the time
+the last item of the burst is read its `sentAt` is already old - which is how a
+device could show a correspondent's reply above the message it answered, that
+message being an echo of the user's own send and written only after the
+recipient's server signed for it.
 
 ## Delivery status
 
