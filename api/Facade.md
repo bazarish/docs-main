@@ -38,6 +38,10 @@ The facade is the "last mile" between the client and the server infrastructure. 
   nobody a stock client trusts, so requiring it would mean no private reseeds -
   which is why the address must be **https**: the transport is what stands
   between the archive and the network.
+- **A server may pack its own.** `GET /v1/messaging/reseed.su3` hands out a
+  random sample of its netDb in that format, rebuilt at most hourly. An operator
+  who wants their own reseed points an address at it - through whatever fronting
+  they like - rather than at the server directly.
 - **The reseed need not be the server.** Because it is an ordinary su3 URL, an
   operator may publish it anywhere - a page they already serve, a host with no
   other relationship to the server - so where a user bootstraps says nothing
