@@ -124,9 +124,8 @@ can never be confused.
   only asynchronous payment step is top-up). The buyer submits an **alias
   certificate** (user-signed `{alias, user: fp}`, `Identity.md`) plus their
   **descriptor** (`{fp, dest, view}`; `dest`/`view` come from the buyer's home
-  server). The client produces both with `bazarish-client alias-cert <account>
-  <alias>` (the signing key never leaves the client) and the portal `POST
-  /portal/buy` is driven with that JSON. The resolver verifies the cert (signer ==
+  server). Both are produced by the buyer's own client - the signing key never
+  leaves it - and the portal `POST /portal/buy` is driven with that JSON. The resolver verifies the cert (signer ==
   fp), claims the name, and stores `alias -> descriptor`.
 - **Balance.** Prepaid ledger (`LedgerStore`, reused): top-up (monero invoice via
   the payment gateway -> idempotent credit), history display, current balance.

@@ -114,8 +114,9 @@ Nothing here is a breaking change to the envelope, so `v` stays at 1.
 
 ## Reference runtime
 
-The client repository ships a minimal bot framework over the same `Session`
-logic the CLI and GUI use, plus a demo bot (`bazarish-bot`):
+The client core carries a minimal bot framework over the same `Session` logic
+every client uses; the implementation that runs it is `client-daemon`, which runs
+an account without an interface:
 
 - handlers register per command, for plain text, and for callbacks;
 - a new contact is auto-greeted (it falls back to the `start` command);

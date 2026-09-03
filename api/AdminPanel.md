@@ -21,12 +21,12 @@ Login is the project's one sign-in-with-key contract (`SignInWithKey.md`), with
 the panel as a self-contained verifier: **no backend has to be online to log
 in**.
 
-1. The operator puts their own fingerprint (`bazarish-client whoami`) in the
-   panel config `admin` field.
+1. The operator puts their own fingerprint - the one their client shows for their
+   account - in the panel config `admin` field.
 2. `GET /login` issues a challenge naming this panel as the consumer.
-3. The operator signs it with their client (`bazarish-client sign-login <account>
-   <challenge>`, or the Signature window), which shows those words before it
-   signs.
+3. The operator signs it with their client, which shows those words before it
+   signs (the desktop client's Signature window, or any client that implements
+   the contract).
 4. `POST /login` verifies the challenge and the blob, requires the recovered
    fingerprint to be one of the configured admins, consumes the challenge, and
    sets a session cookie (`HttpOnly; SameSite=Strict`).
