@@ -62,6 +62,7 @@ Two pieces of account state propagate to the user's other devices as dedicated *
 - `device.contact-remove` - a contact removed, carrying `peer`. Every device drops the contact and its conversation; the device that sent it is also the one that revoked their tokens.
 - `device.contact-block` - `peer` and `blocked`: mail and contact requests from them are dropped as they are read, on every device. The conversation is not touched.
 - `device.contact-prefs` - `peer`, `notifications` and `allowCalls`: what one contact may do here.
+- `device.contact-accepted` - `peer`: a contact request agreed to. Every device holds the same request, so without this the others go on offering an Agree that has been given - and, worse, go on treating the contact as one nothing may be sent to. Receiving it sends the correspondent nothing: the device that agreed carries the exchange, and the batch it buys is its own.
 - `device.chat-clear` - `peer`: this account's copy of one conversation, emptied. Distinct from the `chat.clear` sent to a correspondent, which asks *them* to empty theirs.
 - `device.read` - `peer` and `ts`: this conversation has been read through the
   message sent at that moment. Reading is the account's act, not the device's, so
