@@ -86,6 +86,8 @@ Produced by the client, `base64(JSON)`:
 
 These are the four request-auth headers over a **canonical request**: method
 `BZ-LOGIN`, path `/portal/login`, body = the challenge string exactly as issued.
+A login blob names no device, so its canonical string is the plain one - the
+device line the client API adds (`ClientApi.md`) is absent here.
 
 | Field | Header | Meaning |
 |---|---|---|
