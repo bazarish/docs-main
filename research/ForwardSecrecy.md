@@ -77,22 +77,25 @@ every device as its own session and having the sender encrypt one copy per
 device.
 
 That approach is often rejected because the fanout tells the sender how many
-devices the recipient has. **Here it costs nothing, because a correspondent
-already knows.** Delivery tokens are one-time and therefore addressed per
-device - two devices must never spend the same one - so a device names itself in
-what it sends (`"device": <clientId>` rides on the contact request, the token
-request, the low-stash refill ask, the file offer and more), and the receiving
-side accumulates the pairs on purpose (`refillPeers`, "peer, device"; a contact
-keeps `requesterDevice`; a batch is addressed `forDevice`). The device count is
-not a protected property of this design and never was.
+devices the recipient has. **Here it costs less than it looks, because a
+correspondent already learns some of it.** A device names itself in the file
+handshake (`"device": <clientId>` on a file request, `forDevice` on the offer),
+so anybody who has exchanged a file with an account has seen at least one of its
+device ids. What it learns is a random 8-byte pseudonym, and only for devices
+that *write* to it.
 
-Two honest refinements. What a correspondent learns is the set of devices that
-*write* to them - a device that only reads never names itself - and what it
-learns is a random 8-byte id, a pseudonym rather than a name.
+This used to be far more than that, and the delivery pass is what changed it.
+One-time tokens had to be addressed per device - two devices must never spend
+the same one - so a device named itself on the contact request, the token
+request and the low-stash refill ask, and the receiving side accumulated the
+pairs on purpose. All of that is gone: a pass is not spent, so every device of an
+account presents the same one and none of them has to say which it is. The
+device count is now closer to protected than it was, which makes the fanout
+question live again rather than settled.
 
-What per-device sessions **do** cost here is real but different: the sender
-encrypts and delivers N copies, so one message spends N one-time tokens and N
-times the recipient's mailbox quota. That is the number to weigh, not privacy.
+What per-device sessions cost here is otherwise unchanged: the sender encrypts
+and delivers N copies, so one message costs N times the recipient's mailbox
+quota. Admission is no longer part of that price - one pass admits all N.
 
 **2. Store-and-forward, with long gaps.**
 
@@ -105,8 +108,8 @@ stated, not left to a library default.
 
 **3. The first message has no room.**
 
-The contact request is tokenless and capped: the measured worst case is 11668
-bytes against a cap of 11700. There is no headroom. A hybrid handshake that puts
+The contact request presents nothing and is capped: the measured worst case is
+10947 bytes against a cap of 10979. There is no headroom. A hybrid handshake that puts
 ML-KEM material in the first message does not fit - which is precisely the
 problem SPQR solves by spreading key material over several messages. Any design
 here must say what the *first* message carries and what waits for the second.
@@ -169,8 +172,8 @@ cannot express at all today.
 
 What the evaluation has to answer, in this order:
 
-1. **Cost per message.** Per-device sessions mean N ciphertexts, N one-time
-   tokens and N times the quota. Measure it against a realistic device count
+1. **Cost per message.** Per-device sessions mean N ciphertexts and N times the
+   quota; admission is not part of it. Measure it against a realistic device count
    before anything else - if that number is unacceptable, the rest is moot.
 2. **Skipped-key retention.** Mail waits up to the retention window and arrives
    out of order, so keys for unopened messages sit on disk for as long. Whatever

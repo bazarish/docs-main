@@ -47,7 +47,7 @@ response: {"delivered":<bool>,"errorCode":...,"errorMessage":...,
            "deliveryId":<id>,"signerPub":<base64>,"sig":<base64>}\n
 ```
 
-The recipient runs the same delivery pipeline whoever dialled (dedup -> token -> size/quota -> store), so a client's delivery and a discovery fetch share one served code path.
+The recipient runs the same delivery pipeline whoever dialled (dedup -> size/quota -> pass -> store), so a client's delivery and a discovery fetch share one served code path.
 
 The confirmation is carried **in that reply**: on storing the envelope the recipient signs the `deliveryId` with the **serving destination's own per-destination signing key** (`signerPub` carries the public half; see *Authentication*), never with the server's root identity. The reply is the only available path, the dialling party being a client on an address that publishes no leaseset and accepts no inbound connections. As `deliveryId` is sealed inside the envelope, only a server that unsealed it can state it, and the signature binds that statement to the destination that answered. The sending client accepts a `delivered` result **only** when the signature verifies against the id it sent; an unsigned or incorrectly signed claim is treated as no answer and the attempt is repeated.
 
@@ -72,7 +72,7 @@ that is attributable to a server, and no server that knows whom its users write 
 
 **The identity of the dialling party is not part of admission.** Admission is
 determined by the envelope alone: sealed to that destination's serving key, naming
-a class, a mailbox and a delivery id, and carrying a token unless it is a contact
+a class, a mailbox and a delivery id, and carrying a pass unless it is a contact
 request. No check distinguishes a server from a client, which is what allows a
 client to deliver its own messages over the same frame.
 
@@ -94,7 +94,7 @@ DeliveryEnvelope:
     class: content | contact                # delivery class (admission selector), not the
                                             # content type, which is E2E - see ../Messages.md
     mailbox: <recipient UID>
-    token: <one-time delivery token>        # absent for class "contact"
+    pass: <delivery pass>                   # absent for class "contact"
     deliveryId: <the sender's name for this envelope>   # idempotency / dedup
   payload: <E2E blob>                       # opaque to every server-side component
 ```
@@ -107,23 +107,23 @@ DeliveryEnvelope:
   A user whose transient has lapsed - or whose account a moderated server has not
   approved - has no destination and is not served; the server never
   silently re-points a live, already-shared address.
-- The recipient's server learns only "something arrived from destination X into mailbox V with a valid token" - never the sender identity (see `../Contacts.md`).
+- The recipient's server learns only "something arrived from destination X into mailbox V with a valid pass" - never the sender identity (see `../Contacts.md`).
 
 ## Message delivery flow
 
 1. The sending **client** seals the envelope and dials the recipient's serving destination over I2P, **from a destination held for that one correspondent** and never from its own serving destination. The term of that destination and its provenance are implementation matters; the requirement is that a single outbound address never carries traffic to two correspondents. No server of the sender's participates in a delivery, so none of them learns the sender's correspondents.
 2. Client -> recipient's server: `deliver` with the envelope and its payload, on that one stream.
 3. Recipient's server unseals and processes in strict order:
-   1. **deliveryId dedup** - if the `deliveryId` is still pending in the mailbox, or is in the retained **seen-deliveryId set** (every admitted id, kept independently of the blob until the TTL sweep ages it out), respond success *without* consuming a token. This makes client retries idempotent and blocks replays of an already-delivered envelope - including tokenless `contact` requests that have since been fetched, acked and swept;
-   2. **token check** - hash the presented token, look it up in the mailbox's registered set (`../Contacts.md`); no match -> `DELIVERY_REJECTED`;
-   3. **size/quota checks** - explicit typed errors (`QUOTA_EXCEEDED`, `STORAGE_FULL`), revealed only past a valid token;
-   4. **store** as pending content; the token is consumed atomically with the store, and the `deliveryId` is added to the seen set.
+   1. **deliveryId dedup** - if the `deliveryId` is still pending in the mailbox, or is in the retained **seen-deliveryId set** (every admitted id, kept independently of the blob until the TTL sweep ages it out), respond success. This makes client retries idempotent and blocks replays of an already-delivered envelope, on both admission paths - and with a reusable pass it is the only thing that does;
+   2. **pass check** - hash the presented pass, look it up in the mailbox's registered set (`../Contacts.md`); no match -> `DELIVERY_REJECTED`. Nothing is consumed;
+   3. **size/quota checks** - explicit typed errors (`QUOTA_EXCEEDED`, `STORAGE_FULL`), revealed only past a valid pass;
+   4. **store** as pending content, and add the `deliveryId` to the seen set.
 4. Recipient's server -> sending client: the confirmation is returned **in the reply on the same stream**, signed over the stored `deliveryId` with the signing key of the destination that admitted it. No other path is available, the client having dialled from an address that accepts no inbound connections. The client accepts a `delivered` result only when that signature verifies against the delivery id it sent; an unsigned claim is treated as no answer.
-5. A reply constitutes an answer. A typed refusal (invalid token, size, quota, contact rate limit) fails the delivery immediately and repetition does not change the outcome. Only the absence of a reply warrants a further attempt; the number of attempts is the sending client's policy, as nothing is spooled anywhere and no server retries on another party's behalf. A repeated delivery carries the same delivery id, so a recipient's server that stored the first copy recognises it, stores no second copy and consumes no second token.
+5. A reply constitutes an answer. A typed refusal (unknown pass, size, quota, contact rate limit) fails the delivery immediately and repetition does not change the outcome. Only the absence of a reply warrants a further attempt; the number of attempts is the sending client's policy, as nothing is spooled anywhere and no server retries on another party's behalf. A repeated delivery carries the same delivery id, so a recipient's server that stored the first copy recognises it, stores no second copy.
 
-6. `DELIVERY_REJECTED` is the one refusal that says something about the **capability**: the presented token is not in the mailbox's registered set, and no repetition of any token from the same batch will be either, since a batch is registered and replaced as a whole. A sending client must therefore discard every token it holds for that correspondent and obtain a fresh batch, rather than offering the next one. The other refusals say nothing about the tokens - `STORAGE_FULL` and `QUOTA_EXCEEDED` are reached only past a valid token, which the server re-registers rather than consumes, and `MESSAGE_TOO_LARGE` is about the message - so the stash stands.
+6. `DELIVERY_REJECTED` is the one refusal that says something about the **capability**: the presented pass is not in the mailbox's registered set. There is nothing else to offer instead - a correspondent holds one pass - so a sender that meets it has been cut off, and the way back is a new contact request. No refusal costs a sender anything: a pass is not spent, so `STORAGE_FULL`, `QUOTA_EXCEEDED` and `MESSAGE_TOO_LARGE` leave it exactly as it was, and so does this one.
 
-`contact-request` deliveries skip the token check, are capped in payload size (default 8192 bytes, server-configurable - large enough for the bootstrap sealing key + a full reply-token batch), and are subject to a separate quota and per-origin-server rate limiting.
+`contact-request` deliveries skip the pass check, are capped in payload size (`kMaxContactRequestBytes`, a protocol constant measured against the real worst case - see `ClientApi.md`), and are subject to a separate quota and per-origin-server rate limiting.
 
 ## Requests (draft)
 

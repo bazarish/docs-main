@@ -51,7 +51,7 @@ specification.
 
 ## Size
 
-One message carries at most **512 KiB** of payload (`kMaxMessagePayloadBytes`). The server checks it before spending a token and
+One message carries at most **512 KiB** of payload (`kMaxMessagePayloadBytes`). The server checks it before admission and
 answers `MESSAGE_TOO_LARGE`; the client checks the same number before sending,
 so a message a server would refuse is never built.
 
@@ -89,13 +89,13 @@ Carried as the `class` field of the sealed delivery envelope (see
 `api/Federation.md`). Exactly two values, and this set is frozen - content
 types never appear here:
 
-| `class` | Token | Server policy |
+| `class` | Admitted by | Server policy |
 |---|---|---|
-| `contact` | none | Tokenless bootstrap. Size-capped (`--contact-request-limit`), per-origin rate-limited, separate small quota. The only tokenless path into a mailbox. |
-| `content` | one-time delivery token (required) | Token consumed atomically with storage (see `Contacts.md`). The path for every established-contact message, whatever its content type. |
+| `contact` | nothing | Bootstrap. Size-capped (`kMaxContactRequestBytes`), per-origin rate-limited, separate small quota. The only path into a mailbox that presents nothing. |
+| `content` | the recipient's delivery pass (required) | Looked up, not consumed (see `Contacts.md`). The path for every established-contact message, whatever its content type. |
 
 The server branches on `class` and nothing else: it validates the mailbox,
-deduplicates by `deliveryId` (below), enforces the token (for
+deduplicates by `deliveryId` (below), enforces the pass (for
 `content`) or the size
 cap (for `contact`), and stores the opaque payload. The pending list returns
 the `class` back to the recipient - an admission-class hint the server already
@@ -107,12 +107,12 @@ Sealed envelope as the server sees it:
 { "class": "content" | "contact",
   "mailbox": <recipient fingerprint>,
   "deliveryId": <delivery id>,
-  "tokens": [<base64 one-time token>]   // present iff class == "content"
+  "pass": "<base64 delivery pass>"      // present iff class == "content"
 }
 ```
 
-`tokens` carries as many as the payload weighs - one per 30 KiB, never fewer
-than one (`Contacts.md`, token lifecycle). The recipient's server computes the
+`pass` is the one value the recipient issued to this correspondent, whatever the
+message weighs (`Contacts.md`, pass lifecycle). The recipient's server computes the
 same number from the payload and refuses an envelope that carries any other.
 
 The account database it all lands in carries a **schema version** of its own
@@ -140,7 +140,7 @@ envelope carrying it:
 
 The delivery id being **derived** is what makes sending the same message again
 idempotent: the envelope keeps its name, so a recipient's server that already
-stored it recognises it, stores nothing twice and spends no second token. Binding
+stored it recognises it and stores nothing twice. Binding
 it to the mailbox is what keeps it from linking anything: the copy a sender keeps
 for their own devices and the copy the recipient gets are the same message under
 two unrelated names, so the two servers holding them have nothing to match on.
@@ -170,7 +170,7 @@ versioned envelope:
 ```
 
 **`auth` - who wrote it.** Nothing else in the path answers that question. A
-delivery token is *admission*: it says somebody the recipient issued tokens to
+delivery pass is *admission*: it says somebody the recipient issued a pass to
 put this in their mailbox, not which of their correspondents it was. The seal
 says only who may read. `from` on its own is the sender's word for it, so every
 envelope carries the author's own proof: their identity public keys and both
@@ -194,8 +194,8 @@ stranger.
 
 Measured: **3396 bytes** for the two signatures, **5471** when the keys ride
 along. Every message pays the first figure - a reaction and a read receipt as
-much as a letter. That is what the tokenless contact-request cap is
-measured against (`api/ClientApi.md`): a request carries no token and no card, so
+much as a letter. That is what the contact-request cap is
+measured against (`api/ClientApi.md`): a request carries no pass and no card, so
 its signature is the only thing that names the sender.
 
 **`routing` - where to answer, on every message.** A destination is not for life:
@@ -225,9 +225,8 @@ regenerates its destination should state this to its user.
 | `type` | Delivery class | Purpose / payload |
 |---|---|---|
 | `text` | content | `text` - a plain text line. |
-| `contact.request` | contact | Carries a `bootstrap` block (`sealing` - the same account sealing key the card publishes -, `dest`, `servingKey`, `replyTokens`) plus `text`. The first message; see `Contacts.md`. |
-| `contact.accept` | content | Agreeing to a received `contact.request`: an empty-bodied message whose first-reply `bootstrap` hands the requester our descriptor + reply tokens, making the pair mutual contacts. The requester's client auto-completes the add and surfaces a note. See `Contacts.md`. |
-| `token-refill` | content | `replyTokens` - a fresh stash when the peer's drops low (`Contacts.md`). |
+| `contact.request` | contact | Carries a `bootstrap` block (`sealing` - the same account sealing key the card publishes -, `dest`, `servingKey`, `pass`) plus `text`. The first message; see `Contacts.md`. |
+| `contact.accept` | content | Agreeing to a received `contact.request`: an empty-bodied message whose first-reply `bootstrap` hands the requester our descriptor + our pass, making the pair mutual contacts. The requester's client auto-completes the add and surfaces a note. See `Contacts.md`. |
 | `file` | content | An announcement: `name`, `size`, `sha256` and `mime`. The bytes stay on the sender's disk until the recipient asks for them. See `api/FileTransfer.md`. |
 | `photo` | content | Same shape as `file`, plus optional `width`, `height`. |
 | `audio` / `voice` | content | Same shape as `file`, plus optional `duration`. |
@@ -489,14 +488,14 @@ not evidence about an earlier one that was never delivered.
 No server carries a send, so the number of attempts and the interval between them
 are determined by the sending client. The protocol fixes the following:
 
-- A typed refusal (invalid token, size, quota, contact rate limit) is final;
+- A typed refusal (unknown pass, size, quota, contact rate limit) is final;
   repeating the delivery does not change the outcome. A failure to reach the
   recipient's server is not final and may be retried.
 - A `delivered` response that carries no verifiable signature over the delivery id
   that was sent is not a delivery. The attempt is treated as unanswered.
 - Repeating a delivery is idempotent. The delivery id is derived from the message
   and the recipient mailbox, so a server that has already stored the envelope
-  recognises the repetition, stores no second copy and consumes no second token.
+  recognises the repetition and stores no second copy.
   This is what permits a client to stop retrying and leave the decision to its
   user, including after a restart, when a delivery that was in progress is
   reported as not performed.

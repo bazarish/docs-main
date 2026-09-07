@@ -2,7 +2,7 @@
 
 Status: design draft (decided direction).
 
-A user runs several clients (devices); each has a unique random **client ID**. Contact bookkeeping, delivery-token state, and message history must converge across them without giving servers anything new to read.
+A user runs several clients (devices); each has a unique random **client ID**. Contact bookkeeping, delivery passes, and message history must converge across them without giving servers anything new to read.
 
 ## Model
 
@@ -18,36 +18,23 @@ Each sync message carries a batch of events stamped `(deviceId, seq)` - a per-de
 | Event | Content |
 |---|---|
 | `contact-added` / `contact-revoked` | Contact identity, contact card (destination + serving sealing key) |
-| `token-batch-issued` | Which tokens (and their hashes) went to which contact |
-| `token-hashes-registered` | Hashes registered with the own server |
-| `token-spent` | Outgoing token consumed for a peer |
 | `message-echo` | Full copy of an outgoing message, **including attachments**, so every device shows the complete conversation |
 | `snapshot-request` / `snapshot` | Full-state transfer (bootstrap or gap recovery) |
 
 - Events have **CRDT set semantics** (grow-only sets plus tombstones for revocations) - no global ordering is needed; applying them in any order converges.
 - A **gap in a peer device's `seq`** (events expired from the mailbox while this device was offline longer than the retention period) means state may be incomplete -> the device emits `snapshot-request` and a live device answers with `snapshot`.
 
-## Outgoing token contention
-
-Two devices may race to spend the same token from the shared per-contact stash. Handled optimistically:
-
-1. A device picks a random token it believes unspent.
-2. If another device already burned it, delivery fails with `DELIVERY_REJECTED` -> retry with another token.
-3. deliveryId dedup on the recipient's server guarantees a successfully delivered message is never duplicated.
-
-`token-spent` events converge the known-unspent sets, so collisions are infrequent; strict partitioning of the stash is not required.
-
 ## Enrollment (adding a device)
 
 1. An existing device displays a QR code containing: the identity private keys (classical + post-quantum), the home server fingerprint + facade secret URI, and the user-owned destination key. The new device re-fetches the user's current routing (destination + serving sealing key) from the server (`GET /v1/messaging/destination`). The ML-DSA private key (~4 KB) exceeds practical QR capacity; the enrollment bundle may therefore require a QR-carried one-time secret together with a transfer over a local channel. To be determined in client design.
 2. The new device authenticates as the user and **registers its client ID**.
-3. It announces itself with a sync event; an existing device responds with a `snapshot` (contacts, token bookkeeping, settings, recent history).
+3. It announces itself with a sync event; an existing device responds with a `snapshot` (contacts, settings, recent history).
 4. Content delivered and fully acked *before* registration is gone by design and is not replayed; prior history arrives via the snapshot.
 
 ## Retirement (removing a device)
 
 - Any device can retire a client ID (lost/stolen device included). The server immediately **re-evaluates ack-completeness** of pending content: blobs that were waiting only on the retired client are deleted.
-- **Limitation:** with a shared identity key, a stolen device retains the identity indefinitely. Retirement stops deliveries to it but does not revoke the key. A token epoch reset limits mailbox abuse; the identity itself is unrecoverable. Per-device keys with cross-signing are the known evolution path if this risk proves unacceptable in practice.
+- **Limitation:** with a shared identity key, a stolen device retains the identity indefinitely. Retirement stops deliveries to it but does not revoke the key. A correspondent can revoke the pass the account holds, which stops the stolen device writing to that one mailbox; the identity itself is unrecoverable. Per-device keys with cross-signing are the known evolution path if this risk proves unacceptable in practice.
 
 ## Account sync (avatar & contact names)
 
@@ -59,10 +46,10 @@ Two pieces of account state propagate to the user's other devices as dedicated *
 - `device.delegation-term` - the term this account delegates its destination for; the shortest choice wins.
 - `device.saved` - a message the user kept for themselves, carrying it in `message`. The chat it belongs to is the account's own fingerprint, which no contact can hold.
 - `device.saved-clear` - that chat, emptied on every device.
-- `device.contact-remove` - a contact removed, carrying `peer`. Every device drops the contact and its conversation; the device that sent it is also the one that revoked their tokens.
+- `device.contact-remove` - a contact removed, carrying `peer`. Every device drops the contact and its conversation; the device that sent it is also the one that revoked their pass.
 - `device.contact-block` - `peer` and `blocked`: mail and contact requests from them are dropped as they are read, on every device. The conversation is not touched.
 - `device.contact-prefs` - `peer`, `notifications` and `allowCalls`: what one contact may do here.
-- `device.contact-accepted` - `peer`: a contact request agreed to. Every device holds the same request, so without this the others go on offering an Agree that has been given - and, worse, go on treating the contact as one nothing may be sent to. Receiving it sends the correspondent nothing: the device that agreed carries the exchange, and the batch it buys is its own.
+- `device.contact-accepted` - `peer`: a contact request agreed to. Every device holds the same request, so without this the others go on offering an Agree that has been given - and, worse, go on treating the contact as one nothing may be sent to. Receiving it sends the correspondent nothing: the device that agreed carries the exchange.
 - `device.chat-clear` - `peer`: this account's copy of one conversation, emptied. Distinct from the `chat.clear` sent to a correspondent, which asks *them* to empty theirs.
 - `device.read` - `peer` and `ts`: this conversation has been read through the
   message sent at that moment. Reading is the account's act, not the device's, so
@@ -92,13 +79,13 @@ A device that has just joined cannot learn a contact from the network: a corresp
 
 One entry carries what a contact **is**: their fingerprint, their identity keys (what every message of theirs is checked against, `Messages.md`), their sealing key, destination, serving key and view capability, whether they refused to be passed on, the local display name, the per-contact switches, whether this account has issued to them, whether they are blocked, and their avatar.
 
-It carries nothing that belongs to one device or one exchange in flight - above all **no delivery tokens**: they are one-time, and two devices spending the same one is a message lost. A device that receives a contact this way asks for its own batch through the ordinary path when it first needs to write.
+It carries the contact's **delivery pass** along with everything else about them, and this is the one thing it deliberately did not carry before: a one-time token could not be in two places, so a device that learned a contact this way had to buy its own before it could write. A pass is not spent, so every device holds the same one and a device that learns a contact can write to them at once. What it still carries nothing of is anything that belongs to one device or one exchange in flight.
 
 Answers are **chunked**: one contact is never split across two messages, and an entry whose avatar would not fit is sent without it (the correspondent sends their face again the next time they write; the address they are reached at is what cannot be re-derived). The chunks carry no sequence number and no end marker: the merge is per message and fills gaps, so the order they arrive in does not matter and there is nothing for the asker to wait for. An empty chunk is not sent.
 
 Merging **fills gaps only**. A contact this device already has is not overwritten: routing learned from the correspondent themselves is fresher than a copy of it, and a second answer from another device must not undo a rename or a move. Missing fields - keys, avatar, name, switches - are taken from the book.
 
-`device.message` is sent **after** the recipient's server has signed for the delivery it echoes, not when the message is written. An echo that goes out first puts on every other device a message that may never arrive - and one copy per retry, all of them shown as still sending - which is a desync with no way back. What every device shows is therefore what at least one server holds. `device.message` carries what this device did in a conversation, so every device shows the same one: a message sent, a picture, a voice message, an edit, a deletion, a reaction, and a request to a correspondent to clear the chat. What a device does *not* echo is its own errands - read receipts, call signalling, token refills and the file-transfer handshake - which are between it and the correspondent. The read state is not among them: it is the account's, not the device's, and it travels as `device.read` above. Where a message has been read from is nobody's business, but *that* it has been read is the same fact on every device the account is open on - a second device that offered everything again as new was reporting something that is not true.
+`device.message` is sent **after** the recipient's server has signed for the delivery it echoes, not when the message is written. An echo that goes out first puts on every other device a message that may never arrive - and one copy per retry, all of them shown as still sending - which is a desync with no way back. What every device shows is therefore what at least one server holds. `device.message` carries what this device did in a conversation, so every device shows the same one: a message sent, a picture, a voice message, an edit, a deletion, a reaction, and a request to a correspondent to clear the chat. What a device does *not* echo is its own errands - read receipts, call signalling and the file-transfer handshake - which are between it and the correspondent. The read state is not among them: it is the account's, not the device's, and it travels as `device.read` above. Where a message has been read from is nobody's business, but *that* it has been read is the same fact on every device the account is open on - a second device that offered everything again as new was reporting something that is not true.
 
 All are local-only facts that must never reach a contact, so they travel the self-channel exclusively. The routing-key sibling `device.i2p-master` (preserving the user's I2P address across devices, see `Identity.md`) uses the same mechanism. Wire shapes are in `Messages.md`.
 
@@ -108,7 +95,7 @@ A `device.i2p-master` that carries a **different** master than the receiving dev
 
 Until that question is settled a device **publishes nothing**: minting an address of its own and delegating it would take the account's address away from every contact holding it, and none of them would learn a replacement until the user wrote to them again. What a client does when nobody answers is its own choice (this implementation puts it to the user); what the protocol requires is that it not publish silently.
 
-**Every `device.*` type is a message from one of the account's own devices, and only that.** The channel is the account's own mailbox, but a mailbox is where correspondents write too: admission (a delivery token) is not authorship, so a receiver checks the signer of a device message against its own identity and drops it otherwise - before any field of it is read. Without that check an admitted contact could change an account setting or write into its address book, both of which these types do.
+**Every `device.*` type is a message from one of the account's own devices, and only that.** The channel is the account's own mailbox, but a mailbox is where correspondents write too: admission (a delivery pass) is not authorship, so a receiver checks the signer of a device message against its own identity and drops it otherwise - before any field of it is read. Without that check an admitted contact could change an account setting or write into its address book, both of which these types do.
 
 A self-message is named by a **delivery id of its own**, unrelated to the one the same message carries to its recipient (`Messages.md`): the copy kept for the account's devices and the copy the contact receives share no name, so the two servers holding them cannot be matched against each other.
 

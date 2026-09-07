@@ -29,7 +29,7 @@ HTTP transports map typed errors onto appropriate status codes; the JSON body is
 | `QUOTA_EXCEEDED` | Blob is larger than the receiving server accepts; the error must explicitly explain the problem to the sender | server |
 | `STORAGE_FULL` | User's pending-content quota is exhausted | server |
 | `RECIPIENT_SERVER_UNREACHABLE` | The recipient's server returned no answer: it could not be dialled, the stream failed, or it asserted a delivery without a verifiable signature. Not a refusal; the sending client may repeat the attempt, and on exhausting its attempts reports this as the reason (`Messages.md`) | client |
-| `DELIVERY_REJECTED` | Delivery refused. Deliberately combines "invalid or consumed token", "unknown mailbox" and "recipient not served here" into one externally indistinguishable result (anti-enumeration; see `Contacts.md`). A tokenless contact request is the only alternative admission path | server |
+| `DELIVERY_REJECTED` | Delivery refused. Deliberately combines "unknown pass", "unknown mailbox" and "recipient not served here" into one externally indistinguishable result (anti-enumeration; see `Contacts.md`). A contact request, which presents nothing, is the only alternative admission path | server |
 | `CONTACT_REQUEST_TOO_LARGE` | Attached contact-request message exceeds the limit (default 8192 bytes, server-configurable) | server |
 | `ALIAS_TAKEN` | Requested alias is already registered | service node |
 | `ALIAS_UNKNOWN` | Alias resolution found no such alias. Aliases are intended to be discoverable, so this is reported explicitly and is not subject to anti-enumeration | service node |
@@ -41,7 +41,7 @@ The registry grows as APIs are specified; codes are append-only and never reused
 
 ## Anti-enumeration policy
 
-Detailed mailbox-state errors (`QUOTA_EXCEEDED`, `STORAGE_FULL`) are returned **only after a valid delivery token has been presented** - so only actual contacts can learn anything about a mailbox. Everything else (bad token, no such mailbox, account not served here) collapses into `DELIVERY_REJECTED`.
+Detailed mailbox-state errors (`QUOTA_EXCEEDED`, `STORAGE_FULL`) are returned **only after a valid delivery pass has been presented** - so only actual contacts can learn anything about a mailbox. Everything else (unknown pass, no such mailbox, account not served here) collapses into `DELIVERY_REJECTED`.
 
 ## Open questions
 

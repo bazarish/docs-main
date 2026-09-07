@@ -85,7 +85,7 @@ The facade is the "last mile" between the client and the server infrastructure. 
 ### What the facade still knows
 
 Sealing the traffic removes the **global identifiers** - the caller's public
-keys (which are their identity), their destination, their device ids, the tokens
+keys (which are their identity), their destination, their device ids, the passes
 that admit mail to their mailbox, the private transient that operates their
 address. It does not remove the **flow**, and the difference has to be stated
 rather than glossed over:

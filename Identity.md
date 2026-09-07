@@ -15,7 +15,7 @@ Status: draft skeleton.
   - `<alias>` - an exclusive **username** on the central resolver (paid; the project's monetization, `api/AliasResolver.md`). Resolving it yields a descriptor, after which the contact card is fetched and verified.
 - Users have no binding to a server in anything a contact can see. Registration opens an unbounded channel with the server, and the only thing that expires is the delegation of the user's destination - which the network itself enforces. Nothing signed by the user names the server.
 - All clients (devices/app instances) of a user **share the identity keypair set**; a new device receives it during enrollment (see `DeviceSync.md`). Each client registers a unique random **client ID** so the server can track delivery completeness across clients.
-- The user's **I2P destination is the account's, not a device's**: contacts hold that one address, so every device of the account operates the same master key. A device that arrives without it takes it from the account (its enrollment material, or `device.i2p-master-request` to the account's other devices) rather than minting one, because a second address delegated to the server strands every contact holding the first. Delivery tokens are the opposite: they are one-time capabilities, never shared between devices, and a device that has none buys its own (`DeviceSync.md`).
+- The user's **I2P destination is the account's, not a device's**: contacts hold that one address, so every device of the account operates the same master key. A device that arrives without it takes it from the account (its enrollment material, or `device.i2p-master-request` to the account's other devices) rather than minting one, because a second address delegated to the server strands every contact holding the first. A delivery pass follows the same rule for the same reason: it is the account's, not a device's, so it travels in the address book and every device presents the same one (`DeviceSync.md`).
 
 ## Server identity
 
@@ -39,7 +39,7 @@ Status: draft skeleton.
 - **Delivery sealing is per-destination.** Each user's own serving destination
   has
   its **own serving sealing key**; the delivery envelope's admission header
-  (recipient, token, deliveryId) is sealed to the serving sealing key of the
+  (recipient, pass, deliveryId) is sealed to the serving sealing key of the
   recipient's destination, whose private half the recipient's server holds. There
   is no single server-wide delivery sealing key (`InviteAnonymity.md`).
 - **Federation signing is per-destination too.** Each serving destination also
@@ -77,7 +77,7 @@ Body: `{ v, t: "contact-card", issuedAt, dest, sealingKey, servingKey }`.
   put the account's routing quietly back to what it used to be - valid signature,
   right owner, simply stale.
 - `sealingKey` - the user's E2E sealing key (SPKI DER, base64): what a contact
-  encrypts to. The very first contact request is sealed to it before any token
+  encrypts to. The very first contact request is sealed to it before any pass
   exchange, and so is **every message afterwards** - the card is where a stranger
   learns it, not a key reserved for first contact. Because it rides inside the
   user-signed card, no intermediary can substitute it.
@@ -122,8 +122,8 @@ re-broadcast to them on a schedule.
 
 A user is served by **exactly one server at a time**. Migration S1 -> S2:
 
-1. Register on S2, register fresh delivery tokens there, close the account on S1 (or let it go idle).
-2. Push the new contact card (S2 destination + serving key + sealing key) + fresh token batches to all contacts over E2E.
+1. Register on S2, register the delivery passes there, close the account on S1 (or let it go idle).
+2. Push the new contact card (S2 destination + serving key + sealing key) to all contacts over E2E.
 3. Contacts switch as the card arrives. Deliveries that race the cutover **fail and stay on the sender's client** (standard send semantics) and are retried after the new card arrives - messages are delayed, not lost.
 
 Accepted failure mode: if S1 becomes permanently unavailable before the user has prepared the migration, deliveries from contacts continue to fail until the user publishes a new card (or, where an alias is used, until contacts resolve it again). A user's destination is portable across servers (it is their own offline key), so migration need not change the destination at all.

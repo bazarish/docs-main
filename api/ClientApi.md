@@ -81,15 +81,15 @@ it in the mailbox until the recipient's devices have collected it - and the sing
 write a device makes to its own account, `POST /v1/messaging/self`, which reaches
 no other party.
 
-A **tokenless contact request** is capped by the protocol at **11700 sealed
+A **contact request**, which presents nothing, is capped by the protocol at **10979 sealed
 bytes** (`kMaxContactRequestBytes`) - not by any operator setting, and not with
 room to spare: this is the one thing a stranger may put in a mailbox, so the cap
 is the measured worst case and nothing above it.
 
-The worst case is **11668 bytes**, measured through the real path: the two hybrid
-sealing keys the bootstrap carries, the 16-token reply batch the requester hands
+The worst case is **10947 bytes**, measured through the real path: the two hybrid
+sealing keys the bootstrap carries, the delivery pass the requester hands
 over so the peer can answer, the ML-KEM ciphertext of the seal, the authorship
-block with the sender's keys in it (a request has no card and no token, so the
+block with the sender's keys in it (a request has no card and no pass, so the
 signature is the only thing naming them), the longest greeting a user may write
 and the longest name an account may carry. The 32 bytes on top are what the
 variable-length parts can add - an ECDSA signature is 70 to 72 bytes, a CBOR
@@ -102,11 +102,11 @@ alphabet). Both are refused where they are typed rather than at the recipient's
 server.
 
 - A contact acceptance is not a separate endpoint: it is an ordinary content
-  message that spends a token received in the request (see `../Contacts.md`).
+  message presenting the pass received in the request (see `../Contacts.md`).
   Declining a request transmits nothing.
 - A repeated delivery is the same delivery: the delivery id is derived from the
   message and the recipient mailbox (`../Messages.md`), so the recipient's server
-  recognises the repetition, stores no second copy and consumes no second token.
+  recognises the repetition and stores no second copy.
 
 ### Own destination
 
@@ -161,12 +161,12 @@ With no reseed address in the descriptor, the router uses the public hosts it
 carries. That is the fallback, and the only case in which the bootstrap leaves
 the network the user chose.
 
-### Delivery tokens (see `../Contacts.md`)
+### Delivery passes (see `../Contacts.md`)
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /v1/messaging/tokens` | Register a batch of one-time tokens for this user's mailbox. The tokens themselves, not their hashes: revoking a correspondent's tokens (below) is a sweep over their shape |
-| `POST /v1/messaging/tokens/revoke` | Drop every token this user holds that was minted under the given mask - one correspondent's, all of them. Answers before the sweep rather than after it (`../Contacts.md`) |
+| `POST /v1/messaging/passes` | Register the hashes of the passes this user's mailbox admits. Hashes, not the passes themselves: a sender presents the pass, so what is on the node's disk recognises a delivery and cannot produce one. Registering one already held is how a block is lifted |
+| `POST /v1/messaging/passes/revoke` | Drop exactly these passes and answer how many were there. Exact and immediate - the account names what it issued, so there is nothing to sweep for (`../Contacts.md`) |
 
 ### Client registry (see `../DeviceSync.md`)
 

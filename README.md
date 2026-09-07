@@ -15,7 +15,7 @@ component implements.
 
 - [Architecture](Architecture.md) - components, topology, trust boundaries, key decisions
 - [Identity](Identity.md) - keys, UIDs, certificates, contact card, algorithms
-- [Contacts](Contacts.md) - contact admission via one-time delivery tokens
+- [Contacts](Contacts.md) - contact admission via delivery passes
 - [Messages](Messages.md) - delivery class vs content type; the content-type registry
 - [Bots](Bots.md) - bots as ordinary identities; commands, inline keyboards, callbacks
 - [DeviceSync](DeviceSync.md) - multi-device enrollment and E2E state sync

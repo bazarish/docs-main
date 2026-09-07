@@ -26,7 +26,7 @@ server change to introduce.
 
 ## The three content types
 
-All three are `content`-class deliveries (token-gated, established-contact),
+All three are `content`-class deliveries (pass-gated, established-contact),
 sealed end-to-end like any message.
 
 ### `bot.command` - a command invocation
@@ -121,7 +121,7 @@ an account without an interface:
 - handlers register per command, for plain text, and for callbacks;
 - a new contact is auto-greeted (it falls back to the `start` command);
 - the bot polls its mailbox, decrypts with `sync`, and dispatches each update;
-- replies are sent with the normal `content` path, spending delivery tokens
+- replies are sent with the normal `content` path, presenting the delivery pass
   exactly as a human client does.
 
 Because a bot is an ordinary registered identity, the same framework runs against a

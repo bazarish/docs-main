@@ -72,10 +72,10 @@ keys:
 | Layer | Contents | Decrypted by | Key |
 |---|---|---|---|
 | Content (E2E) | the message itself | **U** (while offline, on next sync) | `sealingKey` |
-| Admission header | `mailbox` + one-time `token` | **U's server** (while U is offline) | `servingSealingKey` |
+| Admission header | `mailbox` + `pass` | **U's server** (while U is offline) | `servingSealingKey` |
 
 The server stores-and-forwards while U is offline, so it **must** read
-`mailbox` + `token` to enforce contact-admission and quota (the token scheme,
+`mailbox` + `pass` to enforce contact-admission and quota (the pass scheme,
 `../Contacts.md`) - while staying blind to the content layer, which it cannot
 decrypt. One key cannot serve both layers because the readers differ (U vs U's
 server). Sealing the admission header is also what keeps the **sender's own
@@ -104,7 +104,7 @@ DeliveryEnvelope:
   sealed:                                   # CMS envelope to the destination's serving sealing key
     class: content | contact
     mailbox: <recipient UID>
-    token: <one-time delivery token>        # absent for class "contact"
+    pass: <delivery pass>                   # absent for class "contact"
     deliveryId: <delivery id>
   payload: <E2E blob>
 ```
