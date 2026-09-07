@@ -23,7 +23,13 @@ Status: draft skeleton.
 - **Server card** - a document signed by the server's root key, binding the
   server's identity to its transport endpoint(s) (`i2p:<b33>`) and a server-level
   sealing key. It is the server's own identity document (the service node is
-  bound to it). It is **not** the peer-facing routing artifact and is **not**
+  bound to it), and it is also what a **client** fetches in the open before it can
+  speak in private: the tunnel is sealed to the sealing key in it, and the card is
+  trusted because it is signed by the fingerprint the user already had
+  (`api/ClientApi.md`). That sealing key **must be hybrid** - sealing needs the
+  ML-KEM half, and a server whose key predates hybrid sealing keys can serve no
+  client at all, so it refuses to start rather than fail one connection at a time.
+  It is **not** the peer-facing routing artifact and is **not**
   carried in invites: delivery routing and sealing are per-destination and travel
   in the user's contact card (below); a contact discovers the serving sealing key
   needed to fetch that card from the **descriptor** (`key`,
@@ -52,31 +58,72 @@ Status: draft skeleton.
 
 **Container for all certificates: CMS SignedData over a JSON body** (OpenSSL-native, standard; the body format matches the system-wide JSON wire format). Each body carries a format version field.
 
-### Subscription certificate
+### Contact card
 
-Issued **by the user**, signed with the identity key; asserts "server S serves user U until T" **and** carries the user's peer-facing routing - it doubles as the **contact card**.
+Issued **by the user** and signed with their identity key: the cryptographic
+answer to "where and how do I deliver to U?". Signed by U, so it stays
+trustworthy through any untrusted intermediary.
 
-Body (draft): `{ v, user: <fingerprint>, server: <server-fingerprint>, issuedAt, notAfter, sealingKey?, dest?, servingSealingKey? }`.
+Body: `{ v, t: "contact-card", issuedAt, dest, sealingKey, servingKey }`.
 
-- `sealingKey` - the user's E2E sealing **prekey** (SPKI DER, base64): a contact encrypts the very first contact request to it before any token exchange. Because it rides inside the user-signed certificate, no intermediary can substitute it, closing the first-message bootstrap gap.
-- `dest` - the user's serving **destination** as a `.b32.i2p` host (a user's own offline-key destination cannot publish a b33, so there it is the standard b32): where a contact routes deliveries. Never a raw destination or an addressbook name (`api/Federation.md`).
-- `servingSealingKey` - the public **serving sealing key** of that destination: a contact seals the delivery envelope's admission header to it. Not a signature and not a trust anchor - the user just vouches for it under their one signature; a wrong value only makes delivery fail (`InviteAnonymity.md`). Its private half is held by the user's server. The client learns `dest`/`servingSealingKey` from its server (`GET /v1/messaging/destination`) and folds them into the certificate.
+- `t` - what this document is. Checked before any of the body is believed, so
+  that one signed document cannot be read as another: with optional fields and no
+  type, a subscription certificate parsed cleanly as a contact card, and the only
+  thing standing in the way was which fields the reader happened to look at.
+- `issuedAt` - when it was signed. Two cards of one person are ordered by this
+  and by nothing else, and the node that holds one **refuses any that is not
+  newer** (`api/ClientApi.md`). Without it the current card is whichever was
+  published last, so a second device holding an old copy could republish it and
+  put the account's routing quietly back to what it used to be - valid signature,
+  right owner, simply stale.
+- `sealingKey` - the user's E2E sealing key (SPKI DER, base64): what a contact
+  encrypts to. The very first contact request is sealed to it before any token
+  exchange, and so is **every message afterwards** - the card is where a stranger
+  learns it, not a key reserved for first contact. Because it rides inside the
+  user-signed card, no intermediary can substitute it.
+- `dest` - the user's serving **destination** as a `.b32.i2p` host (a user's own
+  offline-key destination cannot publish a b33, so there it is the standard b32):
+  where a contact routes deliveries. Never a raw destination or an addressbook
+  name (`api/Federation.md`).
+- `servingKey` - the public **serving sealing key** of that destination: a contact
+  seals the delivery envelope's admission header to it. Not a signature and not a
+  trust anchor - the user just vouches for it under their one signature; a wrong
+  value only makes delivery fail (`InviteAnonymity.md`). Its private half is held
+  by the user's server, which is what lets the server route without being able to
+  read: the message itself is sealed to `sealingKey`, whose private half never
+  leaves the user's device.
 
-There is **no server fingerprint dependency or server card** in the peer-facing artifact - routing is by destination.
+**The owner is not a field.** A card is a statement its signer makes about
+themselves, so the subject is taken from the keys that signed it. A name written
+beside the signature would be a second place for one fact, and the only thing a
+second place can add is a disagreement with the first. A reader who wants a
+particular person compares fingerprints - which is where that check belongs,
+because only the reader knows whose card they asked for.
 
-It has **two consumers**:
+What is deliberately **absent**: any server fingerprint or server card (routing
+is by destination, and naming the server would let cards be grouped by who hosts
+them); the view capability that permits fetching the card (it travels in the
+invite - putting it inside would hand it to everyone who already has the card);
+and anything about the owner's devices.
 
-1. **The serving server (via the service node)** - the account, which has no term. Registration is grant-gated through the service portal (`api/ServicePortal.md`) and opens an unbounded channel. What expires is the **delegation** of the user's destination, which the I2P network enforces; an account with none for the node's idle window (`idleDeleteDays`, 180 by default) is deleted along with its pending content.
-2. **Contacts' clients** - the **contact card**: the same artifact, handed to contacts over E2E (or in an invite), is the cryptographic answer to "where and how do I deliver to U?" (prekey + destination + serving sealing key). Signed by U, so it stays trustworthy through any untrusted intermediary.
+**Forward secrecy: there is none, and the card is where that shows.**
+`sealingKey` is long-lived and never rotated, so whoever obtains its private half
+reads everything that account was ever sent - including what is still sitting in
+mailboxes. Compare `servingKey`, which does have a rotation mechanism. This is a
+known state, not an oversight, and what to do about it is being worked out in
+`research/ForwardSecrecy.md`.
 
-Routing-staleness policy for contacts: the last known card remains the routing target even past `notAfter` - expiry signals staleness, not invalidity. A fresh card is pushed to **the server on every renewal**, but to **contacts only when the destination changes** (avoids re-broadcast every few days).
+A card is republished to **the server** whenever its contents change (a new
+destination, a rotated serving key); contacts learn a new destination from the
+`routing` that rides on every message (`Architecture.md`), so a card is not
+re-broadcast to them on a schedule.
 
 ### One serving server, hard-cutover migration
 
 A user is served by **exactly one server at a time**. Migration S1 -> S2:
 
 1. Register on S2, register fresh delivery tokens there, close the account on S1 (or let it go idle).
-2. Push the new contact card (S2 destination + serving sealing key + prekey) + fresh token batches to all contacts over E2E.
+2. Push the new contact card (S2 destination + serving key + sealing key) + fresh token batches to all contacts over E2E.
 3. Contacts switch as the card arrives. Deliveries that race the cutover **fail and stay on the sender's client** (standard send semantics) and are retried after the new card arrives - messages are delayed, not lost.
 
 Accepted failure mode: if S1 becomes permanently unavailable before the user has prepared the migration, deliveries from contacts continue to fail until the user publishes a new card (or, where an alias is used, until contacts resolve it again). A user's destination is portable across servers (it is their own offline key), so migration need not change the destination at all.
@@ -95,7 +142,7 @@ verifies the user-signed **contact card** for that fingerprint. Two trust layers
 
 1. **alias -> fingerprint** is asserted by the resolver - the inherent trust of
    names; the UI surfaces the resolved fingerprint for out-of-band verification.
-2. everything after - the contact card (prekey + destination + serving sealing
+2. everything after - the contact card (sealing key + destination + serving
    key) - is **user-signed and verified against the fingerprint**, so no
    intermediary can forge it.
 

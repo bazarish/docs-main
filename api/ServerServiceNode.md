@@ -10,7 +10,7 @@ An account has **no term**. Registration opens an unbounded channel; the only cl
 
 | Request | Purpose |
 |---|---|
-| `get-card` | fingerprint + the descriptor's `view` capability -> the user's **contact card** (prekey + destination + serving sealing key). Backs the federation `card` request - the first-contact card fetch (`api/FederatedResolve.md`). The capability must be the one the node issued for that account: a wrong one is refused **exactly** like an unknown user, so the lookup cannot be used to ask a server whether it hosts a fingerprint |
+| `get-card` | fingerprint + the descriptor's `view` capability -> the user's **contact card** (sealing key + destination + serving sealing key). Backs the federation `card` request - the first-contact card fetch (`api/FederatedResolve.md`). The capability must be the one the node issued for that account: a wrong one is refused **exactly** like an unknown user, so the lookup cannot be used to ask a server whether it hosts a fingerprint |
 
 ## Service node -> Server (implemented)
 

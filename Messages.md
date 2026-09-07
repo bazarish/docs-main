@@ -225,7 +225,7 @@ regenerates its destination should state this to its user.
 | `type` | Delivery class | Purpose / payload |
 |---|---|---|
 | `text` | content | `text` - a plain text line. |
-| `contact.request` | contact | Carries a `bootstrap` block (`sealing` prekey, `dest`, `servingKey`, `replyTokens`) plus `text`. The first message; see `Contacts.md`. |
+| `contact.request` | contact | Carries a `bootstrap` block (`sealing` - the same account sealing key the card publishes -, `dest`, `servingKey`, `replyTokens`) plus `text`. The first message; see `Contacts.md`. |
 | `contact.accept` | content | Agreeing to a received `contact.request`: an empty-bodied message whose first-reply `bootstrap` hands the requester our descriptor + reply tokens, making the pair mutual contacts. The requester's client auto-completes the add and surfaces a note. See `Contacts.md`. |
 | `token-refill` | content | `replyTokens` - a fresh stash when the peer's drops low (`Contacts.md`). |
 | `file` | content | An announcement: `name`, `size`, `sha256` and `mime`. The bytes stay on the sender's disk until the recipient asks for them. See `api/FileTransfer.md`. |

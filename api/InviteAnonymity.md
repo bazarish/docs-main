@@ -16,7 +16,7 @@ invite/server-card shape; `../Identity.md`, `../Contacts.md`, `Facade.md` and
 ## Problem
 
 An invite today carries two artifacts: the user's **subscription certificate**
-(user-signed: `user`, `server`, prekey) and the serving server's **server card**
+(user-signed: `user`, `server`, sealing key) and the serving server's **server card**
 (root-signed: `server`, transport endpoints, sealing key). A third party who
 collects invites from several users of one server can **cluster** them: the
 server card is a byte-identical, root-signed blob shared by every user of that
@@ -39,20 +39,24 @@ a destination - and the destination is the single tunable anonymity knob.
 ```
 ContactCard  (CMS-signed by user U - the only artifact a contact fetches):
   v
-  user:              <U fingerprint>     # equals the signer; the identity anchor
-  prekey:            <SPKI DER>          # U's E2E sealing prekey (first message)
-  dest:              <i2p destination>   # dest_U - where to deliver to U
-  servingSealingKey: <SPKI DER>          # key the delivery envelope is sealed to
+  t:           "contact-card"      # what this document is, checked first
+  issuedAt:    <unix seconds>      # what orders two cards of one person
+  sealingKey:  <SPKI DER>          # what U's mail is sealed to, first and after
+  dest:        <i2p destination>   # dest_U - where to deliver to U
+  servingKey:  <SPKI DER>          # key the delivery envelope is sealed to
 ```
+
+The owner is not written in the body: it is the signer, and `fingerprint()` is
+taken from the keys that signed. One fact, one place.
 
 No `server` fingerprint, no endpoints list, no separate root-signed card, no
 root signature. The card carries **exactly one signature - U's**; there is no
-server signature anywhere on the contact path. `dest` and `servingSealingKey`
+server signature anywhere on the contact path. `dest` and `servingKey`
 are plain fields the user vouches for under that one signature.
 
 Why this is safe with no server signature: the first message is E2E-sealed to
-`prekey`, which only U holds - confidentiality never depended on the server. If
-`dest`/`servingSealingKey` were tampered, delivery merely fails (the recipient
+`sealingKey`, whose private half only U holds - confidentiality never depended on the server. If
+`dest`/`servingKey` were tampered, delivery merely fails (the recipient
 server cannot produce a forged acceptance the sender's client would believe, and
 no plaintext is exposed). The server was already untrusted for content; routing
 is now an unsigned hint the user vouches for, not a trust root.
@@ -60,14 +64,14 @@ is now an unsigned hint the user vouches for, not a trust root.
 ### Two keys, one signature - why `servingSealingKey` exists
 
 `servingSealingKey` (the `sealingKey_U` of the decided
-`sign_U{prekey, sealingKey_U, dest_U}` shape) is a **public encryption key
+`sign_U{sealingKey, dest_U}` shape) is a **public encryption key
 embedded in the user-signed card** - not a signature and not a trust anchor.
 There are two sealed layers with **different readers**, so they need different
 keys:
 
 | Layer | Contents | Decrypted by | Key |
 |---|---|---|---|
-| Content (E2E) | the message itself | **U** (while offline, on next sync) | `prekey` |
+| Content (E2E) | the message itself | **U** (while offline, on next sync) | `sealingKey` |
 | Admission header | `mailbox` + one-time `token` | **U's server** (while U is offline) | `servingSealingKey` |
 
 The server stores-and-forwards while U is offline, so it **must** read
@@ -224,7 +228,7 @@ mapping.
 - **addByInvite** - verify the card; deliver to `card.dest`, seal the envelope
   to `card.servingSealingKey`. No server card, no fingerprint resolve.
 - **contact-request bootstrap** (`../Contacts.md`) - the bootstrap ships the
-  sender's **contact card** (dest + serving sealing key + prekey) instead of the
+  sender's **contact card** (dest + serving sealing key + sealing key) instead of the
   sender's server card, so the peer replies by federating to the sender's dest.
 - **addByUsername / alias resolve** - the resolved trust chain becomes the
   contact card (not sub-cert + server card). The cross-server sealed `resolve`

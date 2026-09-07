@@ -123,7 +123,7 @@ DeliveryEnvelope:
 
 6. `DELIVERY_REJECTED` is the one refusal that says something about the **capability**: the presented token is not in the mailbox's registered set, and no repetition of any token from the same batch will be either, since a batch is registered and replaced as a whole. A sending client must therefore discard every token it holds for that correspondent and obtain a fresh batch, rather than offering the next one. The other refusals say nothing about the tokens - `STORAGE_FULL` and `QUOTA_EXCEEDED` are reached only past a valid token, which the server re-registers rather than consumes, and `MESSAGE_TOO_LARGE` is about the message - so the stash stands.
 
-`contact-request` deliveries skip the token check, are capped in payload size (default 8192 bytes, server-configurable - large enough for the bootstrap prekey + a full reply-token batch), and are subject to a separate quota and per-origin-server rate limiting.
+`contact-request` deliveries skip the token check, are capped in payload size (default 8192 bytes, server-configurable - large enough for the bootstrap sealing key + a full reply-token batch), and are subject to a separate quota and per-origin-server rate limiting.
 
 ## Requests (draft)
 
@@ -149,13 +149,13 @@ b33), carried in the user-signed **contact card** (`../Identity.md`,
 longer a root-signed server card.
 
 This holds in both directions on first contact: a contact request carries the
-sender's own **routing** (sealing prekey + destination + serving sealing key) in
+sender's own **routing** (sealing key + destination + serving sealing key) in
 its bootstrap, so the recipient replies by federating to the sender's destination
 over I2P, having learned only that destination - not a server fingerprint.
 
 ## First-contact discovery
 
-First contact needs the peer's UID and contact card (prekey + destination +
+First contact needs the peer's UID and contact card (sealing key + destination +
 serving sealing key) without leaking to intermediaries and without the client
 touching a foreign facade. The model is specified in `FederatedResolve.md`; in
 summary:

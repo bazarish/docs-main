@@ -58,10 +58,47 @@ The facade is the "last mile" between the client and the server infrastructure. 
   facade address discloses nothing about which users a server hosts.
 - Published under a **secret URI** known only to clients of this server, and that secrecy is **mandatory, not a deployment option**: `bazarish-facade-http` refuses to start without `--base-path <secret>`, which it requires on every request and strips before forwarding. The single exception is an explicit `--public`, and it means one thing only - a fronting reverse proxy (Caddy, nginx, ...) already publishes this facade under a secret URI of its own. The secret reaches a client solely inside the facade URL of the server descriptor (below); it is never advertised, never derived from the server fingerprint, and never sent anywhere else.
 - The whole clearnet API therefore lives under the secret prefix. Nothing is left outside it: the reseed is no longer part of this API at all (`ClientApi.md`), so a facade answers only requests from a client that already holds the secret.
-- A single catch-all handler relays every request **transparently** - method, headers, body and query string verbatim - to backends over the **operator private channel** (localhost/unix socket/VPN), routing by path prefix once the secret prefix is stripped:
-  - `/v1/messaging/*` -> messaging server
-  - `/v1/account/*` -> service node
+- **Three paths exist, and the facade reads none of them.** Once the secret
+  prefix is stripped, everything is relayed over the **operator private channel**
+  (localhost/unix socket/VPN) to the messaging server, and there is only one
+  backend to relay to:
+  - `POST /t` - the client tunnel. One opaque body in, one opaque body out; the
+    answer is always `200`, because a status code outside the seal would be a
+    channel of its own. What is inside - the method, the path, the headers, the
+    device the request speaks for, the body, and the real status of the answer -
+    is sealed and unreadable here. The facade cannot even tell mail being fetched
+    from an account being managed. See `ClientApi.md`.
+  - `GET /v1/server/card` - the signed server card, which is what a client seals
+    its tunnel to. Public, identical for every caller, and signed by the
+    fingerprint the user already had, so a facade may withhold it but cannot put
+    one of its own in its place.
+  - `GET /v1/messaging/reseed` - the reseed archive, needed before the client has
+    any transport at all and therefore necessarily outside the tunnel.
   - anything else -> 404 (never forwarded)
+- **Account management is not a separate route any more.** Client calls to the
+  service node arrive inside the same tunnel and are forwarded to the node by the
+  messaging server under its own signature; the node is no longer reachable from
+  the facade at all (`Architecture.md`). That is what leaves one path where there
+  used to be two prefixes, and with it goes the one bit that said which of the
+  two kinds a request was.
+
+### What the facade still knows
+
+Sealing the traffic removes the **global identifiers** - the caller's public
+keys (which are their identity), their destination, their device ids, the tokens
+that admit mail to their mailbox, the private transient that operates their
+address. It does not remove the **flow**, and the difference has to be stated
+rather than glossed over:
+
+- a client dials from a stable outbound destination (a second one holds the long
+  poll), so every request of one device is trivially linkable to the others;
+- when a request happens, and when a parked poll returns - which is when mail
+  arrived;
+- how large it was, to the nearest step of the padding ladder.
+
+"A facade knows the flow but not whose it is, nor what is in it" is what this
+design achieves. "A facade knows nothing" would be untrue, and nothing here
+should be read as claiming it.
 - The ops listener also carries the facade's **own configuration**, operator-signed
   like `/healthz`: `GET /settings` and `PUT /settings` (the secret base path, the
   two backends, both sockets, the I2P side, the log level) and `POST /restart`.
@@ -73,7 +110,7 @@ The facade is the "last mile" between the client and the server infrastructure. 
   descriptor) before the old one stops answering.
 - Everything outside the secret prefix answers the same bare **404** - the API root, an unknown path, and the operator liveness endpoint alike - so a probe of the host learns nothing. `/healthz` is not on the client-facing socket at all: it is served on a separate private **ops listener** (`--ops-listen <host> <port>`) that is never published to clients (`AdminPanel.md`).
 - Nothing streams through the facade: the only large payload there ever was - a file upload - now goes directly between clients (see `FileTransfer.md`).
-- Holds no keys, parses no content (the auth signature is verified by the backends, not the facade), stores nothing. An unreachable backend yields a `FACADE_UPSTREAM` 502 - the facade is a dumb pipe.
+- Holds no keys, parses no content (there is nothing left to parse: authentication happens inside the seal, at the backend), stores nothing. An unreachable backend yields a `FACADE_UPSTREAM` 502 - the facade is a dumb pipe.
 - Implemented in the `facade-http` repository (`Facade`; covered by tests and live-verified relaying to a running server-core).
 
 ## Client addressing
@@ -144,7 +181,7 @@ Consequences for first contact (`Contacts.md`, `Federation.md`):
   (`FederatedResolve.md`) - a direct fetch over a transient I2P destination of
   its own, never through the requester's server and never through the foreign
   facade. The contact
-  request bootstrap carries the sender's own routing (prekey + destination +
+  request bootstrap carries the sender's own routing (sealing key + destination +
   serving sealing key), so the reply path is equally facade-free.
 - **By `<alias>`** - resolved at the **central resolver** over its I2P endpoint
   (`AliasResolver.md`); again the client's own direct dial, never through its

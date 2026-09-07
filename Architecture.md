@@ -31,7 +31,19 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 
 - The server has **no public IP interfaces**. Its only public presence is in hidden networks (I2P first).
 - Facade <-> Server / Service node communication goes over an **operator-controlled private channel** (unix socket, localhost, or VPN - deployment choice). Splitting facade and server across hosts is an operator concern.
-- The facade routes client requests by path prefix: messaging -> server, account management -> service node.
+- **The facade carries one sealed tunnel and reads nothing.** A client's requests
+  all arrive as opaque frames on a single path; the messaging server opens them
+  and runs what was inside through its own routes. Account calls go on from there
+  to the service node, forwarded under the server's own signature with the user
+  named in the path it signed - so the node authorises them against the server
+  card it is already bound to, without a shared secret or a new setting. The node
+  is not reachable from the facade at all. See `api/Facade.md`, `api/ClientApi.md`.
+- What the node gives up for that is the user's own signature on each account
+  call: it now has the server's word for whose call it is. What must be
+  self-evident still is - the contact card is signed by its owner and the I2P
+  transient carries an offline signature by the user's master key - so the
+  artifacts that matter prove themselves, and only the fact of the call is
+  vouched for.
 
 ## Key decisions
 
@@ -40,7 +52,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 3. **Facade <-> server transport** - operator private channel, not a hidden network hop.
 4. **Wire format** - JSON for control messages, raw HTTP bodies for binary content (no base64 overhead). E2E-encrypted payloads are opaque blobs to all server-side components.
 5. **Destination routing** - delivery routes by the recipient's I2P **destination** (its b33), carried in the user-signed contact card, not by server fingerprint; the sender dials it directly (no resolver, no `peers.json`). A server has **no single federation address**: every user is served by their own destination, which admits what arrives and initiates no connections. The sending **client** performs the dialling, from a destination held for that one correspondent; a server that initiates no connections cannot derive a correspondence graph from the addresses it contacted. A contact is shared as a **descriptor** (`fp:b33`); a **username** resolves at the central resolver. Every routing target is a `.b32.i2p` host. See `Identity.md`, `api/Federation.md`, `api/InviteAnonymity.md`, `api/FederatedResolve.md`, `api/AliasResolver.md`.
-6. **Single facade entry point** - the client uses one secret URI; the facade fans out to server and service node.
+6. **Single facade entry point** - the client uses one secret URI, and behind it one path: the tunnel. The facade fans out to nothing, because there is one backend; the messaging server is what reaches the service node.
 6a. **Routing travels with every message** - a message carries its sender's current destination and serving sealing key (`routing`), and a receiver adopts the pair whenever it differs. Regenerating an I2P key changes the address, and a contact who learned the old one at introduction would dial it forever; one message from the moved side repairs the way back, in either direction and of any type. There is no second recovery path: a request for someone's new address could only go to their old one. The rule is that a party which changes its address sends first. See `Messages.md`.
 6b. **Tunnel length is a user setting** - three levels: minimal (1 hop each way, no variance), middle (1 hop, variance 1: I2P adds between zero and one hop and never subtracts), maximum (3 hops, no variance, the depth I2P itself defaults to). The client defaults to minimal and states what one hop does and does not conceal; call media remains minimal at every setting, three hops in each direction introducing audible delay in a live call. Server components accept `--privacy` and default to maximum.
 7. **Docs language** - English (code comments are English per codestyle).
@@ -51,14 +63,14 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 12. **Shared identity key across devices** - new devices are enrolled by QR transfer of the identity key; per-device keys with cross-signing remain a possible future evolution (see `DeviceSync.md`).
 13. **Explicit client registry** - client IDs are registered/retired via the API; the delete-when-all-acked rule operates on the registered set. The registry is owned by the server, not the service node.
 14. **Device sync via the own mailbox** - an E2E event journal (contacts, token bookkeeping, full message-history echo) delivered through the standard send/pending/ack path; no dedicated server mechanism.
-15. **Subscription certificate is dual-purpose** - the lifecycle anchor on the serving server and, pushed to contacts over E2E, the **contact card** (prekey + destination + serving sealing key) that answers "where and how do I deliver?". Exactly one serving server at a time; migration is a hard cutover: mail in flight during it fails at the sender, who resends when the new routing has arrived (messages delayed, not lost). Registration is grant-gated through the service portal. See `Identity.md`, `api/ServicePortal.md`, `api/InviteAnonymity.md`.
+15. **The contact card is what answers** "where and how do I deliver?" - the user-signed sealing key, destination and serving key, published to the serving server and fetched by contacts. It also anchors the account's lifecycle on that server. It answers "where and how do I deliver?". Exactly one serving server at a time; migration is a hard cutover: mail in flight during it fails at the sender, who resends when the new routing has arrived (messages delayed, not lost). Registration is grant-gated through the service portal. See `Identity.md`, `api/ServicePortal.md`, `api/InviteAnonymity.md`.
 16. **All certificates are CMS SignedData over JSON bodies** (contact card, alias, server card) - OpenSSL-native standard container, consistent with the JSON wire format.
 17. **Sealed alias resolution** - first-contact lookups are encrypted to the target server's resolve key and dialled by the client itself; the requester's own server is not on the path and never learns the alias. The response is a self-verifying chain (alias cert + the user's contact card). Cross-server resolution (central-resolver `resolve` + sealed card fetch) is implemented and live-validated over real I2P, as is invite-based first contact; only the production resolver deployment (baking the resolver coordinate into the client) remains.
 18. **The post-quantum hybrid covers sealing as well as signing (mandatory)** - signing is ECDSA P-256 + ML-DSA-65, and every identity statement is dual-signed and valid only when both verify; the fingerprint covers both public keys. Sealing is ECDH P-256 + ML-KEM-768 and covers everything encrypted anywhere in the project, because it all goes through one `cms::seal` - layered over CMS since OpenSSL has no KEMRecipientInfo yet (`Identity.md`).
 
 ## Trust boundaries
 
-- **Facade compromise must not damage server infrastructure.** The facade knows only the private-channel addresses of its backends and the traffic passing through it. It holds no keys and no content at rest.
+- **Facade compromise must not damage server infrastructure.** The facade knows the private-channel address of its backend and the traffic passing through it - and that traffic is sealed end to end, so what it can learn is the flow (a stable source, timing, a padded length), never who or what. It holds no keys and no content at rest.
 - **Server sees only ciphertext.** All message content is E2E-encrypted by clients; server-side components store and relay opaque blobs.
 - **A user's own server receives; it does not send.** Its functions for its user are: accept deliveries on that user's destination, hold them until the user's devices have collected them, carry a write addressed to those devices, and register delivery tokens. It is never given an outgoing message and never dials a correspondent, so the set of a user's correspondents is not available to it.
 - **Metadata minimization is a core requirement.** Any new endpoint or stored field must be evaluated for what it reveals about users and their contact graph. Collectable metadata is a critical bug by definition.

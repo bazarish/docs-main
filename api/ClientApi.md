@@ -6,16 +6,49 @@ Status: draft skeleton. The single client-facing API, reached through a facade (
 
 - Base: one secret URI per facade; everything below is relative to it.
 - Control messages: JSON. Binary content (attachments, encrypted blobs): raw HTTP bodies, no base64.
-- Routing by path prefix (performed by the facade):
-  - `/v1/messaging/*` -> server
-  - `/v1/auth/*` -> server (a session is sealed to a key that server holds)
-  - `/v1/account/*` -> service node
+- **Everything below travels inside one sealed tunnel.** The paths named in this
+  document are what the *server* sees after it opens a frame; on the wire there
+  is a single `POST /t` carrying an opaque body, and a facade in the middle can
+  read none of it (`Facade.md`). The paths still mean what they say - they are
+  simply not visible outside:
+  - `/v1/messaging/*` - answered by the messaging server itself
+  - `/v1/account/*` - forwarded by it to the service node, under its own
+    signature, with the user named in the path it signs
+
+### The tunnel
+
+Two kinds of frame, and a client's own identity is presented in exactly one of
+them.
+
+- **hello** - opens a tunnel. CMS-sealed to the server's sealing key, which the
+  client takes from `GET /v1/server/card`: that card is public, identical for
+  everyone, and signed by the server root key whose fingerprint the user already
+  had before they saw a facade, so the card can be withheld but not substituted.
+  The frame carries a fresh secret, a one-time key for the answer, and the hybrid
+  signature that says who is opening it. The answer - the tunnel's lifetime - is
+  sealed to that one-time key.
+  The server's sealing key **must be hybrid**: sealing needs the ML-KEM half, and
+  a server whose key predates hybrid sealing keys cannot be talked to at all. It
+  refuses to start rather than let every client sit at "connecting".
+- **carry** - everything afterwards. The request rides under AES-256-GCM with a
+  key derived from the same secret (a different derivation from the session MAC
+  key: one secret, two purposes, and holding one is not holding the other),
+  addressed by the per-request handle described below. No asymmetric work per
+  request, which matters when a client polls every few seconds.
+- **A tunnel cannot open the next tunnel.** That is structural rather than
+  checked: a hello is only ever CMS-sealed and signature-verified, and a carried
+  frame is only ever opened with a tunnel key. Otherwise a leaked secret could
+  renew itself indefinitely and the identity would never be presented again,
+  which is exactly what the lifetime below exists to bound.
+- **The answer's status rides inside.** Outside it is always `200`, because a
+  code visible to the facade would say what the seal was meant to hide.
+- **Payloads are padded** to a step of a fixed ladder before they are encrypted.
+  Without it the length of a waiting-mail list would still count the mail.
 - Authentication, first contact: signed with **both** identity keys (hybrid, like all identity statements). Canonical string `"v1\n" + timestamp + "\n" + METHOD + "\n" + path + "\n" + hex(sha256(body)) + "\n"`, plus `clientId + "\n"` when the request names a device (see the client ID below); headers `X-Bazarish-Keys` (base64 of `{"c": b64(EC SPKI), "pq": b64(ML-DSA SPKI)}`), `X-Bazarish-Timestamp`, `X-Bazarish-Sig-Classical`, `X-Bazarish-Sig-Pq`. The server verifies both signatures and both key types and derives the caller UID from the presented keys - no prior key exchange. Freshness window +/-300 s, narrowed to exactly-once by a server-side replay cache that remembers each accepted request's signature for the window (the randomized classical signature is the per-request nonce, so a legitimate resend is re-signed and accepted while a captured request replayed verbatim is rejected). Measured size of those headers: **~8.3 KB**.
-- Authentication, afterwards: a **session**. The signature above is presented once to `POST /v1/auth/session`, and every later request carries `X-Bazarish-Session` (this request's handle), `X-Bazarish-Seq` and `X-Bazarish-Mac` (HMAC-SHA256 over the same canonical string plus `seq + "\n"`) - **~174 bytes**, and an HMAC instead of an ML-DSA verification. Two properties beyond the size:
+- Authentication, afterwards: a **session**, which is the tunnel. The signature above is presented once, in the hello, and every later request carries `X-Bazarish-Session` (this request's handle), `X-Bazarish-Seq` and `X-Bazarish-Mac` (HMAC-SHA256 over the same canonical string plus `seq + "\n"`) - **~174 bytes**, and an HMAC instead of an ML-DSA verification. Two properties beyond the size:
   - a signature is evidence a server can show a third party that this user made this request at this time; a MAC is not, because the server could have produced it itself;
-  - the handle is `HMAC(secret, seq)`, different on every request, so the facade in the middle cannot tie a session's requests together. Nothing is transmitted to arrange this: both sides derive handles, and the server keeps only the next 64 of them indexed (a client runs two connections, so requests overtake each other).
-- Opening a session is the one thing a session may not do: `POST /v1/auth/session` accepts the identity signature only, and answers a MAC-authenticated attempt with `SESSION_INVALID`. Otherwise a leaked secret could renew itself indefinitely and the identity would never be presented again, which is exactly what the lifetime below exists to bound.
-- Sessions expire at a point drawn at random between **1 and 2 hours**: a fixed lifetime would have every client renew on the same schedule, and the short life is what makes a leaked session key worth little. The issue response carries `expiresUnix`, so a client renews ahead of time (5 minutes early) rather than discovering the lapse from a refused request. A lapsed or unknown session answers `SESSION_INVALID`, which the client answers by signing that one request and opening a session for the next - never by retrying the same way. Three refusals in a row and it stops asking for 15 minutes; a server with no session face, or an account with no serving key to seal to, is the same case. A session that could not be opened because **nobody answered** is not that case and waits only a minute: the server said nothing about sessions, the network was down, and it is over as soon as it is over.
+  - the handle is `HMAC(secret, seq)`, different on every request, so nothing in the middle can tie a session's requests together by it. Nothing is transmitted to arrange this: both sides derive handles, and the server keeps only the next 64 of them indexed (a client runs two connections, so requests overtake each other).
+- Sessions expire at a point drawn at random between **1 and 2 hours**: a fixed lifetime would have every client renew on the same schedule, and the short life is what makes a leaked session key worth little. The issue response carries `expiresUnix`, so a client renews ahead of time (5 minutes early) rather than discovering the lapse from a refused request. A lapsed or unknown session answers `SESSION_INVALID`, which the client answers by opening another tunnel and sending the request through it - never by retrying the same way. Three refusals in a row and it stops asking for 15 minutes; a server with no tunnel face is the same case. A session that could not be opened because **nobody answered** is not that case and waits only a minute: the server said nothing about sessions, the network was down, and it is over as soon as it is over.
 - The client ID travels in the `X-Bazarish-Client` header, and is **signed with the request** (it is the last line of the canonical string, under both schemes). It has to be: the server picks a device's mail queue by it, so while it was only a header, anything between the two ends could re-label a request as another device of the same account and acknowledge that device's mail away - the message would be dropped before that device ever fetched it. A request that names no device (an operator push, a login blob) signs the string without that line, so those paths are unchanged.
 - All errors follow `../Errors.md`.
 
@@ -23,7 +56,7 @@ Status: draft skeleton. The single client-facing API, reached through a facade (
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /v1/account/card` | Publish the user-signed **contact card** (`{card}`): the sealing **prekey** plus the serving **destination** + **serving sealing key** the client fetched from `GET /v1/messaging/destination` (see `../Identity.md`, `InviteAnonymity.md`). The card names no server and carries no validity window. This call is also what turns a portal registration into an account - the first one redeems the grant (`ServicePortal.md`) - and it is repeated whenever the routing changes; a repeat grants nothing. The destination can only be delegated once the account exists, so the first card carries no routing: the client delegates its transient and publishes again straight after. Responds `{quotaBytes, serverCard, approval, registrationMessage}` |
+| `POST /v1/account/card` | Publish the user-signed **contact card** (`{card}`): the sealing key plus the serving **destination** + **serving sealing key** the client fetched from `GET /v1/messaging/destination` (see `../Identity.md`, `InviteAnonymity.md`). The card names no server and carries no validity window. This call is also what turns a portal registration into an account - the first one redeems the grant (`ServicePortal.md`) - and it is repeated whenever the routing changes; a repeat grants nothing. The destination can only be delegated once the account exists, so the first card carries no routing: the client delegates its transient and publishes again straight after. Responds `{quotaBytes, serverCard, approval, registrationMessage}` |
 | `DELETE /v1/account/registration` | Terminate the account. The destination is revoked, the node discards the account record and the grants, and the messaging server is instructed to discard the mailbox and all other state held for that fingerprint (`DELETE /v1/messaging/account`, operator-signed). The request is signed with the account's own identity key, the only credential that can authorise it; a client therefore performs this call before removing its local profile and removes it only on success. **Idempotent**: a key for which the node holds nothing receives the same response as a deletion, with nothing revoked or discarded, so that a client whose account an operator has already removed can still complete the operation locally. A client treats any 4xx response likewise: no state for the account remains on the server, and it removes its local copy. Only the absence of a response (or a 5xx) leaves both sides unchanged, with the reason reported to the user |
 | `POST /v1/account/i2p-dest` | Upload a signed offline **transient** (`{transient, expiresUnix}`; empty revokes). Every account owns a destination - it is the base protocol, not a purchase - so the only gates are that the account exists here and, on a moderated node, that it is approved (`ACCOUNT_PENDING_APPROVAL` until then). The node hands the transient to the messaging server, which operates the destination, and records its validity |
 | `GET /v1/account/i2p-status` | `{approval, registrationMessage, transientExpires, transientUpdatedAt, ...}` - the client polls this to drive transient re-issue and to see whether a moderated account is still awaiting approval |

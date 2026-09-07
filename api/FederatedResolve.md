@@ -22,7 +22,7 @@ transport in `Federation.md`.
   Rendered for humans as `fp:b32` (the `:` distinguishes it from an alias); the
   full link/QR also carries `view`. It does **not** contain the contact card -
   it points at one.
-- **Contact card** - user-signed (`user`, `dest`, `prekey`, `servingSealingKey`;
+- **Contact card** - user-signed (`t`, `issuedAt`, `dest`, `sealingKey`, `servingKey`, the owner taken from the signature;
   ~= 8.7 KB, the hybrid post-quantum signature dominates), fetched live and
   verified against `fp` (`../Identity.md`). It names **no server**: a card that
   did would tell every contact who hosts its owner, and let two cards be compared
