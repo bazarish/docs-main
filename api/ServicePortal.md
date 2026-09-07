@@ -167,7 +167,7 @@ An operator chooses one of two modes (`registration.requireApproval`):
   account can neither send nor receive. The error carries the operator's
   `registration.message`, which states how to contact the operator to complete
   registration. Approval is performed by an operator from the admin panel. An
-  account not approved within `registration.ttlDays` (default 7) is deleted, so an
+  account not approved is swept by the same idle sweep as any other, `idleDeleteDays` (default 180) after it was registered - there is no shorter horizon of its own, so an
   abandoned registration does not hold a fingerprint indefinitely.
 
 This mechanism is moderation, not a charge.
@@ -244,8 +244,8 @@ server descriptor to paste into a client, or - on a moderated node - the
 "waiting for the operator" notice with the operator's instructions.
 `POST /logout` drops the session.
 
-The portal's **web files live on disk**, not in the binary: `--portal-assets
-<dir>` (mandatory with `--portal-listen`) holds one template per state of the
+The portal's **web files live on disk**, not in the binary: `portal.assets
+<dir>` (mandatory with `portal.listen`) holds one template per state of the
 flow, the stylesheet, the logo, the fonts and an optional `portal.js`. Every word
 on the page is in those files; the node only fills in the values a template asks
 for by name:
@@ -283,7 +283,6 @@ in that directory, of a type the portal publishes, are served.
 | Client | `POST /v1/account/card` | key | publish the card, redeem the grant |
 | Client | `POST /v1/account/i2p-dest` | key | upload a signed offline transient (refused while the account is unapproved) |
 | Client | `GET /v1/account/i2p-status` | key | approval state and the recorded transient validity |
-| Client | `GET /v1/account/contact` | none | fingerprint -> contact card lookup |
 
 ## 8. Removed (replaced by the portal)
 

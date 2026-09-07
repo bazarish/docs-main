@@ -8,28 +8,31 @@ A user runs several clients (devices); each has a unique random **client ID**. C
 
 - **Shared identity keys.** All clients of a user hold the same hybrid identity keypair set (see `Identity.md`); a new device receives it during enrollment. Senders never need to know how many devices a user has.
 - **Explicit client registry.** Client IDs are registered and retired via the API (see `api/ClientApi.md`). The "delete when all clients received" rule operates on this definite set; implicit discovery would admit races and leave retired identifiers holding quota.
-- **Sync channel = own mailbox.** Sync data travels as ordinary E2E deliveries to the user's own mailbox through the standard send/pending/ack path. No dedicated server mechanism; the server cannot distinguish sync traffic from ordinary messages, and the "all clients acked -> delete immediately" rule performs the cleanup without an additional mechanism.
+- **Sync channel = own mailbox.** Sync data travels as ordinary E2E deliveries to the user's own mailbox, written through `POST /v1/messaging/self` and read back through the standard pending/ack path. The server sees a delivery class and nothing else about it, and the "all clients acked -> delete immediately" rule performs the cleanup.
 - With a **single registered client**, no sync traffic is produced at all.
 
-## Sync journal
+## What actually syncs
 
-Each sync message carries a batch of events stamped `(deviceId, seq)` - a per-device monotonically increasing sequence.
+There is no event journal, no per-device sequence and no CRDT: the mechanism is
+the flat list of `device.*` self-messages below, and the address-book transfer
+(`device.contacts-request` / `device.contacts`) is what a full-state handover
+looks like. An earlier draft of this file specified a journal with
+`message-echo`, `snapshot` and gap detection; none of it was built, and it is
+gone from here rather than left standing as a design somebody might implement
+against.
 
-| Event | Content |
-|---|---|
-| `contact-added` / `contact-revoked` | Contact identity, contact card (destination + serving sealing key) |
-| `message-echo` | Full copy of an outgoing message, **including attachments**, so every device shows the complete conversation |
-| `snapshot-request` / `snapshot` | Full-state transfer (bootstrap or gap recovery) |
-
-- Events have **CRDT set semantics** (grow-only sets plus tombstones for revocations) - no global ordering is needed; applying them in any order converges.
-- A **gap in a peer device's `seq`** (events expired from the mailbox while this device was offline longer than the retention period) means state may be incomplete -> the device emits `snapshot-request` and a live device answers with `snapshot`.
+Sync data travels as ordinary E2E deliveries to the user's own mailbox, but not
+through the same door as mail: `POST /v1/messaging/self` is its own endpoint,
+with its own delivery class (`device`), and it is deliberately outside the budget
+a stranger's contact request is counted against. A server that had only one
+registered device stores nothing at all.
 
 ## Enrollment (adding a device)
 
 1. An existing device displays a QR code containing: the identity private keys (classical + post-quantum), the home server fingerprint + facade secret URI, and the user-owned destination key. The new device re-fetches the user's current routing (destination + serving sealing key) from the server (`GET /v1/messaging/destination`). The ML-DSA private key (~4 KB) exceeds practical QR capacity; the enrollment bundle may therefore require a QR-carried one-time secret together with a transfer over a local channel. To be determined in client design.
 2. The new device authenticates as the user and **registers its client ID**.
-3. It announces itself with a sync event; an existing device responds with a `snapshot` (contacts, settings, recent history).
-4. Content delivered and fully acked *before* registration is gone by design and is not replayed; prior history arrives via the snapshot.
+3. It asks for the address book (`device.contacts-request`); every other device that has contacts answers.
+4. Content delivered and fully acked *before* registration is gone by design and is not replayed; prior history arrives with the address book and the message echo.
 
 ## Retirement (removing a device)
 
@@ -101,10 +104,10 @@ A self-message is named by a **delivery id of its own**, unrelated to the one th
 
 ## Quota interplay
 
-`message-echo` with attachments doubles outgoing traffic and temporarily occupies the user's own quota: echo blobs are retained only until every registered client has fetched them, so for devices that are normally online the occupancy is brief. An offline device accumulates echoes for the retention period; substantial attachment traffic on the free tier (20 MB) will exhaust the quota. This is an accepted trade-off, to be reviewed against operational experience.
+`device.message` with attachments doubles outgoing traffic and temporarily occupies the user's own quota: echo blobs are retained only until every registered client has fetched them, so for devices that are normally online the occupancy is brief. An offline device accumulates echoes for the retention period; substantial attachment traffic on the free tier (50 MB) will exhaust the quota. This is an accepted trade-off, to be reviewed against operational experience.
 
 ## Open questions
 
-- **Snapshot size vs quota** - a long-lived account's snapshot may exceed the free quota; chunked snapshots or an explicit size bound needed.
-- Client-side policy for `message-echo` (for example, omitting attachments above a threshold). The protocol permits a partial echo carrying an attachment stub; defaults to be determined in client design.
+- **Address-book size vs quota** - a long-lived account's book is sent in as many messages as it takes, one contact never spanning two; whether that needs an explicit bound is open.
+- Client-side policy for `device.message` (for example, omitting attachments above a threshold). The protocol permits a partial echo carrying an attachment stub; defaults to be determined in client design.
 - Per-device keys as a future identity model (see Retirement).

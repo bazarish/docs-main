@@ -99,7 +99,7 @@ quota. Admission is no longer part of that price - one pass admits all N.
 
 **2. Store-and-forward, with long gaps.**
 
-Mail waits up to the retention window (14 days by default) and arrives out of
+Mail waits up to the retention window (30 days by default) and arrives out of
 order. A ratchet has to keep skipped-message keys for that long, which means
 they are on disk, which means they are part of what a seized device gives up -
 the very thing forward secrecy was meant to remove. Whatever is chosen, the
@@ -109,7 +109,7 @@ stated, not left to a library default.
 **3. The first message has no room.**
 
 The contact request presents nothing and is capped: the measured worst case is
-10947 bytes against a cap of 10979. There is no headroom. A hybrid handshake that puts
+17858 bytes against a cap of 17890. There is no headroom. A hybrid handshake that puts
 ML-KEM material in the first message does not fit - which is precisely the
 problem SPQR solves by spreading key material over several messages. Any design
 here must say what the *first* message carries and what waits for the second.

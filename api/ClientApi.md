@@ -81,12 +81,12 @@ it in the mailbox until the recipient's devices have collected it - and the sing
 write a device makes to its own account, `POST /v1/messaging/self`, which reaches
 no other party.
 
-A **contact request**, which presents nothing, is capped by the protocol at **10979 sealed
+A **contact request**, which presents nothing, is capped by the protocol at **17890 sealed
 bytes** (`kMaxContactRequestBytes`) - not by any operator setting, and not with
 room to spare: this is the one thing a stranger may put in a mailbox, so the cap
 is the measured worst case and nothing above it.
 
-The worst case is **10947 bytes**, measured through the real path: the two hybrid
+The worst case is **17858 bytes**, measured through the real path: the two hybrid
 sealing keys the bootstrap carries, the delivery pass the requester hands
 over so the peer can answer, the ML-KEM ciphertext of the seal, the authorship
 block with the sender's keys in it (a request has no card and no pass, so the

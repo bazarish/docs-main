@@ -40,7 +40,7 @@ Which pass an account holds for each correspondent is private client state, carr
 A is not B's contact and B is not A's - the first exchange must bootstrap both directions:
 
 1. A's client derives its pass *for B* and registers its hash on A's own server.
-2. A sends a **contact request** to B: a delivery admitted by nothing, flagged as a request, payload capped (10979 bytes, the measured worst case; a protocol constant, not an operator setting). The cap is on the delivered, CMS-sealed bytes and must comfortably exceed a real contact request: the E2E payload carries A's identity, the introduction message, A's self-chosen **display name** (`dn`, so B can seed a named friend - see "Display names" below), **the pass B will write back with**, plus A's routing **bootstrap** - `{ sealing key, dest, servingKey }` (see `../Identity.md`) - without which B would not know where to send the acceptance, so a sealed request weighs 10947 bytes at its worst, the authorship block that
+2. A sends a **contact request** to B: a delivery admitted by nothing, flagged as a request, payload capped (17890 bytes, the measured worst case; a protocol constant, not an operator setting). The cap is on the delivered, CMS-sealed bytes and must comfortably exceed a real contact request: the E2E payload carries A's identity, the introduction message, A's self-chosen **display name** (`dn`, so B can seed a named friend - see "Display names" below), **the pass B will write back with**, plus A's routing **bootstrap** - `{ sealing key, dest, servingKey }` (see `../Identity.md`) - without which B would not know where to send the acceptance, so a sealed request weighs 17858 bytes at its worst, the authorship block that
 introduces the sender's keys (`Messages.md`) being 5471 of them. The cap is that
 number plus what the variable-length parts can add, and no more: room above the
 worst case is room for a stranger to fill a mailbox with. (A cap below that silently rejects every contact request with `CONTACT_REQUEST_TOO_LARGE`. No server fingerprint or server card: routing is by destination.)
@@ -53,7 +53,7 @@ worst case is room for a stranger to fill a mailbox with. (A cap below that sile
 
 4. B declines by taking no action: nothing is transmitted. The hash A pre-registered stays until A removes the pending contact, which revokes it.
 
-Contact requests are the only path into a mailbox that presents nothing; they get a separate small quota and per-origin-server rate limiting. Two bounds, not one: **3 per minute** per serving destination (`kContactRequestsPerMinute`) says how fast they may arrive, and **30 waiting at once** (`kMaxPendingContactRequests`, counted over what the mailbox is still holding) says how many may pile up. Past either, the answer is the same transient refusal a rate-limited sender gets - come back later - which says nothing about who is served at that destination.
+Contact requests are the only path into a mailbox that presents nothing; they are bounded by rate and by depth rather than by a quota of their own - a mailbox has one quota, and every class is stored against it. Two bounds, not one: **3 per minute** per serving destination (`kContactRequestsPerMinute`) says how fast they may arrive, and **30 waiting at once** (`kMaxPendingContactRequests`, counted over what the mailbox is still holding) says how many may pile up. Past either, the answer is the same transient refusal a rate-limited sender gets - come back later - which says nothing about who is served at that destination.
 
 ## Display names and avatars
 
@@ -65,12 +65,14 @@ A user's **avatar** (square, compressed client-side to <= 500 KB) is exchanged o
 
 ## First-contact discovery and co-location
 
-Before A can send the contact request above it must learn B's routing (`{ sealing key, dest, servingKey }`). Two discovery paths exist:
+Before A can send the contact request above it must learn B's routing (`{ sealing key, dest, servingKey }`). One discovery path exists:
 
 - **Invite / alias** - A holds a self-verifying descriptor (fingerprint + serving destination + serving key) and fetches B's user-signed card **over I2P federation**, dialing B's serving destination directly. The card is verified against the fingerprint, so no server is trusted (see `api/FederatedResolve.md`).
-- **By fingerprint** - A asks **its own server's facade** for B's routing (`GET /v1/account/contact`). This only works for a peer already known to be on A's own server and trusts that server for the routing. (CLI-only; not exposed in the GUI.)
 
-**Co-location rule (mandatory).** Two clients of the same server always have *different* I2P destinations - every account owns one - so first-contact discovery **MUST** go over I2P (the invite/alias card fetch), **never** the facade contact lookup. A facade lookup tells the shared server "client A is asking for client B"; combined with both resolving to that server, it discloses that A and B are **co-located on it**. Routing discovery through I2P makes A's lookup of B indistinguishable from any other federation fetch, so the server cannot infer co-location. The facade by-fingerprint path is therefore only for cases where same-server membership is already not secret.
+
+**Co-location rule (mandatory).** Two clients of the same server always have *different* I2P destinations - every account owns one - so first-contact discovery goes over I2P and there is no by-fingerprint lookup through a facade at all: one existed in an earlier draft, and a lookup that told a shared server "client A is asking for client B" would have disclosed that A and B are **co-located on it**.
+
+The same rule binds the answering end, which is the harder half. A card fetch arrives on a destination, and that destination answers for **its own user only**. Answering for any fingerprint the node happens to serve turned every published address into an oracle: dial A's destination, ask for B, and a card back proves the two are served by the same server. Nothing exotic is needed to try it - a fingerprint and the account-wide `view` capability, both of which ride in the routing block of every message a contact receives.
 
 For the same reason the contact request **delivery** is routed by destination over federation (I2P) in every case, including one in which the same server operates both destinations. No local short-circuit exists; the sending client performs the delivery, so no server is in a position to take one. See `api/Federation.md`.
 
@@ -89,7 +91,7 @@ destination serves. Such a request does not enter the seen-set, so it cannot be
 used to suppress the genuine delivery of the same id. A pass-bearing delivery for another mailbox is
 refused like any other bad admission.
 
-Unknown pass, unknown mailbox, and a recipient not served here must be externally indistinguishable (single `DELIVERY_REJECTED` error). Two refusals the one-time scheme had are simply gone: nothing can be "already spent", and no envelope can present the wrong number of them. Detailed typed errors (e.g. `QUOTA_EXCEEDED`, which the sender must see explicitly) are returned only after a valid pass has been presented - so only actual contacts can learn mailbox state.
+Unknown pass, unknown mailbox, and a recipient not served here must be externally indistinguishable (single `DELIVERY_REJECTED` error). Two refusals the one-time scheme had are simply gone: nothing can be "already spent", and no envelope can present the wrong number of them. Detailed typed errors (`STORAGE_FULL` and `MESSAGE_TOO_LARGE`, which the sender must see explicitly) are returned only after a valid pass has been presented - so only actual contacts can learn mailbox state. The order that makes this true is in `api/Federation.md`, and it is load-bearing rather than incidental.
 
 ## Open questions
 

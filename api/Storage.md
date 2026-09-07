@@ -2,12 +2,11 @@
 
 Status: draft skeleton.
 
-Internal abstraction inside the server for keeping users' pending encrypted content. Two backends from the start:
+Internal abstraction inside the server for keeping users' pending encrypted content. One backend:
 
-- **Disk** - plain filesystem layout, the simple-deploy default.
-- **Object storage** - S3-compatible API.
+- **Disk** - plain filesystem layout.
 
-The server code depends only on the abstract interface; backend choice is server configuration.
+The server code depends only on the abstract interface, so another backend could be added; none exists, and there is no configuration key that would select one.
 
 ## Stored data
 
@@ -38,6 +37,5 @@ Content is opaque ciphertext; the interface never interprets blob contents.
 
 ## Open questions
 
-- Where delivery-state metadata lives for the object-storage backend (object tags vs sidecar objects vs a small local index).
 - Encryption at rest: content is already end-to-end ciphertext; to be decided whether backend-level encryption adds sufficient value to justify the complexity.
 - Crash consistency of the ack-set -> delete rule (avoid resurrecting acked content after restart).

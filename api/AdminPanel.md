@@ -51,7 +51,7 @@ Privileged service endpoints are authenticated by **hybrid signature**, not a
 shared secret. The panel has its own identity (generated on first start, kept in
 its state directory); it signs every service call with the request-auth headers
 (common `auth::signRequest`). Each service authorises a configured set of operator
-fingerprints (`--operator-fingerprint`, repeatable) and verifies the request with
+fingerprints (`operators`, repeatable) and verifies the request with
 `auth::authorizeRequest` (verify both signatures, then require the caller
 fingerprint to be authorised). The service node likewise signs its own
 quota/transient pushes with its identity, so server-core authorises both the
@@ -81,7 +81,7 @@ Every service but one serves it on the same private listener as its API, which i
 already unreachable from the clearnet. The exception is **facade-http**, whose API
 listener *is* the clearnet one: there `/healthz` would answer a caller who does not
 know the secret prefix and would thereby identify the host as a facade, so it is
-served on a separate private operations socket (`--ops-listen <host> <port>`) and the panel is
+served on a separate private operations socket (`opsListen <host> <port>`) and the panel is
 configured with that address, not the published facade URL (`Facade.md`).
 The panel probes every configured service concurrently and renders status,
 version, uptime, current/peak RAM and round-trip latency.
@@ -165,7 +165,7 @@ The quota is set **on the service node**, which is the component that grants it 
 pushes it to server-core. Setting it directly on server-core, as an earlier
 revision of the panel did, is overwritten by the node's next push.
 
-The panel serves its web files from `--assets <dir>` (mandatory): the page shell,
+The panel serves its web files from `assets <dir>` (mandatory): the page shell,
 the sign-in page, the stylesheet, the script and the logo, read once at startup and
 served from memory. An operator changes the presentation by editing these files and
 restarting the panel.
@@ -191,7 +191,7 @@ place in that flow.
 
 The configuration contains no secrets. The panel prints its own operator
 fingerprint at startup; that fingerprint is added to each service's
-`--operator-fingerprint`.
+`operators`.
 
 Everything above is also editable from the Panel tab, and the panel writes it
 back into this same file one value at a time - the operator's key order, spacing
