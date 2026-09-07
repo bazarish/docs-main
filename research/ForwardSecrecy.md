@@ -64,30 +64,35 @@ model, where the network is hostile and a server's disk may be read.
 
 ## The constraints that decide this, and they are ours, not Signal's
 
-**1. One key, many devices - and the device count is private.**
+**1. One key, many devices - and the devices are already visible.**
 
-This is the hard one. Every device of an account shares the *same* identity and
-the *same* sealing key (an import copies `sealingPem` verbatim). A message is
-placed in the account's mailbox **once**, and every registered device fetches it
-independently; a device may be offline for days and fetch it later.
+Every device of an account shares the *same* identity and the *same* sealing key
+(an import copies `sealingPem` verbatim). A message is placed in the account's
+mailbox **once**, and every registered device fetches it independently; a device
+may be offline for days and fetch it later.
 
-A ratchet is a piece of state that must advance in lockstep with the sender. If
-one device advances it, the others cannot open what follows. Signal solves this
-by treating every device as its own session and having the sender encrypt N
-copies - which is exactly what tells the sender how many devices the recipient
-has. This project deliberately treats that number as private: the mailbox is
-per account, and `GET /v1/messaging/clients` answers only about one's own.
+A ratchet is state that must advance in lockstep with the sender. If one device
+advances it, the others cannot open what follows. Signal solves this by treating
+every device as its own session and having the sender encrypt one copy per
+device.
 
-So the first question is not "which ratchet" but: **are we willing to let a
-correspondent learn how many devices we have?** Every answer below depends on it.
+That approach is often rejected because the fanout tells the sender how many
+devices the recipient has. **Here it costs nothing, because a correspondent
+already knows.** Delivery tokens are one-time and therefore addressed per
+device - two devices must never spend the same one - so a device names itself in
+what it sends (`"device": <clientId>` rides on the contact request, the token
+request, the low-stash refill ask, the file offer and more), and the receiving
+side accumulates the pairs on purpose (`refillPeers`, "peer, device"; a contact
+keeps `requesterDevice`; a batch is addressed `forDevice`). The device count is
+not a protected property of this design and never was.
 
-There is a middle path worth studying: an account-level key that own devices
-share and re-key among themselves over the existing device-sync channel
-(`DeviceSync.md` already carries contact books and token grants between devices).
-That keeps the device count private and gives forward secrecy against an outside
-attacker, at the cost that a compromised device can still read the account's
-traffic until the account re-keys - which is arguably the honest security level
-for a design where all devices share one identity anyway.
+Two honest refinements. What a correspondent learns is the set of devices that
+*write* to them - a device that only reads never names itself - and what it
+learns is a random 8-byte id, a pseudonym rather than a name.
+
+What per-device sessions **do** cost here is real but different: the sender
+encrypts and delivers N copies, so one message spends N one-time tokens and N
+times the recipient's mailbox quota. That is the number to weigh, not privacy.
 
 **2. Store-and-forward, with long gaps.**
 
@@ -133,39 +138,55 @@ like.
    synchronised across own devices (constraint 1 in full force). Delivers:
    forward secrecy against later compromise; **no** recovery after a compromise -
    an attacker who takes the chain key follows it forever.
-4. **Double ratchet, hybrid (Signal-shaped).** Cost: high - it is the multi-device
-   problem, the skipped-key problem and the first-message size problem all at
-   once, and either a Rust dependency (libsignal) or our own implementation,
-   which rule 4 discourages. Delivers: forward secrecy and post-compromise
-   security, the strongest of the options.
+4. **Double ratchet, hybrid (Signal-shaped).** Cost: high - the skipped-key
+   problem and the first-message size problem at once, N ciphertexts per message,
+   and either a Rust dependency (libsignal) or our own implementation, which rule
+   4 discourages. Delivers: forward secrecy and post-compromise security.
 5. **2MLS with a post-quantum ciphersuite.** Cost: high, but a different kind:
    a standard, a C++ implementation to evaluate (mlspp), and PQ ciphersuites
    still at draft. Delivers: forward secrecy and post-compromise security, and -
-   the reason it is on this list despite the weight - **multi-device falls out of
-   the model rather than being bolted on**: each device is a leaf of the group,
-   which is what MLS is for. It also fits the project's rule better than anything
-   else here, because it is an RFC with implementations rather than a scheme we
-   would be writing.
+   the reason it heads the recommendation - **multi-device falls out of the model
+   rather than being bolted on**: each device is a leaf of the group, which is
+   what MLS is for, and retiring a device re-keys the group, which the shared-key
+   design cannot express at all. It also fits the project's rule better than
+   anything else here, because it is an RFC with implementations rather than a
+   scheme we would be writing.
 
 ## Recommendation
 
-Decide constraint 1 first - whether the number of a user's devices may become
-visible to their correspondents. It is a product question, not a cryptographic
-one, and every option below the first depends on the answer.
+Because a correspondent already sees a user's writing devices, the usual reason
+to avoid per-device sessions does not apply, and the choice is an engineering one
+rather than a product one.
 
-If the answer is **no** (the count stays private), then options 4 and 5 in their
-standard shapes are both off unless devices share ratchet state, and the honest
-shortlist is (2) now and (3) or an MLS group whose leaves are *own devices*
-later.
+**MLS deserves the serious evaluation first.** It is the only option here that is
+a published standard with a C++ implementation to lean on rather than a scheme
+this project would be writing itself - which is what the codebase's own rule
+against home-made cryptography asks for. It gives post-compromise security as
+well as forward secrecy. And multi-device is native: each device is a leaf, which
+is exactly the shape this account model already has, with the added benefit that
+the group re-keys when a device is retired - something the shared-key design
+cannot express at all today.
 
-If the answer is **yes**, 2MLS deserves a serious evaluation before anything is
-written: it is the only option on this list that is a standard with a C++
-implementation, it gives post-compromise security as well as forward secrecy,
-and multi-device is native rather than grafted.
+What the evaluation has to answer, in this order:
 
-Either way, (2) is worth doing regardless and independently: it is small, it uses
-mechanisms that already exist, and it turns "everything, forever" into "the last
-N days" while the larger question is settled.
+1. **Cost per message.** Per-device sessions mean N ciphertexts, N one-time
+   tokens and N times the quota. Measure it against a realistic device count
+   before anything else - if that number is unacceptable, the rest is moot.
+2. **Skipped-key retention.** Mail waits up to the retention window and arrives
+   out of order, so keys for unopened messages sit on disk for as long. Whatever
+   that parameter ends up being, it is a security statement and belongs in the
+   docs, not in a library default.
+3. **The first message.** The contact request has 32 bytes of headroom. Say
+   explicitly what the handshake puts in it and what waits for the second
+   message.
+4. **PQ ciphersuites** are still an IETF draft. Decide whether to ship the
+   classical suite first and add the hybrid one later, and what that means for
+   the project's "hybrid everywhere" rule in the meantime.
+
+**Rotation (option 2) is still worth doing on its own, and now.** It is small, it
+reuses the two-step mechanism the serving key already has, and it turns
+"everything, forever" into "the last N days" while the larger question is
+settled. It is not forward secrecy and must not be described as such.
 
 ## Sources
 
