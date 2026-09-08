@@ -252,4 +252,9 @@ intermediaries are trusted for availability only (`Identity.md` /
 
 - Facade registration/rotation flow: how a server **operator** issues and revokes secret URIs. (Clients already learn a server's facades from the configuration link above, and can add/edit the list locally; what remains is the operator-side issuance/revocation and whether updated facades should also propagate via the server card.)
 - Whether the facade enforces any rate limiting or leaves it entirely to the reverse proxy.
-- Streaming/long-poll support requirements imposed by the incoming-delivery mechanism chosen in `ClientApi.md`.
+- ~~Streaming/long-poll support imposed by the incoming-delivery mechanism~~ -
+  settled: incoming mail is one held-open request (`ClientApi.md`) and there is
+  no second mechanism behind it, so a facade **must** carry a request answered
+  late - up to 30 seconds - and its own upstream timeouts must outlast that. A
+  facade that closes a parked request under a client is not slow, it is broken:
+  the client has no other way to hear that mail arrived.
