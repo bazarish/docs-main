@@ -109,9 +109,22 @@ and anything about the owner's devices.
 **Forward secrecy: there is none, and the card is where that shows.**
 `sealingKey` is long-lived and never rotated, so whoever obtains its private half
 reads everything that account was ever sent - including what is still sitting in
-mailboxes. Compare `servingKey`, which does have a rotation mechanism. This is a
-known state, not an oversight, and what to do about it is being worked out in
-`research/ForwardSecrecy.md`.
+mailboxes. Compare `servingKey`, which does have a rotation mechanism.
+
+This is a decision rather than an oversight, and the reasoning is worth keeping
+because the question comes back. Forward secrecy bounds what a key obtained later
+can reopen in ciphertext somebody hoarded. It does not bound what an account's own
+database gives up: the transcript is stored decrypted inside it, so a device and
+its passphrase yield the history whatever the message keys did. The threat this
+protocol is built against is that database, not a recording of the traffic - so
+neither key rotation nor a ratchet would answer it, and both cost real
+complexity: rotation adds retired keys and the silent loss of mail from a contact
+who has been away too long, a ratchet adds state that every device of an account
+would have to advance in lockstep while each fetches its mail independently.
+
+Reopen it if something changes the premise - message history stored under a key
+of its own, say, which is what would make the ciphertext hoard the weak point
+again.
 
 A card is republished to **the server** whenever its contents change (a new
 destination, a rotated serving key); contacts learn a new destination from the
