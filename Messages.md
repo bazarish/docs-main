@@ -427,47 +427,40 @@ group and a client can pattern-match a family (`call.*`) it partially supports.
 ### Ordering and timestamps
 
 Every content envelope carries `sentAt` as a **unix millisecond** timestamp,
-stamped by the sending client from its own clock at send time. It is the single
-source of truth for both the message's displayed time and its position in the
-conversation: the recipient shows `sentAt`, never the moment the message was
-received. Because a send takes as long as I2P takes and a recipient's mailbox is fetched on
-its own schedule (`api/Federation.md`), several messages written in quick
-succession can arrive in a different order than they were sent; ordering by
-`sentAt` rather than by arrival repairs that. (The sending client does deliver one
-correspondent's messages one at a time, in the order they were written, so what
-reorders them is the far side, not the near one.)
+stamped by the sending client from its own clock at send time. It sits inside the
+sealed body, under the authorship signature, and it is the single source of truth
+for both the message's displayed time and its position in the conversation.
 
-Placement on arrival of a message with timestamp `t`, where `T` is the
-recipient's local clock at the moment it is received, follows one rule:
+A recipient orders a conversation by `sentAt` and by nothing else. In particular
+it does not order by when the message reached it, and it has nothing from a
+server to order by: a mailbox is told the delivery class and the size of an
+envelope and never its contents, so no server is in a position to say when a
+message was written - and none is asked. The local arrival clock stands in only
+for an envelope that carries no `sentAt` at all.
 
-- **Recent (`T - t <= 20000` ms)** - place the message in `sentAt` order. This is
-  the common case (a burst of messages whose hops scrambled their arrival), and
-  reordering then only touches the last few lines, which are already in view, so
-  nothing shifts outside the user's viewport.
-- **Late (`T - t > 20000` ms)** - **append** the message at the end as a fresh
-  arrival; do **not** reposition it by `sentAt`. Its displayed time is still its
-  own (older) `sentAt`, so the user still sees when it was written, but it lands at
-  the bottom where an arrival is expected. A long-delayed message (the sender was
-  offline, a slow relay) must not silently insert itself up in the history, above
-  the fold, where a reader with the chat open would never notice it appear.
+Two things scramble the order before the reader sees it, and each is repaired
+where it happens:
 
-Concretely each message gets a stable **order key**: its `sentAt` for a recent
-arrival, the local arrival time `T` for a late one. The conversation is kept
-sorted by the order key, which makes the two cases compose without conflict: a
-genuinely new message (order key ~= its `sentAt`, i.e. ~= now) always sorts after
-a late message anchored at its earlier arrival time, and the late message never
-jumps ahead of newer traffic. The window is precisely what stops the
-"don't reorder old arrivals" rule from disturbing the live ordering of new ones -
-old arrivals are pinned at the bottom, recent ones are sorted among themselves.
+- **In flight.** A send takes as long as I2P takes, and each message travels its
+  own way, so two messages written half a second apart can reach the recipient's
+  mailbox seconds apart and in either order. The recipient repairs this by
+  sorting on `sentAt`.
+- **In the mailbox.** A mailbox hands its waiting items out in the order it took
+  them (`api/ClientApi.md`), so a burst is fetched in the order it arrived rather
+  than in whatever order the server's storage happens to enumerate.
 
-The width of it is set by how long a mailbox takes to drain, not by how long a
-message takes to arrive: every waiting item is fetched by a request of its own and
-a client takes them a few at a time, so a burst reaches the reader over tens of
-seconds. A window narrower than that drain reorders nothing, because by the time
-the last item of the burst is read its `sentAt` is already old - which is how a
-device could show a correspondent's reply above the message it answered, that
-message being an echo of the user's own send and written only after the
-recipient's server signed for it.
+Concretely each message gets a stable **order key**, which is its `sentAt`. The
+conversation is kept sorted by it, so a message written long ago and delivered
+only now appears where it was written, in history, rather than at the bottom.
+That it can therefore arrive above the fold is not left to the reader's eye: the
+unread mark is kept as a high-water over *stored* rows, in the order they were
+received, so a late arrival is unread whatever its timestamp says.
+
+The cost of ordering by a clock the recipient does not control is stated plainly:
+a correspondent whose clock is wrong (or who lies about it) places their own
+messages wrongly in the conversation, and nothing but their own signature backs
+the time. This is accepted deliberately - the alternative is to let the party
+that is meant to know nothing about a message decide where it goes.
 
 ## Delivery status
 

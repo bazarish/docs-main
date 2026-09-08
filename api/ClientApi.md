@@ -119,8 +119,8 @@ server.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /v1/messaging/events` | Hold the request open until something is pending for this client (or `wait` seconds pass, capped at 30), then answer in the same shape as `pending`. How a server holds it open is its own business; what the protocol requires is that a delivery ends the wait. A client that gets a 404 here falls back to polling `pending` |
-| `GET /v1/messaging/pending` | List pending entries for this client ID: `{pending: [{id, class}]}` where `class` is the delivery class `content` or `contact` (the admission selector, not the content type - see `../Messages.md`) |
+| `GET /v1/messaging/events` | Hold the request open until something is pending for this client (or `wait` seconds pass, capped at 30), then answer in the same shape as `pending`. How a server holds it open is its own business; what the protocol requires is that a delivery ends the wait, at once. This is the **only** way a client learns that mail has arrived: there is no second, slower mechanism to fall back to, and a wait that ends in an error is asked again rather than handed to one |
+| `GET /v1/messaging/pending` | List pending entries for this client ID: `{pending: [{id, class}]}` where `class` is the delivery class `content` or `contact` (the admission selector, not the content type - see `../Messages.md`). **Oldest arrival first**, and `events` answers in the same order: a burst is fetched in the order the mailbox took it, not in whatever order the server's storage enumerates. The order is arrival only - where each message sits in the conversation is decided by the `sentAt` inside the sealed envelope, which no server sees |
 | `GET /v1/messaging/pending/{blobId}` | Fetch the raw E2E payload bytes |
 | `POST /v1/messaging/ack` | Confirm receipt for this client ID; when all registered client IDs of the user have acked, the server deletes the content immediately |
 
@@ -179,7 +179,7 @@ Every request carries the client's unique random **client ID**; the "delete when
 
 ## Open questions
 
-- **Incoming delivery mechanism** - long-poll vs websocket vs plain polling on `/pending`. Affects facade transparency.
+- **Incoming delivery mechanism** - settled: one held-open request (`events`), no periodic polling and no fallback. A facade carrying it learns when an event happened and nothing else - the request rides the tunnel, so the client, the path and the answer are opaque to it.
 - **Pagination / batching** for `/pending` with many messages.
 - Retention period of completed send attempts before they are dropped.
 - Endpoint naming and request/response schemas - to be specified per endpoint once flows are agreed.
