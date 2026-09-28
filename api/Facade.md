@@ -58,7 +58,7 @@ The facade is the "last mile" between the client and the server infrastructure. 
   facade address discloses nothing about which users a server hosts.
 - Published under a **secret URI** known only to clients of this server, and that secrecy is **mandatory, not a deployment option**: `bazarish-facade-http` refuses to start without `basePath <secret>`, which it requires on every request and strips before forwarding. The single exception is an explicit `public`, and it means one thing only - a fronting reverse proxy (Caddy, nginx, ...) already publishes this facade under a secret URI of its own. The secret reaches a client solely inside the facade URL of the server descriptor (below); it is never advertised, never derived from the server fingerprint, and never sent anywhere else.
 - The whole clearnet API therefore lives under the secret prefix. Nothing is left outside it: the reseed is no longer part of this API at all (`ClientApi.md`), so a facade answers only requests from a client that already holds the secret.
-- **Three paths exist, and the facade reads none of them.** Once the secret
+- **Two paths exist, and the facade reads neither.** Once the secret
   prefix is stripped, everything is relayed over the **operator private channel**
   (localhost/unix socket/VPN) to the messaging server, and there is only one
   backend to relay to:
@@ -72,11 +72,10 @@ The facade is the "last mile" between the client and the server infrastructure. 
     its tunnel to. Public, identical for every caller, and signed by the
     fingerprint the user already had, so a facade may withhold it but cannot put
     one of its own in its place.
-  - `GET /v1/messaging/reseed` - **kept in the allow-list, and dead**: the server
-    serves the archive on its ops socket and the portal serves it publicly
-    (`ClientApi.md`), so nothing answers this path. It is listed here because the
-    code still whitelists it, not because it works.
-  - anything else -> 404 (never forwarded)
+  - anything else -> 404 (never forwarded). The reseed archive is not among
+    them: the server serves it on its ops socket and the portal serves it
+    publicly (`ClientApi.md`), and the path the facade once whitelisted for it is
+    gone from the list as well as from the answer.
 - **Account management is not a separate route any more.** Client calls to the
   service node arrive inside the same tunnel and are forwarded to the node by the
   messaging server under its own signature; the node is no longer reachable from

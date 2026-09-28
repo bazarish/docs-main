@@ -5,8 +5,10 @@ Status: implemented.
 The **service node** owns user accounts. It exposes a **web portal** (the
 "Service site") through which a user registers and proves ownership of their key.
 The **messaging server (server-core)** stays a pure delivery layer: it never
-registers anyone. A client can sign and fetch, but **cannot self-register** -
-registration is a human/web flow guarded by a captcha.
+registers anyone. Proving the key is the whole registration, whether it is proven
+in the portal or by a client calling `POST /v1/account/registration`; there is no
+puzzle in front of it, because anything a person reads off a picture a solver
+reads too.
 
 **This node sells nothing.** It maintains no balance, no ledger and no payment
 gateway, and offers no paid service. The only paid component of the project is the
@@ -20,7 +22,7 @@ own I2P destination - is included.
             +---------------------------------+  paste | (key never enters browser) |
                            | HTTP                 sig   +----------------------------+
                   +--------v---------+
-                  |   service node   |  accounts, captcha, approval
+                  |   service node   |  accounts and approval      
                   +------------------+
        grants registration | quota
                   +--------v---------+
@@ -69,7 +71,6 @@ GET /v1/account/portal  ->
   "message": "<human text shown by the client>",
   "links":   ["https://portal-a.example/...", "https://portal-b.example/..."],  // >=1
   "registration": {
-    "captcha":          true,
     "requiresApproval": false,
     "message":          "<how to reach the operator, when approval is required>"
   },
@@ -79,10 +80,10 @@ GET /v1/account/portal  ->
 
 The client shows the message and the link(s); the user opens one in a browser.
 Several links allow mirrors/onion/clearnet alternatives. There is no service
-catalogue because nothing is sold here: the only variables are whether a captcha
-is required, whether an operator has to approve the account, and the one storage
-quota everybody gets. (The global `username` namespace is a separate product sold
-by the central alias-resolver, not the service node - see `AliasResolver.md`.)
+catalogue because nothing is sold here: the only variables are whether an
+operator has to approve the account and the one storage quota everybody gets.
+(The global `alias` namespace is a separate product sold by the central
+alias-resolver, not the service node - see `AliasResolver.md`.)
 
 server-core, when it rejects an unregistered sender, returns an error that points
 at the same portal.
@@ -127,8 +128,8 @@ sharing an address; every other destination in the project stays encrypted.
 
 A destination can only be delegated once the account exists, so the client
 publishes its card first, delegates its transient, and immediately re-publishes it
-contact card (`POST /v1/account/renew` inside the term it already holds, which
-grants nothing and consumes no grant) with the routing folded in. On a moderated
+contact card (`POST /v1/account/card` again, inside the term it already holds,
+which grants nothing and consumes no grant) with the routing folded in. On a moderated
 node the delegation is refused until an operator approves the account, so the
 client publishes its routing then instead.
 
@@ -155,9 +156,10 @@ per-user-destination endpoint) and reports its state on
 
 ## 4. Registration: open or moderated
 
-Behind login, gated by the configured **captcha**. On success the node issues a
-account into the store when the client publishes its card; the client reads its
-state back via `GET /v1/account/i2p-status`.
+Proving the key is the registration, and the node records a pending grant for
+that fingerprint. The grant becomes an account in the store when the client
+publishes its card; the client reads its state back via
+`GET /v1/account/i2p-status`.
 
 An operator chooses one of two modes (`registration.requireApproval`):
 
@@ -182,7 +184,7 @@ This mechanism is moderation, not a charge.
 | `DELETE /v1/account/user?user=` | Operator-signed: delete the account (certificate, grants, destination) |
 | `POST /v1/account/ban` | Operator-signed: delete the account and refuse this key from now on (reason defaults to "Banned") |
 | `POST /v1/account/unban` | Operator-signed: lift a ban |
-| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed, and the whole of what an operator can change: registration mode and its two messages, captcha (on/off, `captchaLength`, `captchaTtlSeconds`), `loginConsumer`, `portalLinks`, `facades`, `reseeds`, `defaultQuotaBytes`, `idleDeleteDays`, `logLevel`, and the three addresses `listen`, `portalListen`, `messaging` - plus the account count and the sum of the quotas. Everything is written back into the node's config file, so a restart keeps it; `logLevel` and the portal's own words apply at once, the captcha numbers and the three addresses at the next start |
+| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed, and the whole of what an operator can change: registration mode and its two messages, `loginConsumer`, `portalLinks`, `facades`, `reseeds`, `defaultQuotaBytes`, `idleDeleteDays`, `logLevel`, and the three addresses `listen`, `portalListen`, `messaging` - plus the account count and the sum of the quotas. Everything is written back into the node's config file, so a restart keeps it; `logLevel` and the portal's own words apply at once, the three addresses at the next start |
 
 A ban outlives the account it removed - it is what stops the same key from
 registering again - so it is stored apart from the record it deletes, and a
@@ -202,29 +204,7 @@ number of matches (`total`). The search belongs here rather than in the panel:
 the node is the only side that has the accounts, and shipping them all to filter
 one would be both slow and a leak of the whole roster into a browser.
 
-## 5. Captcha (pluggable, self-hosted default)
-
-A `Captcha` interface (`issue() -> {id, challenge-render}`, `verify(id, answer)
--> bool`). The built-in default is a **self-hosted server-rendered image
-captcha** - no third party, works **without JavaScript**. An operator may
-register a different provider. Captcha gates free registration; it never depends
-on an external service by default, preserving the privacy posture.
-
-The id is stateless: `base64({ts, tag})` where `tag = HMAC(secret, answer||ts)`,
-so verification stores nothing per challenge beyond a small single-use set, and
-a challenge outside the window (default 300 s) is dead.
-
-The image is a **drawing, not text**. Every character is a set of stroked
-polylines from a built-in stroke font, placed with a per-challenge rotation,
-shear, baseline shift and point jitter, cut into pieces at random seams and
-emitted in shuffled document order, together with decoy strokes and a wave that
-crosses the whole code. Nothing in the markup names a character or their order,
-so the answer cannot be read out of the source - the reader has to rasterise,
-segment and recognise, which is the work a captcha is meant to cost. The strokes
-carry `currentColor` and no background, so the page styles the captcha with the
-rest of the site.
-
-## 6. Web frontend (JS-free)
+## 5. Web frontend (JS-free)
 
 The portal is **a single page** at `/`, server-rendered without JavaScript (forms,
 full-page reloads, post-redirect-get). It presents one action at a time; there is
@@ -233,15 +213,11 @@ no account area, as the node offers nothing to purchase or manage:
 1. **the user's key** - the page renders a challenge; the user signs it in their client
    and pastes the blob back. `POST /login` verifies it and sets the session
    cookie.
-2. **register** - a signed-in user without an account is presented with a captcha.
-   `POST /register` verifies the answer and issues the grant; solving the captcha
-   constitutes the registration. Where the node is configured without a captcha,
-   proof of the key constitutes the registration and the grant is issued when the
-   page loads.
-
-Thereafter the same page reports the account (quota, term) and provides the
-server descriptor to paste into a client, or - on a moderated node - the
-"waiting for the operator" notice with the operator's instructions.
+There is no second step: the grant is issued as the key is proven, so the page
+that follows the sign-in already reports the account - its quota, what the
+messaging server holds for it, and the server descriptor to paste into a client -
+or, on a moderated node, the "waiting for the operator" notice with the
+operator's instructions. An account's owner can also end it from here.
 `POST /logout` drops the session.
 
 The portal's **web files live on disk**, not in the binary: `portal.assets
@@ -255,10 +231,11 @@ for by name:
 | `page.html` (shell) | `title`, `server` (this node's messaging-server fingerprint), `session`, `content` |
 | `session.html` | `fingerprint` |
 | `signin.html` | `challenge`, `error` |
-| `register.html` | `quota`, `captcha`, `captchaId`, `error` |
-| `registered.html` | `quota`, `term`, `descriptor` |
+| `registered.html` | `quota`, `descriptor`, `mailbox`, `devices` |
 | `registered-approval.html` (moderated node) | the same, plus `message` - the operator's note |
-| `waiting.html` | `message` |
+| `waiting.html` | the same as the approval page |
+| `banned.html` | `message` - the operator's reason |
+| `confirm-delete.html` | `mailbox`, `devices` |
 
 `error` and `message` carry a whole notice or nothing at all, because a
 placeholder in a file cannot remove its own box when there is nothing to say.
@@ -270,44 +247,41 @@ meant to be taken away, and a browser without scripts loses nothing else. Each f
 and served from memory afterwards, so an edit takes effect on restart; only files
 in that directory, of a type the portal publishes, are served.
 
-## 7. API relationships
+## 6. API relationships
 
 | Caller | Endpoint | Auth | Purpose |
 |---|---|---|---|
 | Client | `GET /v1/account/portal` | none | onboarding text + portal links + registration terms |
 | Client | `sign-login <challenge>` (local) | key | produce the login signature |
-| Browser | `GET /`, `POST /login` | sig -> session | sign-in-with-key |
-| Browser | `POST /register` | session + captcha | registration grant |
+| Browser | `GET /`, `POST /login` | sig -> session | sign-in-with-key, which is the registration |
+| Client | `POST /v1/account/registration` | key | the same registration, with no page to visit |
 | Panel | `POST /v1/account/approve` | operator sig | moderation |
 | Panel | `GET /v1/account/users`, `GET /v1/account/user`, `PUT /v1/account/quota` | operator sig | the operator's account list, search and quota |
 | Client | `POST /v1/account/card` | key | publish the card, redeem the grant |
 | Client | `POST /v1/account/i2p-dest` | key | upload a signed offline transient (refused while the account is unapproved) |
 | Client | `GET /v1/account/i2p-status` | key | approval state and the recorded transient validity |
 
-## 8. Removed (replaced by the portal)
+## 7. Removed
 
-- `POST /v1/account/card` (client-initiated grant, no captcha) and
-  the client `Session::registerAccount` direct flow.
 - `POST`/`DELETE /v1/account/alias`, `GET /v1/account/resolve`, and the on-node
-  alias registry: the global `username` namespace moved out to the central
+  alias registry: the global `alias` namespace moved out to the central
   **alias-resolver** (`AliasResolver.md`). The service node no longer sells,
   stores, or resolves names - and since the payment layer moved to the resolver
   too, it now sells nothing at all: a destination and a mailbox quota come with
-  the account.
+  the account. Nothing of a payment layer is left here, not even an abstraction.
+- The captcha, and with it `GET /portal/captcha`, `POST /register` and
+  `register.html`. A puzzle a person can read is a puzzle a solver can read, so
+  it bought nothing and cost a page; what is left is the two modes above.
 
-Kept: `card`; the `mock` gateway (tests); the `PaymentGateway`
-registry/abstraction.
-
-## 9. Security notes
+## 8. Security notes
 
 - The key never enters the browser; login is a relayed one-shot signature bound
   by `purpose` + `audience` + a fresh, HMAC-bound, single-use nonce.
-- Captcha defaults to self-hosted (no third-party calls, JS-free capable).
 - Sessions are short-lived signed cookies.
 - Approval and deletion are operator-signed actions on the private channel; the
   portal itself can neither approve an account nor see who is waiting.
 
-## 10. Open questions
+## 9. Open questions
 
 - Whether server-core embeds portal links in its rejection error or only
   references the service node's `/v1/account/portal`.

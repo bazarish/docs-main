@@ -19,7 +19,7 @@ This is a direct consequence of the two-layer model:
 
 There is deliberately **no** server-side bot registry, bot flag, or bot
 discovery in this iteration. A bot is reached exactly like any contact: by
-fingerprint, by invite link, or by a username (alias) it registered with a
+fingerprint, by invite link, or by an alias it registered with a
 service node. Discovery, rate-limiting policy and any distinct UI treatment are
 open questions left to clients and future iterations - none of them require a
 server change to introduce.

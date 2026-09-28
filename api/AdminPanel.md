@@ -119,7 +119,7 @@ A sidebar carries the views:
 
   | Tab | What it holds |
   |---|---|
-  | Registration | open or moderated, captcha on or off, its length and lifetime, the message a new client is told and the one a waiting account is shown |
+  | Registration | open or moderated, the message a new client is told and the one a waiting account is shown |
   | Portal | the login consumer (name, address, role) the client shows before a user signs, the portal's public links, and the socket the portal binds |
   | Network | the facades and reseeds clients reach this server by, the descriptor built from them, the node's own operator API and the messaging server it is bound to, and the log level |
   | Accounts | the storage a new account gets and how long an idle one is kept, beside the two numbers that say whether the promise still fits: what the quotas have allocated and what the disk actually holds (`GET /v1/messaging/storage`) |

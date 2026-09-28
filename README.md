@@ -42,7 +42,7 @@ One repository per component, developed side by side:
 | Shared C++ library | [common-cpp](https://github.com/bazarish/common-cpp) |
 | Server fleet: messaging server, service node, HTTP facade, admin panel | [bazarish-server](https://github.com/bazarish/bazarish-server) |
 | Client (core, CLI, Qt6 GUI) | [client-qt6](https://github.com/bazarish/client-qt6) |
-| Username registry (signed resolve + portal; the one paid component) | [alias-resolver](https://github.com/bazarish/alias-resolver) |
+| Alias registry (signed resolve + portal; the one paid component) | [alias-resolver](https://github.com/bazarish/alias-resolver) |
 | Specification | this repository |
 
 This repository specifies the protocol: the wire formats, what each party may

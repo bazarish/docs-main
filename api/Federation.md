@@ -132,7 +132,7 @@ DeliveryEnvelope:
 | `deliver` | Deliver an envelope (message or contact request) for a local mailbox |
 | `card` | Return **this destination's own user's** contact card for a fingerprint query - the first-contact card fetch (`FederatedResolve.md`). A destination answers for the one user it belongs to and for nobody else: answering node-wide made every published address an oracle for "is this fingerprint served here", and two invites proved their owners co-located |
 
-Username resolution (`alias` -> descriptor) is **not** an operator-to-operator
+Alias resolution (`alias` -> descriptor) is **not** an operator-to-operator
 verb; it is served by the separate central resolver over its own I2P endpoint
 (`AliasResolver.md`, `FederatedResolve.md`).
 
@@ -166,7 +166,7 @@ summary:
   fingerprint sealed to the serving sealing key - a direct fetch over a transient
   I2P destination, and verifies the card against the fingerprint. `fp` anchors
   integrity; nothing in between learns the fingerprint (sealed) or the result.
-- A **username** resolves to a descriptor at the central resolver
+- An **alias** resolves to a descriptor at the central resolver
   (`AliasResolver.md`), which returns a signed self-verifying record over its I2P
   endpoint; the client then runs the card fetch above.
 

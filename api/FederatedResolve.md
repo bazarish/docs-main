@@ -3,7 +3,7 @@
 Status: **design** (supersedes the earlier draft of this document). Specifies how
 a client discovers a contact it knows only by a small scannable identifier or by
 name, over I2P, with the home server learning nothing about it - it is not on the
-path - and no party able to forge the result. The central username registry/daemon is specified in
+path - and no party able to forge the result. The central alias registry/daemon is specified in
 `AliasResolver.md`; the identity/certificate formats in `../Identity.md`; the I2P
 transport in `Federation.md`.
 
@@ -56,7 +56,7 @@ home server never sees who is being added (below).
    A caller whose descriptor is out of date gets that one answer and knows to ask
    for a fresh one. Rotating `view` retires every descriptor already shared -
    which a key doing double duty in the delivery path could never do.
-2. **Alias resolve - `fp` is unknown.** `username` -> descriptor. This is the only
+2. **Alias resolve - `fp` is unknown.** `alias` -> descriptor. This is the only
    step without an `fp` anchor, so it is where MITM and the trusted alias->identity
    binding live. Served by the single central resolver (`AliasResolver.md`).
 
@@ -106,7 +106,7 @@ admission headers with (`../Identity.md`, `InviteAnonymity.md`); no new key. On
 the only path there is, the I2P stream is already confidential to `srv`, so
 app-layer sealing is optional. Integrity is always the `fp` anchor.
 
-## Alias-resolve protocol (`username` -> descriptor)
+## Alias-resolve protocol (`alias` -> descriptor)
 
 The full **signed** resolve is served over the resolver's I2P endpoint only,
 for uniform client automation (`AliasResolver.md`). The resolver returns a
@@ -158,7 +158,7 @@ Namespace anti-enumeration is out of scope for the resolver (resolve is unauthen
 3. **client** - *done.* Descriptor handling, a fetch transport that dials the
    target directly over a transient I2P destination (a served `CARD_UNKNOWN` /
    `ALIAS_UNKNOWN` is authoritative),
-   ephemeral seal/verify, address parsing (`fp:b33` vs `<alias>`), `addByUsername`
+   ephemeral seal/verify, address parsing (`fp:b33` vs `<alias>`), `addByAlias`
    routed to the resolver (record chain verified against the hardcoded root,
    alias normalized to `a-z0-9`/1-32), and OOB-fingerprint display (the resolved
    fingerprint is returned to the CLI/GUI). The resolver coordinate (root fp +

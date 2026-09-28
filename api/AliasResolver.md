@@ -1,9 +1,9 @@
-# Alias Resolver (central username service)
+# Alias Resolver (central alias service)
 
 Status: **implemented** (one hardening pending - see *Implementation status*). The
 `bazarish/alias-resolver` repository (9th repo) - a single global daemon run only
-by the developer. It owns the global `username` namespace (the project's
-monetization) and serves the cryptographically-signed `username -> descriptor`
+by the developer. It owns the global `alias` namespace (the project's
+monetization) and serves the cryptographically-signed `alias -> descriptor`
 resolution. The resolve **protocol** (wire format, descriptor, direct-dial vs
 proxy, address forms) is specified in `FederatedResolve.md`; this document
 specifies the **daemon**: its shape, the web portal, the alias lifecycle, key
@@ -96,7 +96,7 @@ Two faces, one daemon:
    destination (offline-key-delegated, see *Key rotation*), whose **b32** is the
    hardcoded resolver address in every client. The full **signed** resolve
    (`FederatedResolve.md`) is served **only here**, for uniformity of client
-   automation. The web portal's username search is a human **display** convenience
+   automation. The web portal's alias search is a human **display** convenience
    (shows the descriptor or "free"), not the trusted artifact a client adds a
    contact from.
 
@@ -114,10 +114,10 @@ can never be confused.
 
 ## Portal features
 
-- **Username search.** Look up a `username`: shows the bound **descriptor**
+- **Alias search.** Look up a `alias`: shows the bound **descriptor**
   (`{fp, dest, view}`, the normal form) if taken, or "free" if available.
   Display only - the authoritative signed resolve is the I2P path.
-- **Atomic purchase of a free name.** Claim a free `username` -> debit balance ->
+- **Atomic purchase of a free name.** Claim a free `alias` -> debit balance ->
   bind to the signed-in account (its `fp`), all under one lock/transaction so two
   buyers cannot race the same name. Purchase is **balance-only**: the buyer must
   already hold sufficient balance (no name is ever held pending an invoice - the
@@ -201,7 +201,7 @@ purchase and renewal are instant balance debits.
 
 ## Signed resolve (I2P-only)
 
-A client resolves `username` by dialling the resolver's hardcoded b32 over I2P
+A client resolves `alias` by dialling the resolver's hardcoded b32 over I2P
 (a direct fetch over a transient I2P destination of the client's own - `FederatedResolve.md`)
 and receives a **signed descriptor record**:
 
@@ -256,17 +256,18 @@ required), so a freshly built or local resolver is exercised without a rebuild.
 
 ## Payments
 
-No runtime coupling to operator service nodes - the resolver runs its **own**
-instance of the shared payment module (`PaymentGateway` monerod/mock, `LedgerStore`,
-`GrantStore`, `LoginChallenge`/HMAC, captcha; config-driven) with the **developer's**
-wallet, prices and ledger. Purchasing a username transfers payment to the developer over the
-portal; the buyer's home operator is never involved (no inter-operator settlement).
-The payment code is **shared as a library, not a shared backend** - the same module
-is also used by operator service nodes for their own services. (Operator service
-nodes sell nothing at all; registration is free and captcha-gated.)
+No runtime coupling to operator service nodes. The payment layer lives in this
+repository and nowhere else in the project: `PaymentGateway` with a Monero, a
+Bitcoin and a mock backend, `LedgerStore`, `InvoiceStore` and `RateOracle`, on the
+**developer's** wallet, prices and ledger. Buying an alias transfers payment to
+the developer over the portal; the buyer's home operator is never involved, and
+there is no inter-operator settlement. An operator's service node carries none of
+this - not a gateway, not a ledger, not an abstraction of one: an account there is
+free, and registering is proving a key.
 
 ## Open / to confirm
 
-- Whether the human web search is rate-limited / captcha-gated against namespace
-  enumeration (the I2P signed path is the automation interface; the web search is
-  a convenience and may warrant abuse controls).
+- Whether the human web search is rate-limited against namespace enumeration
+  (the I2P signed path is the automation interface; the web search is a
+  convenience and may warrant abuse controls). Not with a puzzle: a picture a
+  person reads is a picture a solver reads.

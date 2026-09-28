@@ -230,7 +230,7 @@ mapping.
 - **contact-request bootstrap** (`../Contacts.md`) - the bootstrap ships the
   sender's **contact card** (dest + serving sealing key + sealing key) instead of the
   sender's server card, so the peer replies by federating to the sender's dest.
-- **addByUsername / alias resolve** - the resolved trust chain becomes the
+- **addByAlias / alias resolve** - the resolved trust chain becomes the
   contact card (not sub-cert + server card). The cross-server sealed `resolve`
   (`Federation.md`, still pending - the Stage-2 track) keeps a **server-level**
   resolve key for its entry point: the client cannot seal to a per-dest key for
@@ -288,7 +288,7 @@ server-wide signer either (a delivery confirmation is signed per destination).
    the b33); local short-circuit only on same-destination. TCP federation removed;
    `i2p.enabled` mandatory.
 3. **client** - `createInvite` / `addByInvite` / contact-request bootstrap /
-   `addByUsername` on the contact card and route-by-dest; `deliver`
+   `addByAlias` on the contact card and route-by-dest; `deliver`
    targets a destination; `Client::myDestination()` fetches the assigned routing.
 4. **docs** - folded into `../Identity.md`, `../Contacts.md`, `Facade.md`,
    `Federation.md`, `Architecture.md`, `Messages.md`, `DeviceSync.md`,

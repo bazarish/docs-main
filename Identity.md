@@ -12,7 +12,7 @@ Status: draft skeleton.
 - A user **is** a hybrid keypair set. The canonical UID is the identity fingerprint covering both public keys.
 - Address / contact forms:
   - `<fingerprint>:<b32>` - the **descriptor**: identity fingerprint + the user's own destination (a `.b32.i2p` host). The primary scannable/QR form; the full link `bazarish://invite?fp=...&dest=...&view=...` also carries the card-read capability (`api/FederatedResolve.md`). A fingerprint is an identity, not a route, so it is always paired with a destination - there is no `@server-fingerprint` form (nothing maps a fingerprint to an endpoint).
-  - `<alias>` - an exclusive **username** on the central resolver (paid; the project's monetization, `api/AliasResolver.md`). Resolving it yields a descriptor, after which the contact card is fetched and verified.
+  - `<alias>` - an exclusive **alias** on the central resolver (paid; the project's monetization, `api/AliasResolver.md`). Resolving it yields a descriptor, after which the contact card is fetched and verified.
 - Users have no binding to a server in anything a contact can see. Registration opens an unbounded channel with the server, and the only thing that expires is the delegation of the user's destination - which the network itself enforces. Nothing signed by the user names the server.
 - All clients (devices/app instances) of a user **share the identity keypair set**; a new device receives it during enrollment (see `DeviceSync.md`). Each client registers a unique random **client ID** so the server can track delivery completeness across clients.
 - The user's **I2P destination is the account's, not a device's**: contacts hold that one address, so every device of the account operates the same master key. A device that arrives without it takes it from the account (its enrollment material, or `device.i2p-master-request` to the account's other devices) rather than minting one, because a second address delegated to the server strands every contact holding the first. A delivery pass follows the same rule for the same reason: it is the account's, not a device's, so it travels in the address book and every device presents the same one (`DeviceSync.md`).
@@ -34,7 +34,7 @@ Status: draft skeleton.
   in the user's contact card (below); a contact discovers the serving sealing key
   needed to fetch that card from the **descriptor** (`key`,
   `api/FederatedResolve.md`), not from a fetched server card. Cross-server
-  username resolution is served by the separate central resolver
+  alias resolution is served by the separate central resolver
   (`api/AliasResolver.md`), which signs its own records.
 - **Delivery sealing is per-destination.** Each user's own serving destination
   has
@@ -182,7 +182,7 @@ Trust ladder for adding a contact, strongest first:
 - **By descriptor / fingerprint** (`fp:b33`, a QR or link) - the contact card is
   fetched and verified against the fingerprint, so a server cannot forge, only
   withhold; on a direct fetch over a transient I2P destination it cannot even observe the lookup.
-- **By username (alias)** - the central resolver maps the human-readable name to a
+- **By alias** - the central resolver maps the human-readable name to a
   fingerprint. Convenient, but the **alias->fingerprint mapping is trusted**: a
   hostile resolver could return an attacker's fingerprint, so the UI surfaces the
   resolved fingerprint for out-of-band verification. Everything after the mapping
