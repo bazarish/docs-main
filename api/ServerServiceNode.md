@@ -1,12 +1,12 @@
 # Server <-> Service Node API
 
-Status: draft skeleton.
+Status: implemented.
 
 Internal API over the operator private channel. The service node owns per-operator user-management state (accounts: the quota granted and the card published); the server owns content and delivery, and consults the service node to make admission decisions. The global **alias** namespace is **not** here - it is a separate central service (`api/AliasResolver.md`), not the operator service node.
 
 An account has **no term**. Registration opens an unbounded channel; the only clock is the delegated destination, and an account that has none for the node's idle window is deleted (`idleDeleteDays`, 180 by default).
 
-## Server -> Service node (draft)
+## Server -> Service node
 
 | Request | Purpose |
 |---|---|
@@ -29,8 +29,18 @@ that fingerprint; no shared secret is used.
 
 Owned by the **server** (it drives the delete-when-all-acked storage rule, see `../DeviceSync.md`); the service node never learns the user's device count.
 
-## Open questions
+## What the split settled on
 
-- **Pull vs push**: does the server query account state per request (with caching), or does the service node push state changes? Affects failure modes when one daemon is down.
-- **Quota usage accounting**: limits come from the account (service node), usage from stored content (server). Confirm the split: service node = limit, server = usage.
-- Transport details (unix socket vs localhost HTTP) and whether this API needs authentication beyond channel isolation.
+- **Push, not pull.** The node pushes what it owns (the delegated transient, the
+  quota, a serving-key rotation, a deletion) and reconciles the quotas once at
+  start, so the messaging server needs the node for nothing on the delivery path.
+  The one thing the server asks the node for is a user's contact card, and it holds
+  the answer briefly rather than calling per delivery.
+- **The quota is the node's, the usage is the server's.** The node grants and
+  stores the number; only the filesystem under the server knows what is in a
+  mailbox, so the panel and the portal read usage from the server
+  (`GET /v1/messaging/account`).
+- **Localhost HTTP, signed per request.** Channel isolation is not the
+  authentication: every call carries the caller's hybrid signature and each side
+  authorises it by fingerprint - the node by the server card it is bound to, the
+  server by its configured `operators` list. No shared secret.

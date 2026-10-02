@@ -18,16 +18,20 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 ## Topology
 
 ```
-                          clearnet          operator-controlled private channel
-                             |             +...................................+
-[Client] --HTTPS, secret URI---> [Reverse proxy] -> [Facade] ----> [Server] ------> [Storage: disk / object]
-                             |             |                   |       |       |
-                             |             |                   +-> [Service    |
-                             |             |                        node]      |
-                             |             +.......................|..........+
-                             |                                      |
-                             |                          [embedded i2pd router] <======> other servers (federation)
+             clearnet              operator-controlled private channel
+                 |      +.........................................................+
+[Client] --I2P or HTTPS--> [Facade] --the sealed tunnel--> [Server] --> [Storage: disk]
+                 |      |                                     |                   |
+                 |      |          signed, user named in path  v                   |
+                 |      |                              [Service node] --> [its own records]
+                 |      +..........................................|..............+
+                 |                                                 |
+                 |                        [embedded i2pd router] <==+==> other servers (federation)
 ```
+
+The facade has exactly one backend. The service node is **not** reachable from it:
+an account call rides the same tunnel as everything else and the messaging server
+is what passes it on.
 
 - The server has **no public IP interfaces**. Its only public presence is in hidden networks (I2P first).
 - Facade <-> Server / Service node communication goes over an **operator-controlled private channel** (unix socket, localhost, or VPN - deployment choice). Splitting facade and server across hosts is an operator concern.

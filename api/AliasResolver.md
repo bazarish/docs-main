@@ -31,43 +31,32 @@ matching the owner's real identity. What is done:
   management; reuses the operator service node's payment/auth primitives **as a
   library** (own ledger/wallet/prices, no runtime coupling).
 - **Lifecycle scheduler** - hourly auto-renew-from-balance + release-after-grace.
-- **Admin face** (`--admin <fingerprint>`) - an admin-gated portal (sign-in-with-key;
+- **Admin face** (config `admin`) - an admin-gated portal (sign-in-with-key;
   the signed-in fingerprint must equal the configured admin, else no admin routes
   exist at all): a dashboard (active/frozen name counts, outstanding top-up invoices,
   total user balance, payments received all-time / last year / last 30 days, and live
   key status), **manual balance credit** by user fingerprint (grant balance for
   buying/renewing), and **key rotation** (below).
-- **Key rotation (operator-driven, hot)** - the admin uploads new signing material
-  (delegated key PEM + delegation cert), validated against the root anchor and
-  hot-swapped **immediately**, or a new I2P destination key, where a new I2P tunnel
-  is built and serves **at once** while the old one is **drained**. The root
-  fingerprint stays constant; with an offline-key transient of the same master the
-  b32 stays constant too.
+- **Signing-key rotation (operator-driven, hot)** - the admin uploads new signing
+  material (delegated key PEM + delegation cert), validated against the root anchor,
+  persisted and hot-swapped **immediately**. The root fingerprint stays constant, so
+  nothing a client holds changes.
 
-- **Offline-key destination custody** - the serving destination is operated from an
-  *offline-key transient*: the operator generates the permanent master signing key
-  **offline** with `bazarish-alias-resolver-offlinekeys generate-master` (kept
-  air-gapped, never on the live box) and issues short delegated transients from it
-  (`issue-transient <master.dat> <days> <out>`). The daemon runs with
-  `--dest-transient <file>` and holds only the transient - a compromise leaks at most
-  an expiring transient, never the master - and writes **no key to disk**. Every
-  transient shares the master's b32, so the hardcoded resolver address is stable and a
-  rotation is a seamless hot-swap (admin upload -> new I2P tunnel + drain of the old).
-  The `libi2pd` key material is vendored into the offline tool only; the daemon stays
-  a pure I2P consumer of the blob. Without `--dest-transient` the daemon falls back to
-  a self-generated *persisted* key - a dev convenience for demos, not production
-  custody. Live-validated over real I2P: a daemon started on a transient serves the
-  master's exact b32, with no key persisted; and the **two-session hot-swap** runs
-  end to end - the admin rotates the serving destination to a second transient of the
-  same master, the new I2P destination comes up and serves at the **identical b32** while
-  the old one drains, and a fresh client's resolve still reaches the owner over I2P
-  (b32 stable across the swap, resolve continuous). The seamless transient hot-swap
-  (adopting a newer transient of the same master on the live destination, rather
-  than rebuilding it) requires **i2pd >= 2.61.0**: earlier routers dedup the
-  re-presented transient and keep signing leasesets with the old one, so the
-  destination would go offline at the old transient's expiry. The fix (refresh the
-  offline-signed transient on destination re-create) and a related I2P
-  session-teardown crash-fix are upstream in i2pd 2.61.0.
+- **The daemon holds no destination key.** Its address is an operator i2pd **HTTP
+  server tunnel** pointed at the loopback API, so the destination is the tunnel's and
+  the daemon runs no router at all - which is also what makes the hardcoded resolver
+  address an operator concern rather than a key this process could leak. The tunnel
+  is what names each caller (`X-I2P-DestB32`, stripped from the caller's own request
+  first so it cannot be forged), and the face refuses anything arriving without one.
+- **Signing custody is offline.** The operator generates the permanent root
+  **offline** with `bazarish-alias-resolver-signing generate-root` (kept air-gapped,
+  never on the live box) and issues short delegated keys from it
+  (`issue-delegation <root.pem> <days> <out-prefix>`). The daemon holds only a
+  delegated key and its certificate: a compromise leaks at most an expiring
+  delegation, never the root. Live-validated over real I2P: a daemon serving behind
+  its tunnel answers a resolve that verifies against the compiled-in root rather than
+  against anything it handed itself, and a name nobody holds comes back as a typed
+  `ALIAS_UNKNOWN` - which only a daemon that received the frame could have written.
 
 This service is intentionally **centralized**: a globally-unique sellable name
 requires a single registry (like a domain registrar). The centralization is
@@ -135,7 +124,7 @@ can never be confused.
 - **Manage.** Update the bound descriptor (e.g. after the owner migrates servers -
   the alias then points at the new `dest`/`view`); view owned aliases and their
   state/expiry.
-- **Admin face** (opt-in via `--admin <fingerprint>`). Admin-gated pages
+- **Admin face** (opt-in via the config's `admin`). Admin-gated pages
   (sign-in-with-key; the signed-in fingerprint must equal the configured admin): an
   overview dashboard (active/frozen names, outstanding top-up invoices, total user
   balance, payments received all-time / last year / last 30 days, live key status
@@ -226,20 +215,13 @@ compromise is bounded to the delegation window. Both rotations are **operated th
 the admin face** (upload forms, validated server-side) - see *Implementation status*
 for what is wired today.
 
-- **I2P destination - I2P offline keys.** The master destination key is offline;
-  the **b32 is derived from the master and is stable forever**. Production serves
-  with short-lived transients delegated offline by the master. Rotation is a
-  **hot-swap with overlap**: bring up a new I2P destination on the next transient (same
-  master => same b32) -> wait for its leaseset to publish -> switch new accepts over ->
-  drain and close the old session. The b32 never changes => **zero downtime, no
-  client-visible change**. (Offline-key destinations publish a standard LeaseSet2,
-  so the address is the standard b32 `....b32.i2p` - consistent with the project's
-  `.b32.i2p`-only invariant.) Generated offline with
-  `bazarish-alias-resolver-offlinekeys` and served via `--dest-transient`; the
-  serving path is **live-verified on i2pd** (a daemon on a transient serves the
-  master's exact b32, no key on disk). The two-session hot-swap-with-overlap (admin
-  rotate to a fresh transient of the same master) is mechanism-complete; exercising it
-  live needs two concurrent destinations.
+- **I2P destination - the operator's tunnel.** The daemon holds no destination key
+  and runs no router: an i2pd HTTP server tunnel is pointed at its loopback API, and
+  that tunnel's destination is the resolver's address. Custody of the key is
+  therefore the operator's i2pd configuration, where it can be an offline-key
+  transient of a master whose address never changes, and rotating or moving the
+  daemon is a tunnel change rather than anything this process does. The address is a
+  `....b32.i2p` host like every other in the project.
 - **Signing - delegation certificates.** The root hybrid identity (offline) signs
   short-lived `{delegatedPubKey, notAfter}` delegation certs. Production signs each
   resolve record with the **current delegated key** and ships the delegation cert.

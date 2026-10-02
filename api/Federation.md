@@ -26,12 +26,13 @@ Status: draft skeleton.
   cryptographic destination address, never an addressbook name (poisonable) and
   never a raw base64 destination. This is enforced in code (`common`
   `isB32I2pHost`/`validateB32I2pHost`, applied wherever a destination is ingested
-  or dialled). Most destinations are published as an **encrypted LeaseSet2**, so
-  the address is the blinded **b33** (`<b33>.b32.i2p`); the raw destination of
-  such a dest is not connectable (no plain leaseset is published). A user's own
-  offline-key destination can only publish a **standard LeaseSet2**, so it is
-  addressed by its standard **b32** (`<b32>.b32.i2p` = base32(sha256(destination)))
-  - offline keys cannot sign a b33 (see `Identity.md`, `InviteAnonymity.md`).
+  or dialled). Every destination is published as an **encrypted LeaseSet2**, so
+  the address is always the blinded **b33** (`<b33>.b32.i2p`) and the raw
+  destination is not connectable (no plain leaseset is published). A user's own
+  destination is no exception: the delegation carries one blinded-key-authorized
+  transient per day, which is what lets the server publish the address encrypted
+  without ever holding the master signing key, and a delegation without those keys
+  is refused (`Identity.md`, `InviteAnonymity.md`).
 - The delivery framing operates on an abstract connected stream, so a future
   overlay transport would only need to supply a byte stream; nothing above the
   transport assumes I2P specifics.

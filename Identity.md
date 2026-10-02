@@ -81,10 +81,10 @@ Body: `{ v, t: "contact-card", issuedAt, dest, sealingKey, servingKey }`.
   exchange, and so is **every message afterwards** - the card is where a stranger
   learns it, not a key reserved for first contact. Because it rides inside the
   user-signed card, no intermediary can substitute it.
-- `dest` - the user's serving **destination** as a `.b32.i2p` host (a user's own
-  offline-key destination cannot publish a b33, so there it is the standard b32):
-  where a contact routes deliveries. Never a raw destination or an addressbook
-  name (`api/Federation.md`).
+- `dest` - the user's serving **destination** as a `.b32.i2p` host - the blinded
+  **b33** of its encrypted LeaseSet2, like every other destination this project
+  publishes: where a contact routes deliveries. Never a raw destination or an
+  addressbook name (`api/Federation.md`).
 - `servingKey` - the public **serving sealing key** of that destination: a contact
   seals the delivery envelope's admission header to it. Not a signature and not a
   trust anchor - the user just vouches for it under their one signature; a wrong

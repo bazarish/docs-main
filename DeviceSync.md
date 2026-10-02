@@ -24,8 +24,10 @@ against.
 Sync data travels as ordinary E2E deliveries to the user's own mailbox, but not
 through the same door as mail: `POST /v1/messaging/self` is its own endpoint,
 with its own delivery class (`device`), and it is deliberately outside the budget
-a stranger's contact request is counted against. A server that had only one
-registered device stores nothing at all.
+a stranger's contact request is counted against. An account with only one
+registered device stores nothing at all - the answer says so in `stored`, which
+every answer carries, so a client is never left guessing which of the two
+happened.
 
 ## Enrollment (adding a device)
 

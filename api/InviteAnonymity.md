@@ -275,10 +275,9 @@ server-wide signer either (a delivery confirmation is signed per destination).
 
 1. **common** - the contact-card / extended subscription-cert format: `dest`
    and `servingSealingKey` in the user-signed body (`TestCertificates`). Plus
-   `encryptedLeaseSetHost()` (b33), `standardLeaseSetHost()` (standard b32) and
-   `routingHost()` so a destination is addressed by its b33
-   (encrypted LeaseSet2) or its standard b32 (standard LeaseSet2, offline-key
-   per-user) - always a `.b32.i2p` host, never the raw destination
+   `encryptedLeaseSetHost()` and `routingHost()`, so a destination is addressed by
+   the b33 of its encrypted LeaseSet2 - the only form published anywhere in the
+   project - always a `.b32.i2p` host, never the raw destination
    (`isB32I2pHost`/`validateB32I2pHost`; `TestI2pAddress`).
 2. **server-core** - per-destination serving sealing keys (generate, persist,
    select by the destination a connection arrived on); `GET /v1/messaging/destination`
