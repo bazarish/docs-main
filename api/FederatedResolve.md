@@ -3,7 +3,10 @@
 Status: **design** (supersedes the earlier draft of this document). Specifies how
 a client discovers a contact it knows only by a small scannable identifier or by
 name, over I2P, with the home server learning nothing about it - it is not on the
-path - and no party able to forge the result. The central alias registry/daemon is specified in
+path - and nothing between the two ends able to forge the result: on the
+descriptor path the fingerprint anchors it outright, and on the name path the
+signature chain leaves the central registry as the one party trusted for anything
+(*Residual trust*, below). The central alias registry/daemon is specified in
 `AliasResolver.md`; the identity/certificate formats in `../Identity.md`; the I2P
 transport in `Federation.md`.
 
@@ -113,24 +116,37 @@ for uniform client automation (`AliasResolver.md`). The resolver returns a
 **self-verifying signed record**:
 
 ```
-sign_delegated({ v, alias, descriptor: {fp, dest, key}, issuedAt, notAfter }) + delegationCert
+sign_delegated({ v, t: "resolve-record", alias, descriptor: {fp, dest, view},
+                 issuedAt, notAfter })
+  + delegationCert     # root -> delegated
+  + aliasCert          # the owner's own claim over the name, user-signed
 ```
 
 The client verifies the chain `record -> delegationCert (delegated key <- root) ->
-hardcoded resolver root fingerprint`, plus `notAfter`. It then runs the card-fetch
-above with the descriptor. A free/unknown name returns `ALIAS_UNKNOWN`.
+hardcoded resolver root fingerprint`, both `issuedAt` stamps against its own
+clock, both `notAfter`, that the record is for the name it asked about, and the
+owner's certificate - over the same name, and by the identity the descriptor
+names. An answer carrying no owner certificate is refused, which is what a
+registry declining to carry one would send. It then runs the card-fetch above with
+the descriptor. A free/unknown name returns `ALIAS_UNKNOWN`.
 
 - **Integrity / anti-MITM** is the signature chain to the **hardcoded root
   fingerprint** - transport-independent, so anything in the path can only DoS,
   never forge. The resolver's b32 also authenticates the destination.
 - **Confidentiality** of *which* name is looked up: the client dials the resolver
-  itself, so nothing between the two learns the name. The query is sealed to the
-  resolver's key regardless (authenticated via the hardcoded root fingerprint -
-  bootstrap the rotatable sealing key from a root-signed server card).
+  itself from a throwaway destination, so nothing between the two learns the name.
+  Nothing is sealed on top of that, and there is no key for it: the resolver signs
+  what it serves and has to read the question to answer it, so app-layer sealing
+  would hide the name from nobody. The coordinate a client is built with is
+  therefore two values, not three.
 - **Residual trust**: the resolver asserts the alias->`fp` binding (the nature of
-  names). The only defense is **surfacing the resolved `fp` in the UI** for
-  out-of-band verification (safety-number style); the hardcoded anchor removes
-  everything but the resolver itself from trust.
+  names), and the owner's certificate bounds that without removing it - a name
+  cannot be pointed at somebody who never signed for it, but which identity holds
+  a name is the registry's to say. What the hardcoded anchor removes is everything
+  else: the path can withhold an answer and nothing more. The defence left is
+  **surfacing the resolved `fp`** (safety-number style) - the fingerprint the
+  client adds is returned to whatever asked for the add, so it can be compared out
+  of band afterwards.
 - **Cacheable**: the signed record is self-verifying, so clients may cache it up
   to `notAfter`, relieving load on the single resolver.
 
@@ -139,7 +155,7 @@ above with the descriptor. A free/unknown name returns `ALIAS_UNKNOWN`.
 | Party | Card fetch | Alias resolve |
 |---|---|---|
 | The requester's own server | Nothing: it is not on the path, and no path through it exists | Nothing: it is not on the path |
-| I2P network | two opaque sealed blobs | two opaque sealed blobs |
+| I2P network | nothing: the stream is encrypted and authenticated to the destination, and the bodies inside it travel in the clear for that reason | the same |
 | Target (the serving server / resolver) | the `fp` (it serves that card) and that someone holding the descriptor asked | the alias (it owns the namespace); requester unlinkable on direct path |
 | Client | the verified card | the verified descriptor -> card |
 
@@ -152,33 +168,36 @@ Namespace anti-enumeration is out of scope for the resolver (resolve is unauthen
    (`record -> delegated -> root`) on the existing hybrid-cert primitives. Unit
    tests round-trip each.
 2. **server-core** - *done.* The card-fetch responder on every serving
-   destination (the home one and every user's own: unseal `fp` query -> return the
-   card sealed to the response key). The proxy relay that once backed a thin
-   client is gone, along with the route it was served on.
+   destination (the home one and every user's own: read the `{fp, view}` query,
+   answer with the card when the capability matches and refuse identically when it
+   does not; both directions in the clear, for the reason above). The proxy relay
+   that once backed a thin client is gone, along with the route it was served on.
 3. **client** - *done.* Descriptor handling, a fetch transport that dials the
    target directly over a transient I2P destination (a served `CARD_UNKNOWN` /
-   `ALIAS_UNKNOWN` is authoritative),
-   ephemeral seal/verify, address parsing (`fp:b33` vs `<alias>`), `addByAlias`
-   routed to the resolver (record chain verified against the hardcoded root,
-   alias normalized to `a-z0-9`/1-32), and OOB-fingerprint display (the resolved
-   fingerprint is returned to the CLI/GUI). The resolver coordinate (root fp +
-   dest + serving key) is a configurable placeholder until phase 4 ships. Unit
-   tests drive resolve/card over an injected transport (happy path, unknown name,
-   wrong root, alias mismatch).
+   `ALIAS_UNKNOWN` is authoritative), address parsing (`fp:b33` vs `<alias>`), `addByAlias`
+   routed to the resolver (record chain verified against the hardcoded root, the
+   owner's certificate checked beside it, the typed name normalized against the
+   core's own `a-z0-9` bounds before anything is asked), and OOB-fingerprint
+   display (the resolved fingerprint is returned to the CLI/GUI). The resolver
+   coordinate is the two values the shipped binary is built with (root fingerprint
+   + dest), overridable in a session for a test resolver. Unit tests drive
+   resolve/card over an injected transport (happy path, unknown name, wrong root,
+   alias mismatch, a certificate over another name or by another identity).
 4. **alias-resolver** - *implemented* (`AliasResolver.md`): registry + lifecycle,
    signed resolve over I2P (live-validated on i2pd), portal/payments (sign-in-with-key,
    atomic balance-only purchase, balance/top-up, manage), delegation-cert signing,
-   hourly lifecycle scheduler, and **offline-key destination custody + hot-swap
-   rotation** - the master is offline, the daemon runs a short transient, and a
-   rotation serves at the same b32 while the old destination drains (live-validated
-   over real I2P). The seamless transient hot-swap requires **i2pd >= 2.61.0**
-   (the upstream offline-transient refresh + I2P destination teardown fixes). Once deployed,
-   its root fingerprint + destination + serving key are baked into the client
-   (`defaultResolverCoordinate`), enabling the `<alias>` path in production.
-5. **docs + live** - cross-I2P validation. Both the card-fetch (`fp:b33`) path
-   and the full `<alias>` path (add-user -> I2P resolve -> fp:b33 card fetch ->
-   conversation) are live-validated over real I2P; production use waits only on
-   the resolver deployment (baking the coordinate into the client).
+   hourly lifecycle scheduler, and **offline signing custody with a hot swap** -
+   the root is offline, the daemon holds only a short delegated key, and a rotation
+   takes effect on the next record with no restart. The destination is not this
+   daemon's at all: an operator i2pd HTTP server tunnel is pointed at its loopback
+   API, so custody of that key is the operator's i2pd configuration and moving the
+   daemon is a tunnel change. Its root fingerprint and that address are baked into
+   the client (`defaultResolverCoordinate`), enabling the `<alias>` path in
+   production.
+5. **docs + live** - *done.* Both the card-fetch (`fp:b33`) path and the full
+   `<alias>` path (add-user -> I2P resolve -> fp:b33 card fetch -> conversation)
+   are live-validated over real I2P, and the deployed resolver's coordinate is the
+   one the client is built with.
 
 ## Open / follow-up
 
