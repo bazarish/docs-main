@@ -23,7 +23,13 @@ real identity. What is done:
 - **Registry + lifecycle** - `alias -> descriptor` with `active -> frozen (30-day
   anti-hijack grace) -> free`, state a pure function of term + clock; atomic claim,
   yearly renew, owner-only redeem, server-migration descriptor update, post-grace
-  release.
+  release. Held as **one file per name** under `<state>/aliases`, so a name with
+  no file is a name nobody holds and every change writes that one file: measured
+  at ten thousand names, a change costs under a millisecond against the second of
+  CPU and 109 MB of rewriting the whole namespace cost when it lived in a single
+  document. What a name's record weighs is its owner's certificate (8.1 KB of
+  hybrid signature, 11.4 KB in the file), and that sets the cost of start-up -
+  every file is read and every certificate checked, 1.9 ms per name.
 - **Signed resolve over I2P** - a self-verifying record signed by the delegated
   key, with the delegation cert and the owner's own certificate over the name
   beside it; verified end to end against the client's `verifyResolveRecord` and
@@ -94,8 +100,11 @@ Three faces, one daemon, each on a socket of its own:
    `alias.update`, `alias.renew`, `alias.autorenew`, `alias.transfer.accept`). The
    tunnel names each caller in `X-I2P-DestB32` - it strips that header from the
    caller's own request first, so it cannot be forged - and the face refuses
-   anything arriving without a caller and allows one caller five requests per ten
-   seconds. The web portal's alias search is a human **display** convenience
+   anything arriving without a caller. The **window is on the resolve alone**
+   (five per ten seconds per caller by default): a resolve is somebody typing a
+   name, while an owner's op is signed, is one per name they hold, and a client
+   holding twenty names must be able to repoint all twenty in one run. The web
+   portal's alias search is a human **display** convenience
    (free/taken/yours), not the trusted artifact a client adds a contact from, and
    the descriptor a name resolves to never leaves over the web at all.
 3. **The operator's face - plain HTTP.** The overview, one account in full, manual
@@ -239,7 +248,19 @@ length bounds and a name held but never bound. Because the record is
 self-verifying, it is **cacheable** up to `notAfter` (bounded by the daemon's
 `recordTtl` and clamped to the name's own term, so a record never vouches past the
 name's expiry) - this relieves load on the single resolver and softens its
-availability as a single point. Confidentiality of *which* name a client looks up
+availability as a single point.
+
+**The daemon keeps what it has already answered**, both the record and the
+nothing a free name gets, so a repeat of a name costs neither a signature (two
+hybrid signatures and some 38 KB of it) nor a walk of the registry. What makes
+that safe is not a timer: every change to the namespace bumps a counter the kept
+answers are keyed on, so a withdrawn binding cannot be answered from memory, and
+an answer is never served past the `notAfter` it carries - the `Cache-Control` on
+it is the remaining life of the record being served, not a fixed window.
+`answerCacheMegabytes` (500 by default, 0 to keep nothing) bounds what this may
+occupy; past that the least recently asked for goes first. A rotation of the
+signing key drops it all, since the point of rotating is that the next answer
+carries the new key. Confidentiality of *which* name a client looks up
 is the transport's: the client dials the resolver itself from a throwaway
 destination, so nothing in between learns the name, and nothing is sealed on top -
 the resolver has to read the question to answer it.
