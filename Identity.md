@@ -12,7 +12,7 @@ Status: draft skeleton.
 - A user **is** a hybrid keypair set. The canonical UID is the identity fingerprint covering both public keys.
 - Address / contact forms:
   - `<fingerprint>:<b32>` - the **descriptor**: identity fingerprint + the user's own destination (a `.b32.i2p` host). The primary scannable/QR form; the full link `bazarish://invite?fp=...&dest=...&view=...` also carries the card-read capability (`api/FederatedResolve.md`). A fingerprint is an identity, not a route, so it is always paired with a destination - there is no `@server-fingerprint` form (nothing maps a fingerprint to an endpoint).
-  - `<alias>` - an exclusive **alias** on the central resolver (paid; the project's monetization, `api/AliasResolver.md`). Resolving it yields a descriptor, after which the contact card is fetched and verified.
+  - `<alias>` - an exclusive **alias** on the central resolver (paid; the project's monetization, `api/FederatedResolve.md`). Resolving it yields a descriptor, after which the contact card is fetched and verified.
 - Users have no binding to a server in anything a contact can see. Registration opens an unbounded channel with the server, and the only thing that expires is the delegation of the user's destination - which the network itself enforces. Nothing signed by the user names the server.
 - All clients (devices/app instances) of a user **share the identity keypair set**; a new device receives it during enrollment (see `DeviceSync.md`). Each client registers a unique random **client ID** so the server can track delivery completeness across clients.
 - The user's **I2P destination is the account's, not a device's**: contacts hold that one address, so every device of the account operates the same master key. A device that arrives without it takes it from the account (its enrollment material, or `device.i2p-master-request` to the account's other devices) rather than minting one, because a second address delegated to the server strands every contact holding the first. A delivery pass follows the same rule for the same reason: it is the account's, not a device's, so it travels in the address book and every device presents the same one (`DeviceSync.md`).
@@ -35,7 +35,7 @@ Status: draft skeleton.
   needed to fetch that card from the **descriptor** (`key`,
   `api/FederatedResolve.md`), not from a fetched server card. Cross-server
   alias resolution is served by the separate central resolver
-  (`api/AliasResolver.md`), which signs its own records.
+  (`api/FederatedResolve.md`), which signs its own records.
 - **Delivery sealing is per-destination.** Each user's own serving destination
   has
   its **own serving sealing key**; the delivery envelope's admission header
@@ -175,7 +175,7 @@ and verifies it against the fingerprint, so the binding is cryptographic and
 intermediaries are trusted for availability only. This replaces the earlier
 full-card invite (the whole ~= 7-8 KB user-signed card inline, spanning several QR
 symbols): smaller and always-fresh, at the cost of a live fetch at add-time
-(`api/FederatedResolve.md`, `api/AliasResolver.md`).
+(`api/FederatedResolve.md`).
 
 Trust ladder for adding a contact, strongest first:
 
@@ -196,6 +196,6 @@ Trust ladder for adding a contact, strongest first:
 - **Sealing keys: ECDH P-256** (CMS KeyAgreeRecipientInfo, RFC 5753) with **AES-256-GCM** content encryption. X25519 recipients are not supported by OpenSSL CMS. A sealing key is distinct from the identity keys by design.
   - **Sealing is hybrid too: ECDH P-256 + ML-KEM-768 (FIPS 203).** A sealed blob is AES-256-GCM under a key HKDF'd from an ML-KEM encapsulation, wrapped in the classical CMS envelope; opening it needs **both** private halves, so breaking one scheme alone reveals nothing. This covers everything encrypted in the project - delivery-envelope headers, message bodies end to end, federation queries - because they all go through the same `cms::seal`.
   - The layering exists only because OpenSSL CMS has no KEMRecipientInfo (RFC 9629) yet - verified against 3.5, whose `cms.h` knows only TRANS/AGREE/KEK/PASS/OTHER. Every primitive is OpenSSL's; the wrapper is versioned so the KEM recipient moves into the CMS itself when support lands, without changing the container or breaking what is already written.
-- **Alias syntax**: `a-z` and `0-9` only, case-insensitive (normalized to lowercase), 1-32 characters (`api/AliasResolver.md`). The length cap keeps an alias distinct from the 52-character fingerprint form.
+- **Alias syntax**: `a-z` and `0-9` only, case-insensitive (normalized to lowercase), 1-16 characters (`api/FederatedResolve.md`). The length cap keeps an alias distinct from the 52-character fingerprint form.
 
 Implementation: the `common` repository (`Crypto`, `Cms`, `Certificates` modules; covered by tests, including pq-tamper and downgrade cases). Notable sizes: ML-DSA-65 signature ~= 3.3 KB, public key ~= 2 KB - certificates are ~7-8 KB.

@@ -135,7 +135,7 @@ DeliveryEnvelope:
 
 Alias resolution (`alias` -> descriptor) is **not** an operator-to-operator
 verb; it is served by the separate central resolver over its own I2P endpoint
-(`AliasResolver.md`, `FederatedResolve.md`).
+(`FederatedResolve.md`).
 
 ## Facade locality
 
@@ -168,7 +168,7 @@ summary:
   I2P destination, and verifies the card against the fingerprint. `fp` anchors
   integrity; nothing in between learns the fingerprint (sealed) or the result.
 - An **alias** resolves to a descriptor at the central resolver
-  (`AliasResolver.md`), which returns a signed self-verifying record over its I2P
+  (`FederatedResolve.md`), which returns a signed self-verifying record over its I2P
   endpoint; the client then runs the card fetch above.
 
 **Implementation status.** The facade-locality and `.b32.i2p` address invariants

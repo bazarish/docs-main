@@ -13,7 +13,7 @@ reads too.
 **This node sells nothing.** It maintains no balance, no ledger and no payment
 gateway, and offers no paid service. The only paid component of the project is the
 alias service, a separate deployment with its own portal and payment layer
-(`AliasResolver.md`). What a messaging account receives - a storage quota and its
+(`FederatedResolve.md`). What a messaging account receives - a storage quota and its
 own I2P destination - is included.
 
 ```
@@ -83,7 +83,7 @@ Several links allow mirrors/onion/clearnet alternatives. There is no service
 catalogue because nothing is sold here: the only variables are whether an
 operator has to approve the account and the one storage quota everybody gets.
 (The global `alias` namespace is a separate product sold by the central
-alias-resolver, not the service node - see `AliasResolver.md`.)
+alias-resolver, not the service node, and is not specified here.)
 
 server-core, when it rejects an unregistered sender, returns an error that points
 at the same portal.
@@ -265,7 +265,7 @@ in that directory, of a type the portal publishes, are served.
 
 - `POST`/`DELETE /v1/account/alias`, `GET /v1/account/resolve`, and the on-node
   alias registry: the global `alias` namespace moved out to the central
-  **alias-resolver** (`AliasResolver.md`). The service node no longer sells,
+  **alias-resolver**, whose own repository documents it. The service node no longer sells,
   stores, or resolves names - and since the payment layer moved to the resolver
   too, it now sells nothing at all: a destination and a mailbox quota come with
   the account. Nothing of a payment layer is left here, not even an abstraction.

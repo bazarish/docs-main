@@ -2,7 +2,7 @@
 
 Status: implemented.
 
-Internal API over the operator private channel. The service node owns per-operator user-management state (accounts: the quota granted and the card published); the server owns content and delivery, and consults the service node to make admission decisions. The global **alias** namespace is **not** here - it is a separate central service (`api/AliasResolver.md`), not the operator service node.
+Internal API over the operator private channel. The service node owns per-operator user-management state (accounts: the quota granted and the card published); the server owns content and delivery, and consults the service node to make admission decisions. The global **alias** namespace is **not** here - it is a separate central service (`api/FederatedResolve.md`), not the operator service node.
 
 An account has **no term**. Registration opens an unbounded channel; the only clock is the delegated destination, and an account that has none for the node's idle window is deleted (`idleDeleteDays`, 180 by default).
 

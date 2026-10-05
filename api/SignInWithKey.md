@@ -8,7 +8,7 @@ fingerprint and starts a session. The private key never enters the browser and n
 password exists anywhere.
 
 Every verifier in the project speaks this one contract: the service-node portal
-(`ServicePortal.md`), the alias registry (`AliasResolver.md`) and the admin panel
+(`ServicePortal.md`), the alias registry and the admin panel
 (`AdminPanel.md`).
 
 ## 1. The challenge

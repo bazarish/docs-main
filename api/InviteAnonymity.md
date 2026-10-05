@@ -9,7 +9,7 @@ invite/server-card shape; `../Identity.md`, `../Contacts.md`, `Facade.md` and
 > sealing keys, and route-by-b33 model below still hold. The **invite artifact**
 > itself - the full ~= 8 KB user-signed contact card carried inline - has since
 > been replaced by a small **descriptor** (`fp:b33` + serving sealing key) plus a
-> live card fetch (`FederatedResolve.md`, `AliasResolver.md`). Read this document
+> live card fetch (`FederatedResolve.md`). Read this document
 > for the destination-routing rationale; read `FederatedResolve.md` for the
 > current first-contact/discovery shape.
 

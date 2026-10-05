@@ -6,9 +6,9 @@ name, over I2P, with the home server learning nothing about it - it is not on th
 path - and nothing between the two ends able to forge the result: on the
 descriptor path the fingerprint anchors it outright, and on the name path the
 signature chain leaves the central registry as the one party trusted for anything
-(*Residual trust*, below). The central alias registry/daemon is specified in
-`AliasResolver.md`; the identity/certificate formats in `../Identity.md`; the I2P
-transport in `Federation.md`.
+(*Residual trust*, below). The identity/certificate formats are in `../Identity.md` and the I2P transport
+in `Federation.md`. How the registry daemon is built and run is not public and
+is not here: it lives in its own repository (`alias-resolver/docs/Daemon.md`).
 
 ## Two artifacts
 
@@ -32,7 +32,7 @@ transport in `Federation.md`.
   for co-location.
 
 The old full-card-in-invite (offline, multi-QR) is **removed**: the descriptor +
-a live fetch replaces it (rationale in `AliasResolver.md`). Cost: the user's
+a live fetch replaces it. Cost: the user's
 server must be reachable at add-time. Benefit: one QR, always-fresh card, and the
 home server never sees who is being added (below).
 
@@ -61,7 +61,7 @@ home server never sees who is being added (below).
    which a key doing double duty in the delivery path could never do.
 2. **Alias resolve - `fp` is unknown.** `alias` -> descriptor. This is the only
    step without an `fp` anchor, so it is where MITM and the trusted alias->identity
-   binding live. Served by the single central resolver (`AliasResolver.md`).
+   binding live. Served by the single central resolver.
 
 ## Address / contact forms
 
@@ -73,7 +73,7 @@ home server never sees who is being added (below).
 
 Aliases are global on the single resolver, so the `@server` form is unnecessary;
 the protocol stays federation-capable (descriptor + signed records are general)
-even though v1 runs one resolver (`AliasResolver.md`).
+even though v1 runs one resolver.
 
 ## Transport: direct dialling, without a relay
 
@@ -112,7 +112,7 @@ app-layer sealing is optional. Integrity is always the `fp` anchor.
 ## Alias-resolve protocol (`alias` -> descriptor)
 
 The full **signed** resolve is served over the resolver's I2P endpoint only,
-for uniform client automation (`AliasResolver.md`). The resolver returns a
+for uniform client automation. The resolver returns a
 **self-verifying signed record**:
 
 ```
@@ -150,6 +150,89 @@ the descriptor. A free/unknown name returns `ALIAS_UNKNOWN`.
 - **Cacheable**: the signed record is self-verifying, so clients may cache it up
   to `notAfter`, relieving load on the single resolver.
 
+### The alias grammar
+
+`a-z` and `0-9` only, case-insensitive: a name is folded to lowercase as the
+single canonical form (`Alice` == `alice`), so case-variant duplicates cannot
+exist. No separators and no non-ASCII - a separator would let two names differ by
+a character nobody reads. The length bounds are `kAliasMinLength` and
+`kAliasMaxLength` in the core (1-16), and **both sides are built with the same
+constants**: a client normalizes what was typed against them before it asks, the
+registry canonicalizes against them, and a name outside them is answered as a
+name nobody holds rather than as a fault. The cap also keeps an alias
+structurally distinct from the 52-character base32 fingerprint, so the two can
+never be confused.
+
+### What a name can answer
+
+`ALIAS_UNKNOWN` is the only negative, and it covers every reason a name does not
+resolve: never registered, released, bound to nothing, or lapsed and inside the
+registry's own grace. A client therefore cannot tell those apart and has no
+business trying.
+
+A name that stops resolving is not a contact lost: resolve is an **onboarding**
+step, and whoever already holds a descriptor keeps messaging over dest-routing
+without ever consulting the resolver again. Only new lookups stop.
+
+### The owner's own ops
+
+On the same I2P face, an owner keeps their own names working. Each request is
+signed by the owner's identity - the signature is what names them, so no request
+carries a fingerprint field anybody could fill in and there is no way to ask
+about somebody else - and each answer is signed by the resolver's delegated key
+and travels with its delegation certificate, so a device handed an answer by a
+sibling device checks it against the same baked-in root as a record it fetched
+itself.
+
+```
+POST /v1/op/alias.status            every name this account holds
+POST /v1/op/alias.update            point one of them at {fp, dest, view}, with
+                                    the owner's alias certificate over the name
+POST /v1/op/alias.renew             pay for another term from the deposit
+POST /v1/op/alias.autorenew         let the service pay, or stop it
+POST /v1/op/alias.transfer.accept   take a name offered to this account
+```
+
+A request carries its own `issuedAt` and is refused outside a freshness window;
+the op named in the envelope must be the op the signature covers, so relabelling
+an envelope cannot turn a status into an update. A status answer carries its own
+window too, which is how long it may stand in for a freshly fetched one when a
+device hands it to the account's other devices.
+
+### What the face refuses, and what it counts
+
+The resolve face answers nobody it cannot name: the i2pd tunnel in front puts the
+caller's own `.b32.i2p` on each request, having stripped that header from what
+the caller sent, and a request arriving without one is refused. **Resolves are
+counted against a per-caller window** and a client must expect to be told it has
+asked too often; an owner's ops are not counted, because they are signed, are one
+per name held, and a client with twenty names has to be able to repoint all twenty
+in one run.
+
+### The coordinate a client is built with
+
+Two values, and no more: the resolver's **root fingerprint** and the **b32 it
+answers at**. There is no third key, because the resolver signs and never
+encrypts - so nothing a client holds goes stale when the resolver rotates its
+signing material behind the same root. The root fingerprint is the single
+constant `bazarish::kResolverRootFingerprint`, the same one the daemon is built
+with. With either half empty the alias path reports that resolution is
+unavailable rather than guessing. A test or a differently-pointed client is handed
+its coordinate explicitly (`Session::setResolverCoordinate`); there is no ambient
+second way in.
+
+### Why one registry at all
+
+A globally unique sellable name needs a single registry, as a domain does. The
+centralization is bounded to the name binding: the resolver is **out of the
+delivery path** (routing is federated and never consults it after the one-time
+lookup), it cannot forge an identity (descriptors and cards are user-signed), and
+it cannot see who talks to whom. Names are sugar over a base that works without
+them - two people can always exchange `bazarish://invite?...` descriptors by QR
+or link and never touch the resolver (`../Identity.md`). How that registry is
+built, what it charges and how it is operated are its own business and are not
+specified here.
+
 ## What is hidden from whom
 
 | Party | Card fetch | Alias resolve |
@@ -183,7 +266,8 @@ Namespace anti-enumeration is out of scope for the resolver (resolve is unauthen
    + dest), overridable in a session for a test resolver. Unit tests drive
    resolve/card over an injected transport (happy path, unknown name, wrong root,
    alias mismatch, a certificate over another name or by another identity).
-4. **alias-resolver** - *implemented* (`AliasResolver.md`): registry + lifecycle,
+4. **alias-resolver** - *implemented* (its own repository, not specified here):
+   registry + lifecycle,
    signed resolve over I2P (live-validated on i2pd), portal/payments (sign-in-with-key,
    atomic balance-only purchase, balance/top-up, manage), delegation-cert signing,
    hourly lifecycle scheduler, and **offline signing custody with a hot swap** -

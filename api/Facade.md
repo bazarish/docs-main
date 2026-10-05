@@ -185,7 +185,7 @@ Consequences for first contact (`Contacts.md`, `Federation.md`):
   request bootstrap carries the sender's own routing (sealing key + destination +
   serving sealing key), so the reply path is equally facade-free.
 - **By `<alias>`** - resolved at the **central resolver** over its I2P endpoint
-  (`AliasResolver.md`); again the client's own direct dial, never through its
+  (`FederatedResolve.md`); again the client's own direct dial, never through its
   server and never through the foreign facade.
 - **By bare fingerprint** - a fingerprint is an identity, not a route, so it is
   always paired with a destination (the descriptor above). Cross-server first
