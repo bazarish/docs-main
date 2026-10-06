@@ -12,7 +12,7 @@ it; neither the file name nor a sender-supplied MIME value has that role:
 | `text` | the text | shows it |
 | `file` | a transfer's metadata (name, size, sha256, mime) | offers to fetch it; the bytes travel client to client |
 | `image` | the picture itself, bytes in the envelope | decodes it, keeps it in the account, draws it |
-| `voice` | Opus audio, bytes in the envelope | keeps it in the account, plays it on a press |
+| `audio` | Opus audio, bytes in the envelope | keeps it in the account, plays it on a press |
 | `contact.request`, `reaction`, `receipt`, `call.*`, `device.*` | as their names say | as documented elsewhere |
 
 `image` carries the picture **inside the message**: there is no announcement and
@@ -74,13 +74,13 @@ A message has **two** type discriminators that must never be conflated:
 
 The resulting invariant:
 
-> Adding a new kind of content (a file, a photo, a voice note, a call signal,
+> Adding a new kind of content (a file, a picture, a voice note, a call signal,
 > a read receipt) touches **only the client protocol and the content-type
 > registry below**. The server, the storage backend and the federation relay
 > require **no change** and never learn what kind of content they carried.
 
-A photo is not a server concept. It is a `content` delivery whose encrypted
-payload happens to have `type: "photo"`. The server stores and relays the
+A picture is not a server concept. It is a `content` delivery whose encrypted
+payload happens to have `type: "image"`. The server stores and relays the
 identical opaque envelope it would for a text line or a call invite.
 
 ## Layer 1 - delivery class (server-visible)
@@ -237,8 +237,8 @@ regenerates its destination should state this to its user.
 | `contact.request` | contact | Carries a `bootstrap` block (`sealing` - the same account sealing key the card publishes -, `dest`, `servingKey`, `pass`) plus `text`. The first message; see `Contacts.md`. |
 | `contact.accept` | content | Agreeing to a received `contact.request`: an empty-bodied message whose first-reply `bootstrap` hands the requester our descriptor + our pass, making the pair mutual contacts. The requester's client auto-completes the add and surfaces a note. See `Contacts.md`. |
 | `file` | content | An announcement: `name`, `size`, `sha256` and `mime`. The bytes stay on the sender's disk until the recipient asks for them. See `api/FileTransfer.md`. |
-| `image` | content | A picture, carried inline: the bytes ride in the envelope rather than being fetched. The registry called this `photo` and nothing ever sent one - which is how the reference bot came to acknowledge a type that does not exist and not the one that does. |
-| `voice` | content | Same shape as `file`, plus optional `duration`. |
+| `image` | content | A picture, carried inline: the bytes ride in the envelope rather than being fetched. Its body block is named `image`. |
+| `audio` | content | A voice note: the same shape as `image`, plus `durationMs` and a waveform. Its body block is named `audio`. |
 | `receipt` | content | `ref` (the read message's `id`). A **read** receipt - the recipient's client sends it only on a genuine read (the chat is open, the app window focused, and the message scrolled into the visible area), confirming the "green" delivery state below. `ref` is the newest read incoming id, so it acknowledges that message and every earlier one **the sender got as far as the recipient's server** (a read high-water); one that never arrived is not carried up by it. Optional/toggleable. **Never sent about a contact request**: reading a request is not answering it, and a requester who learns that a stranger's client is running and has opened their message has been told something they never agreed to be told. Until the request is accepted, the requester's own plate stops at *delivered*. |
 | `reaction` | content | A reaction to a message: `ref` (the target message's `id`), `text` (**at most 4 characters and 20 bytes** - enough for an emoji with a modifier or a joined pair; **empty removes** the reactor's reaction). Both limits are checked when sending and again on receipt: a peer's client is not the receiver's to trust, and an oversized one is dropped rather than rendered on someone's message. One reaction per user per message - a new one overwrites the old at every recipient. A single sealed delivery to the peer. Never a chat bubble - clients render it as a chip on the target message. See *Reactions*. |
 | `bot.command` | content | A command invocation aimed at a bot: `command` (name, no leading slash), `args` (raw argument string). See *Bots & interactive messages*. |
