@@ -43,14 +43,14 @@ One repository per component, developed side by side:
 |---|---|
 | Shared C++ library | [common-cpp](https://github.com/bazarish/common-cpp) |
 | Server fleet: messaging server, service node, HTTP facade, admin panel | [bazarish-server](https://github.com/bazarish/bazarish-server) |
-| Client (core, CLI, Qt6 GUI) | [client-qt6](https://github.com/bazarish/client-qt6) |
+| Client (core, CLI, Qt6 GUI) | [client-qt](https://github.com/bazarish/client-qt) |
 | Alias registry (signed resolve + portal; the one paid component; closed, and documented in its own repository) | [alias-resolver](https://github.com/bazarish/alias-resolver) |
 | Specification | this repository |
 
 This repository specifies the protocol: the wire formats, what each party may
 learn, and the obligations of an implementation. Decisions left open by the
 protocol are documented with the implementation that makes them; the desktop
-client's settings and policies are in `client-qt6/docs/`.
+client's settings and policies are in `client-qt/docs/`.
 
 ## Cryptography
 

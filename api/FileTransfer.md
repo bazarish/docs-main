@@ -139,6 +139,6 @@ storage service, and a client must report it rather than imply delivery:
 
 | Component | Role |
 |---|---|
-| `client-qt6` | everything: announce, request, serve (one-time dest + temp ciphertext), fetch with resume, verify, decrypt, and report progress |
+| `client-qt` | everything: announce, request, serve (one-time dest + temp ciphertext), fetch with resume, verify, decrypt, and report progress |
 | `server-core` | untouched - it only ever carries the small announcement and the four service messages |
 | `facade-http` | untouched - nothing streams through the facade any more |
