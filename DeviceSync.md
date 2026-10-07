@@ -31,10 +31,13 @@ happened.
 
 ## Enrollment (adding a device)
 
-1. An existing device displays a QR code containing: the identity private keys (classical + post-quantum), the home server fingerprint + facade secret URI, and the user-owned destination key. The new device re-fetches the user's current routing (destination + serving sealing key) from the server (`GET /v1/messaging/destination`). The ML-DSA private key (~4 KB) exceeds practical QR capacity; the enrollment bundle may therefore require a QR-carried one-time secret together with a transfer over a local channel. To be determined in client design.
-2. The new device authenticates as the user and **registers its client ID**.
-3. It asks for the address book (`device.contacts-request`); every other device that has contacts answers.
-4. Content delivered and fully acked *before* registration is gone by design and is not replayed; prior history arrives with the address book and the message echo.
+1. An existing device publishes a one-shot blinded destination and shows two things: a link naming it, `bazarish://pair?v=1&dest=<b33>[&reseed=<https url>]`, and a four-digit code. The link is a QR code and a string; the code is only on the screen. The destination is blinded so a floodfill cannot hand it to anyone who did not get the link.
+2. The new device dials that destination and asks `GET /hello`, carrying the code in `X-Bazarish-Pair`. The existing device compares the code in constant time and only then builds the account bundle, sealed with that same code, and streams it in the response body. A request with a wrong code is refused with `403` and counted; after ten wrong codes the destination is taken down. A request with no code header is refused with `400` and not counted, so a port scan cannot spend the budget. Nothing leaves the device without the code, so the link may travel over any channel.
+3. The bundle is the account backup: identity private keys (classical + post-quantum), the serving sealing key, the destination key, the server endpoint, the address book and the block list. It never touches the disk on either device. Message history is not in it.
+4. A reseed address in the link is what a new device uses to start its own router when it has no network database yet. It is the only coordinate a device can be given before it has an account, so it is an `https` URL and nothing else.
+5. The new device authenticates as the user and **registers its client ID**.
+6. It asks for the address book (`device.contacts-request`); every other device that has contacts answers.
+7. Content delivered and fully acked *before* registration is gone by design and is not replayed; prior history arrives with the address book and the message echo.
 
 ## Retirement (removing a device)
 
