@@ -55,13 +55,14 @@ client's settings and policies are in `client-qt/docs/`.
 ## Cryptography
 
 The post-quantum hybrid is not the signatures alone - it is everything.
-**Signing** is ECDSA P-256 + ML-DSA-65: every identity statement carries both and
-is valid only when both verify. **Sealing** is ECDH P-256 + ML-KEM-768: every
+**Signing** is Ed25519 + ML-DSA-65: every identity statement carries both and
+is valid only when both verify. **Sealing** is X25519 + ML-KEM-768: every
 encrypted thing in the project - a message body end to end, a delivery envelope's
-header, a federation query - goes through the same `cms::seal`, and opening one
-needs both private halves. Breaking one scheme alone forges nothing and reveals
-nothing. Containers are OpenSSL-native standards (PEM, DER, CMS). No custom
-cryptographic constructions.
+header, a federation query - goes through the same `hybrid::seal`, whose key is
+derived from both shared secrets at once, so opening one needs both private
+halves. Breaking one scheme alone forges nothing and reveals nothing. Keys are
+PEM and DER, the composite frame is CBOR, and the password envelope is CMS. Every
+primitive is OpenSSL's; no custom cryptographic algorithms.
 
 ## Status and near-term plan
 

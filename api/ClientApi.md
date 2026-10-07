@@ -44,7 +44,7 @@ them.
   code visible to the facade would say what the seal was meant to hide.
 - **Payloads are padded** to a step of a fixed ladder before they are encrypted.
   Without it the length of a waiting-mail list would still count the mail.
-- Authentication, first contact: signed with **both** identity keys (hybrid, like all identity statements). Canonical string `"v1\n" + timestamp + "\n" + METHOD + "\n" + path + "\n" + hex(sha256(body)) + "\n"`, plus `clientId + "\n"` when the request names a device (see the client ID below); headers `X-Bazarish-Keys` (base64 of `{"c": b64(EC SPKI), "pq": b64(ML-DSA SPKI)}`), `X-Bazarish-Timestamp`, `X-Bazarish-Sig-Classical`, `X-Bazarish-Sig-Pq`. The server verifies both signatures and both key types and derives the caller UID from the presented keys - no prior key exchange. Freshness window +/-300 s, narrowed to exactly-once by a server-side replay cache that remembers each accepted request's signature for the window (the randomized classical signature is the per-request nonce, so a legitimate resend is re-signed and accepted while a captured request replayed verbatim is rejected). Measured size of those headers: **~8.3 KB**.
+- Authentication, first contact: signed with **both** identity keys (hybrid, like all identity statements). Canonical string `"v2\n" + timestamp + "\n" + METHOD + "\n" + path + "\n" + hex(sha256(body)) + "\n"`, plus `clientId + "\n"` when the request names a device (see the client ID below), then `nonce + "\n"`; headers `X-Bazarish-Keys` (base64 of `{"c": b64(Ed25519 SPKI), "pq": b64(ML-DSA SPKI)}`), `X-Bazarish-Timestamp`, `X-Bazarish-Nonce` (16 random bytes, base64), `X-Bazarish-Sig-Classical`, `X-Bazarish-Sig-Pq`. The server verifies both signatures and both key types and derives the caller UID from the presented keys - no prior key exchange. Freshness window +/-300 s, narrowed to exactly-once by a server-side replay cache that remembers each accepted request's nonce for the window: a legitimate resend carries a fresh nonce and is accepted, while a captured request replayed verbatim is rejected, and editing the nonce breaks both signatures because it is signed. Ed25519 is deterministic, so the nonce is what makes a resend distinct - under the old randomized classical signature that fell out of the signature bytes themselves. Measured size of those headers: **8258 bytes**.
 - Authentication, afterwards: a **session**, which is the tunnel. The signature above is presented once, in the hello, and every later request carries `X-Bazarish-Session` (this request's handle), `X-Bazarish-Seq` and `X-Bazarish-Mac` (HMAC-SHA256 over the same canonical string plus `seq + "\n"`) - **~174 bytes**, and an HMAC instead of an ML-DSA verification. Two properties beyond the size:
   - a signature is evidence a server can show a third party that this user made this request at this time; a MAC is not, because the server could have produced it itself;
   - the handle is `HMAC(secret, seq)`, different on every request, so nothing in the middle can tie a session's requests together by it. Nothing is transmitted to arrange this: both sides derive handles, and the server keeps only the next 64 of them indexed (a client runs two connections, so requests overtake each other).
@@ -81,19 +81,19 @@ it in the mailbox until the recipient's devices have collected it - and the sing
 write a device makes to its own account, `POST /v1/messaging/self`, which reaches
 no other party.
 
-A **contact request**, which presents nothing, is capped by the protocol at **17890 sealed
+A **contact request**, which presents nothing, is capped by the protocol at **17590 sealed
 bytes** (`kMaxContactRequestBytes`) - not by any operator setting, and not with
 room to spare: this is the one thing a stranger may put in a mailbox, so the cap
 is the measured worst case and nothing above it.
 
-The worst case is **17858 bytes**, measured through the real path: the two hybrid
+The worst case is **17558 bytes**, measured through the real path: the two hybrid
 sealing keys the bootstrap carries, the delivery pass the requester hands
 over so the peer can answer, the ML-KEM ciphertext of the seal, the authorship
 block with the sender's keys in it (a request has no card and no pass, so the
 signature is the only thing naming them), the longest greeting a user may write
 and the longest name an account may carry. The 32 bytes on top are what the
-variable-length parts can add - an ECDSA signature is 70 to 72 bytes, a CBOR
-integer is as wide as its value.
+variable-length parts can add - a CBOR integer is as wide as its value (an
+Ed25519 signature is always 64 bytes).
 
 Two client-side caps are what make that number a number: the greeting is at most
 **100 bytes** (`kMaxContactGreetingBytes`) and an account's own display name at

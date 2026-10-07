@@ -168,9 +168,9 @@ versioned envelope:
   "sentAt": <unix milliseconds>,   // client send clock; drives ordering and the displayed time
   "replyTo": <id>,            // optional
   "routing": { "dest": <sender b32>, "servingKey": <base64 SPKI>, "view": <32 hex> },
-  "auth": { "c": <ECDSA P-256 signature, CBOR bytes>,
+  "auth": { "c": <Ed25519 signature, CBOR bytes>,
             "p": <ML-DSA-65 signature, CBOR bytes>,
-            "kc": <author's EC public key, SPKI DER - contact request only>,
+            "kc": <author's Ed25519 public key, SPKI DER - contact request only>,
             "kp": <author's ML-DSA public key, SPKI DER - contact request only> },
   ... type-specific fields ...
 }

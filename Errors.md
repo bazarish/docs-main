@@ -33,7 +33,7 @@ HTTP transports map typed errors onto appropriate status codes; the JSON body is
 | `SESSION_INVALID` | The session a request authenticated with is gone. Answered by opening a new tunnel, never by retrying the same way | server |
 | `FACADE_UPSTREAM` | The facade could not reach the server behind it. The one error a facade makes up itself | facade |
 | `DELIVERY_REJECTED` | Delivery refused. Deliberately combines "unknown pass", "unknown mailbox" and "recipient not served here" into one externally indistinguishable result (anti-enumeration; see `Contacts.md`). A contact request, which presents nothing, is the only alternative admission path | server |
-| `CONTACT_REQUEST_TOO_LARGE` | Contact request exceeds `kMaxContactRequestBytes` (17890, a protocol constant - not an operator setting) | server |
+| `CONTACT_REQUEST_TOO_LARGE` | Contact request exceeds `kMaxContactRequestBytes` (17590, a protocol constant - not an operator setting) | server |
 | `ALIAS_TAKEN` | Requested alias is already registered | service node |
 | `ALIAS_UNKNOWN` | Alias resolution found no such alias. Aliases are intended to be discoverable, so this is reported explicitly and is not subject to anti-enumeration | service node |
 | `CLIENT_UNREGISTERED` | Request carries a client ID that is not registered for this user (see `DeviceSync.md`) | server |

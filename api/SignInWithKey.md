@@ -91,9 +91,10 @@ device line the client API adds (`ClientApi.md`) is absent here.
 
 | Field | Header | Meaning |
 |---|---|---|
-| `k` | `X-Bazarish-Keys` | The signer's public keys, classical + ML-DSA. The verifier derives the fingerprint from them: this is *who signed*. |
+| `k` | `X-Bazarish-Keys` | The signer's public keys, Ed25519 + ML-DSA. The verifier derives the fingerprint from them: this is *who signed*. |
 | `t` | `X-Bazarish-Timestamp` | When it was signed. Outside the auth freshness window the blob is dead. |
-| `c` | `X-Bazarish-Signature` | ECDSA P-256 signature. |
+| `n` | `X-Bazarish-Nonce` | The per-request nonce, signed along with the rest. Without it a re-signed blob would be byte-identical to the first. |
+| `c` | `X-Bazarish-Signature` | Ed25519 signature. |
 | `p` | `X-Bazarish-Signature-PQ` | ML-DSA-65 signature. Both must verify - one alone proves nothing. |
 
 The fixed method and path are a domain separator: a login blob is not a signature
