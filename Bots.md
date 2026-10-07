@@ -18,11 +18,10 @@ This is a direct consequence of the two-layer model:
 > client protocol and the content-type registry.
 
 There is deliberately **no** server-side bot registry, bot flag, or bot
-discovery in this iteration. A bot is reached exactly like any contact: by
-fingerprint, by invite link, or by an alias it registered with a
-service node. Discovery, rate-limiting policy and any distinct UI treatment are
-open questions left to clients and future iterations - none of them require a
-server change to introduce.
+discovery in this iteration. A bot is reached exactly like any contact: by its
+invite link or by an alias. Discovery, rate-limiting policy and any distinct UI
+treatment are open questions left to clients and future iterations - none of them
+require a server change to introduce.
 
 ## The three content types
 
@@ -79,15 +78,15 @@ content type of its own and never appears in Layer 1.
 }
 ```
 
-The bot receives the press, acts on `data`, and may reply - a new message, a
-fresh keyboard, anything. `ref` lets the bot correlate the press to the message
-it sent (this protocol has no message editing, so a bot replies rather than
-mutating the original).
+The bot receives the press, acts on `data`, and answers with a new message or
+with an `edit` of the keyboard message itself (*Editing in place*). `ref` names
+the message whose keyboard was tapped, so the bot knows what the press refers to
+and which message an edit replaces.
 
 A button press is not itself shown as a message in the tapping client
-(inline-keyboard semantics): the bot's reply is the visible result. Receipts
-(`Messages.md`) are not sent for `bot.command` / `bot.callback`; they are
-control content, not user-visible lines.
+(inline-keyboard semantics): the bot's reply or edit is the visible result.
+Receipts (`Messages.md`) are not sent for `bot.command` / `bot.callback`; they
+are control content, not user-visible lines.
 
 ### Editing in place
 
