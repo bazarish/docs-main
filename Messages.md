@@ -167,7 +167,7 @@ versioned envelope:
   "from": <sender fingerprint>,
   "sentAt": <unix milliseconds>,   // client send clock; drives ordering and the displayed time
   "replyTo": <id>,            // optional
-  "routing": { "dest": <sender b32>, "servingKey": <base64 SPKI>, "view": <32 hex> },
+  "routing": { "dest": <sender b32>, "servingKey": <base64 SPKI> },   // contact.routing only
   "auth": { "c": <Ed25519 signature, CBOR bytes>,
             "p": <ML-DSA-65 signature, CBOR bytes>,
             "kc": <author's Ed25519 public key, SPKI DER - contact request only>,
@@ -205,34 +205,31 @@ much as a letter. That is what the contact-request cap is
 measured against (`api/ClientApi.md`): a request carries no pass and no card, so
 its signature is the only thing that names the sender.
 
-**`routing` - where to answer, on every message.** A destination is not for life:
-regenerating the I2P key changes the address, and the serving sealing key that
-goes with it. Every message therefore carries the sender's current pair, and a
-receiver whose stored pair differs adopts the new one and persists it before
-dispatching the message. It costs 227 bytes (60-character b32 + 124-character
-key + JSON), applies to every content type including the silent ones, and needs
-no acknowledgement: one message from a moved contact - of any type, in either
-role - repairs the way back to them.
+**`routing` - where to answer, sent once when it changes.** A destination is not
+for life: raising a new I2P key changes the address, and the serving sealing key
+is re-minted with it. The moved account then sends every contact one
+`contact.routing` message carrying `{dest, servingKey}`, and a receiver whose
+stored pair differs adopts the new one and persists it. It rides on that message
+alone - an ordinary letter carries no `routing`, because the pair changes once in
+a long while and paying 227 bytes on every reaction and read receipt to say so
+was not worth it. The sender's queue keeps retrying a contact it could not reach,
+so the update is not lost to one offline device.
 
-`view` is the sender's own descriptor capability, the one their invite carries.
-It rides here for the same reason the pair does: a dialog that began from the
-other side never carried it, and without it that contact could never be handed
-on to a third person. It grants the holder nothing they do not already have -
-the card it reads is the destination and keys they are already talking on - and
-it is what makes "share this contact" work in both directions.
-
-The resulting rule is: **after changing an address, send first.** No other
+The resulting rule is: **after changing an address, tell everyone.** No other
 mechanism restores a pair whose stored routing is stale, because the only path to
 a contact is the destination currently held for them, and a request for a new
-address would be sent to the address that is no longer served. A client that
-regenerates its destination should state this to its user.
+address would be sent to the address that is no longer served. Sending outward
+does not depend on one's own destination, so a moved account can always reach its
+contacts; what it must not do is lose the obligation, which is why the fan-out is
+a queue in the profile database that survives a restart and is cleared one
+contact at a time, on success.
 
 ### Content-type registry (v1)
 
 | `type` | Delivery class | Purpose / payload |
 |---|---|---|
 | `text` | content | `text` - a plain text line. |
-| `contact.routing` | content | A routing change pushed to an established contact: the same `routing` block every message carries, on a message with nothing else in it. |
+| `contact.routing` | content | A routing change pushed to an established contact: the `routing` block, on a message with nothing else in it. The only message that carries one. |
 | `device.chat-pin` | device | One conversation pinned or unpinned, on every device of the account. |
 | `contact.request` | contact | Carries a `bootstrap` block (`sealing` - the same account sealing key the card publishes -, `dest`, `servingKey`, `pass`) plus `text`. The first message; see `Contacts.md`. |
 | `contact.accept` | content | Agreeing to a received `contact.request`: an empty-bodied message whose first-reply `bootstrap` hands the requester our descriptor + our pass, making the pair mutual contacts. The requester's client auto-completes the add and surfaces a note. See `Contacts.md`. |

@@ -175,9 +175,8 @@ server's own clients. This is a hard invariant, not a convention:
 
 Consequences for first contact (`Contacts.md`, `Federation.md`):
 
-- **Descriptor / QR** (`bazarish://invite?fp=...&dest=...&view=...`, rendered as
-  `fp:b33`) - carries the contact's fingerprint, serving destination and the
-  server's serving sealing key. The client fetches the user-signed contact card
+- **Descriptor / QR** (`bazarish://invite?fp=...&dest=...`, rendered as
+  `fp:b33`) - carries the contact's fingerprint and serving destination. The client fetches the user-signed contact card
   for that fingerprint over I2P and verifies it against the fingerprint
   (`FederatedResolve.md`) - a direct fetch over a transient I2P destination of
   its own, never through the requester's server and never through the foreign
@@ -229,7 +228,7 @@ distinct:
 | Artifact | Carries | Audience | Facade? |
 |---|---|---|---|
 | `bazarish://server?...` | server fingerprint + facade URLs | prospective clients of **this** server | **yes** - own server only |
-| `bazarish://invite?...` (descriptor) | fingerprint + own destination + card-read capability (`fp:b32` + `view`) | anyone, to add the holder as a contact | no |
+| `bazarish://invite?...` (descriptor) | fingerprint + own destination (`fp:b32`) | anyone, to add the holder as a contact | no |
 
 The descriptor carries no facade URL; the contact card it points at is fetched
 over I2P and is user-signed, so it is verified against the fingerprint and

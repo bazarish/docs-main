@@ -14,17 +14,15 @@ is not here: it lives in its own repository (`alias-resolver/docs/Daemon.md`).
 
 - **Descriptor** - a small, single-QR pointer:
   ```
-  bazarish://invite?v=1&fp=<52-char base32 fingerprint>&dest=<b32>.b32.i2p&view=<32 hex>[&name=<percent-encoded>]
+  bazarish://invite?v=1&fp=<52-char base32 fingerprint>&dest=<b32>.b32.i2p[&name=<percent-encoded>]
   ```
-  identity (`fp`) + the user's **own** destination (`dest`, a `.b32.i2p` host) +
-  the card-read capability its server issued (`view`, 16 random bytes as hex),
+  identity (`fp`) + the user's **own** destination (`dest`, a `.b32.i2p` host),
   plus an optional `name` the
   inviter advertises (percent-encoded). The recipient adopts `name` as the
   contact's local display name at add time - a one-time static label, never
   re-fetched or transmitted afterwards (`Messages.md`). Older invites omit it.
-  Rendered for humans as `fp:b32` (the `:` distinguishes it from an alias); the
-  full link/QR also carries `view`. It does **not** contain the contact card -
-  it points at one.
+  Rendered for humans as `fp:b32` (the `:` distinguishes it from an alias). It
+  does **not** contain the contact card - it points at one.
 - **Contact card** - user-signed (`t`, `issuedAt`, `dest`, `sealingKey`, `servingKey`, the owner taken from the signature;
   ~= 8.7 KB, the hybrid post-quantum signature dominates), fetched live and
   verified against `fp` (`../Identity.md`). It names **no server**: a card that
@@ -52,13 +50,14 @@ home server never sees who is being added (below).
    and authenticated to the destination, and there is no third party on the path
    to hide them from.
 
-   The `view` in the query is what makes the fetch unaskable without a
-   descriptor: the server answers only when it matches the capability it issued
-   for that account, and a wrong one is refused **identically** to an unknown
-   user. Without that, anyone could ask a server whether it hosts a fingerprint.
-   A caller whose descriptor is out of date gets that one answer and knows to ask
-   for a fresh one. Rotating `view` retires every descriptor already shared -
-   which a key doing double duty in the delivery path could never do.
+   The **destination is the capability**. A blinded `.b32.i2p` address cannot be
+   guessed and cannot be recovered from the network - a floodfill holds only the
+   day's blinded key - so the only way to reach the card is to have been handed
+   the descriptor. The destination answers for its own user alone, so the fetch
+   cannot be used to ask a server whether it hosts some other fingerprint. A
+   caller whose descriptor is out of date reaches nothing and knows to ask for a
+   fresh one. Raising a new destination retires every descriptor already shared,
+   and mints a new serving key with it.
 2. **Alias resolve - `fp` is unknown.** `alias` -> descriptor. This is the only
    step without an `fp` anchor, so it is where MITM and the trusted alias->identity
    binding live. Served by the single central resolver.
@@ -96,15 +95,15 @@ than downgraded silently. The route that formerly provided the relay
 ## Card-fetch protocol (`fp` -> contact card)
 
 ```
-client has descriptor {fp, dest, view}
-  query   = { v, fp, view }                                  # plain; the I2P stream is the envelope
+client has descriptor {fp, dest}
+  query   = { v, fp }                                        # plain; the I2P stream is the envelope
   -> dial srv (direct dial over a transient I2P destination)
   srv unseals, looks up the card for fp, returns:
   response = <card DER>                                      # plain, same reason
   client: verify card signature; assert card.user == fp and card.dest is .b32.i2p
 ```
 
-`view` is a read capability and nothing else - it encrypts nothing. The serving key the sender needs for delivery
+The serving key the sender needs for delivery
 admission headers with (`../Identity.md`, `InviteAnonymity.md`); no new key. On
 the only path there is, the I2P stream is already confidential to `srv`, so
 app-layer sealing is optional. Integrity is always the `fp` anchor.
@@ -116,7 +115,7 @@ for uniform client automation. The resolver returns a
 **self-verifying signed record**:
 
 ```
-sign_delegated({ v, t: "resolve-record", alias, descriptor: {fp, dest, view},
+sign_delegated({ v, t: "resolve-record", alias, descriptor: {fp, dest},
                  issuedAt, notAfter })
   + delegationCert     # root -> delegated
   + aliasCert          # the owner's own claim over the name, user-signed
@@ -186,7 +185,7 @@ itself.
 
 ```
 POST /v1/op/alias.status            every name this account holds
-POST /v1/op/alias.update            point one of them at {fp, dest, view}, with
+POST /v1/op/alias.update            point one of them at {fp, dest}, with
                                     the owner's alias certificate over the name
 POST /v1/op/alias.renew             pay for another term from the deposit
 POST /v1/op/alias.autorenew         let the service pay, or stop it
@@ -242,7 +241,7 @@ specified here.
 | Target (the serving server / resolver) | the `fp` (it serves that card) and that someone holding the descriptor asked | the alias (it owns the namespace); requester unlinkable on direct path |
 | Client | the verified card | the verified descriptor -> card |
 
-Namespace anti-enumeration is out of scope for the resolver (resolve is unauthenticated by design). The **card fetch** is not: it answers only to a caller returning the descriptor's `view` capability, refuses a wrong one exactly as it refuses an unknown user, and is not routed through the clearnet facade at all - otherwise a contact could take the descriptor it legitimately holds and try it against every facade it knows until one answered "yes, here".
+Namespace anti-enumeration is out of scope for the resolver (resolve is unauthenticated by design). The **card fetch** is not: it answers only on the account's own destination, which has to have been handed out, and is not routed through the clearnet facade at all - otherwise a contact could take the descriptor it legitimately holds and try it against every facade it knows until one answered "yes, here".
 
 ## Phasing
 
@@ -251,7 +250,7 @@ Namespace anti-enumeration is out of scope for the resolver (resolve is unauthen
    (`record -> delegated -> root`) on the existing hybrid-cert primitives. Unit
    tests round-trip each.
 2. **server-core** - *done.* The card-fetch responder on every serving
-   destination (the home one and every user's own: read the `{fp, view}` query,
+   destination (the home one and every user's own: read the `{fp}` query,
    answer with the card when the capability matches and refuse identically when it
    does not; both directions in the clear, for the reason above). The proxy relay
    that once backed a thin client is gone, along with the route it was served on.

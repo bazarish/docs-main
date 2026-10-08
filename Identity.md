@@ -11,7 +11,7 @@ Status: draft skeleton.
 
 - A user **is** a hybrid keypair set. The canonical UID is the identity fingerprint covering both public keys.
 - Address / contact forms:
-  - `<fingerprint>:<b32>` - the **descriptor**: identity fingerprint + the user's own destination (a `.b32.i2p` host). The primary scannable/QR form; the full link `bazarish://invite?fp=...&dest=...&view=...` also carries the card-read capability (`api/FederatedResolve.md`). A fingerprint is an identity, not a route, so it is always paired with a destination - there is no `@server-fingerprint` form (nothing maps a fingerprint to an endpoint).
+  - `<fingerprint>:<b32>` - the **descriptor**: identity fingerprint + the user's own destination (a `.b32.i2p` host). The primary scannable/QR form; the full link is `bazarish://invite?fp=...&dest=...` (`api/FederatedResolve.md`). A fingerprint is an identity, not a route, so it is always paired with a destination - there is no `@server-fingerprint` form (nothing maps a fingerprint to an endpoint).
   - `<alias>` - an exclusive **alias** on the central resolver (paid; the project's monetization, `api/FederatedResolve.md`). Resolving it yields a descriptor, after which the contact card is fetched and verified.
 - Users have no binding to a server in anything a contact can see. Registration opens an unbounded channel with the server, and the only thing that expires is the delegation of the user's destination - which the network itself enforces. Nothing signed by the user names the server.
 - All clients (devices/app instances) of a user **share the identity keypair set**; a new device receives it during enrollment (see `DeviceSync.md`). Each client registers a unique random **client ID** so the server can track delivery completeness across clients.
@@ -102,14 +102,13 @@ because only the reader knows whose card they asked for.
 
 What is deliberately **absent**: any server fingerprint or server card (routing
 is by destination, and naming the server would let cards be grouped by who hosts
-them); the view capability that permits fetching the card (it travels in the
-invite - putting it inside would hand it to everyone who already has the card);
-and anything about the owner's devices.
+them); and anything about the owner's devices.
 
 **Forward secrecy: there is none, and the card is where that shows.**
 `sealingKey` is long-lived and never rotated, so whoever obtains its private half
 reads everything that account was ever sent - including what is still sitting in
-mailboxes. Compare `servingKey`, which does have a rotation mechanism.
+mailboxes. `servingKey` is re-minted whenever the account raises a new
+destination, and only then.
 
 This is a decision rather than an oversight, and the reasoning is worth keeping
 because the question comes back. Forward secrecy bounds what a key obtained later
@@ -126,10 +125,11 @@ Reopen it if something changes the premise - message history stored under a key
 of its own, say, which is what would make the ciphertext hoard the weak point
 again.
 
-A card is republished to **the server** whenever its contents change (a new
-destination, a rotated serving key); contacts learn a new destination from the
-`routing` that rides on every message (`Architecture.md`), so a card is not
-re-broadcast to them on a schedule.
+A card is republished to **the server** whenever its contents change, which
+means when the account raises a new destination. Contacts are then told once, by
+a `contact.routing` message carrying the new destination and serving key
+(`Messages.md`); nothing rides on ordinary messages, and a card is not
+re-broadcast on a schedule.
 
 ### One serving server, hard-cutover migration
 
@@ -166,8 +166,8 @@ sealed via the client's own server), so the requester's own server never learns 
 ### Out-of-band invites (the descriptor)
 
 A contact is shared out of band as a small **descriptor** - `<fingerprint>:<b33>`,
-or the link `bazarish://invite?fp=...&dest=...&view=...[&name=...]`: identity +
-serving destination + the server's serving sealing key, plus an optional advertised
+or the link `bazarish://invite?fp=...&dest=...[&name=...]`: identity +
+serving destination, plus an optional advertised
 display name the recipient adopts at add time (static thereafter; see `Messages.md`).
 It fits a single QR. The recipient
 fetches the user-signed **contact card** for that fingerprint from the destination

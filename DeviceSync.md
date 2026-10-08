@@ -83,9 +83,9 @@ Two pieces of account state propagate to the user's other devices as dedicated *
 
 ### The address book
 
-A device that has just joined cannot learn a contact from the network: a correspondent is reached by destination and their card is read with a capability, and nothing turns a fingerprint into either. The account's other devices are the only place the book can come from - so it is asked for, over the same self-channel.
+A device that has just joined cannot learn a contact from the network: a correspondent is reached by destination, and nothing turns a fingerprint into one. The account's other devices are the only place the book can come from - so it is asked for, over the same self-channel.
 
-One entry carries what a contact **is**: their fingerprint, their identity keys (what every message of theirs is checked against, `Messages.md`), their sealing key, destination, serving key and view capability, whether they refused to be passed on, the local display name, the per-contact switches, whether this account has issued to them, whether they are blocked, and their avatar.
+One entry carries what a contact **is**: their fingerprint, their identity keys (what every message of theirs is checked against, `Messages.md`), their sealing key, destination and serving key, the local display name, the per-contact switches, whether this account has issued to them, whether they are blocked, and their avatar.
 
 It carries the contact's **delivery pass** along with everything else about them, and this is the one thing it deliberately did not carry before: a one-time token could not be in two places, so a device that learned a contact this way had to buy its own before it could write. A pass is not spent, so every device holds the same one and a device that learns a contact can write to them at once. What it still carries nothing of is anything that belongs to one device or one exchange in flight.
 

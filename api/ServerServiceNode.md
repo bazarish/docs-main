@@ -10,7 +10,7 @@ An account has **no term**. Registration opens an unbounded channel; the only cl
 
 | Request | Purpose |
 |---|---|
-| `get-card` | fingerprint + the descriptor's `view` capability -> the user's **contact card** (sealing key + destination + serving sealing key). Backs the federation `card` request - the first-contact card fetch (`api/FederatedResolve.md`). The capability must be the one the node issued for that account: a wrong one is refused **exactly** like an unknown user, so the lookup cannot be used to ask a server whether it hosts a fingerprint |
+| `get-card` | fingerprint -> the user's **contact card** (sealing key + destination + serving sealing key). Backs the federation `card` request - the first-contact card fetch (`api/FederatedResolve.md`). The query arrives on that user's own destination and is answered for that user alone, so it cannot be used to ask a server whether it hosts some other fingerprint |
 
 ## Service node -> Server (implemented)
 
@@ -21,7 +21,6 @@ that fingerprint; no shared secret is used.
 |---|---|
 | `PUT /v1/messaging/i2p-dest` | Supply the user's signed offline transient; an empty transient revokes the destination |
 | `PUT /v1/messaging/quota` | Set the mailbox quota granted by the account, in place of the server's default |
-| `PUT /v1/messaging/serving-key` | Rotate a destination's serving sealing key in two phases: prepare, then commit |
 | `GET /v1/messaging/account?user=` | State held for one account: registered devices, bytes in use, effective quota; displayed by the administration panel |
 | `DELETE /v1/messaging/account?user=` | The account has been deleted: discard the mailbox, the replay markers, the delivery passes, the device registry and the quota override. Issued whenever an account is deleted, by its owner or by an operator. Idempotent: a fingerprint for which the server holds no state is already in the requested condition |
 
@@ -32,7 +31,7 @@ Owned by the **server** (it drives the delete-when-all-acked storage rule, see `
 ## What the split settled on
 
 - **Push, not pull.** The node pushes what it owns (the delegated transient, the
-  quota, a serving-key rotation, a deletion) and reconciles the quotas once at
+  quota, a deletion) and reconciles the quotas once at
   start, so the messaging server needs the node for nothing on the delivery path.
   The one thing the server asks the node for is a user's contact card, and it holds
   the answer briefly rather than calling per delivery.
