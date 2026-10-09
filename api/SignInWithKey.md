@@ -14,7 +14,9 @@ verifier checks a login (section 4) and what a client must do before it signs
 
 Every verifier in the project speaks this one contract: the service-node portal
 (`ServicePortal.md`), the alias registry and the admin panel
-(`AdminPanel.md`).
+(`AdminPanel.md`). A site outside the project verifies logins with
+[auth-sdk](https://github.com/bazarish/auth-sdk), which implements the verifier
+side in Go, Rust, Python and JavaScript.
 
 ## 1. The signed request
 
