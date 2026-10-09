@@ -54,11 +54,9 @@ specification.
 One message carries at most **512 KiB** of payload (`kMaxMessagePayloadBytes`).
 The server checks it before storing anything - on a delivery, only after the
 pass has been accepted - and answers `MESSAGE_TOO_LARGE`, a final refusal. The
-client checks the same number before sending: a message whose encoded body is
-over it is refused locally, with a request to send it as a file, and nothing is
-delivered. That check is made on the body before the authorship signatures and
-the seal are added, which take a few KiB more, so a body that close to the limit
-passes it and is then refused by the server.
+client checks the same number on the same bytes before sending: the payload as
+it leaves, signed and sealed. A message over it is refused locally, with a
+request to send it as a file, and nothing is delivered.
 
 Anything larger is a file: `sendFile` puts only its metadata (name, size,
 sha256, mime) in the message and the bytes travel client to client over a
