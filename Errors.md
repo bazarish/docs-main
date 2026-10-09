@@ -28,7 +28,7 @@ HTTP transports map typed errors onto appropriate status codes; the JSON body is
 | Code | Meaning | Source |
 |---|---|---|
 | `STORAGE_FULL` | User's pending-content quota is exhausted | server |
-| `QUOTA_EXCEEDED` | Defined, but no component emits it: an exhausted quota is reported as `STORAGE_FULL` | none |
+| `QUOTA_EXCEEDED` | Retired: an exhausted quota is `STORAGE_FULL`. The name is never reused | none |
 | `RECIPIENT_SERVER_UNREACHABLE` | The recipient's server returned no answer: it could not be dialled, the stream failed, or it asserted a delivery without a verifiable signature. Not a refusal; the sending client may repeat the attempt, and on exhausting its attempts reports this as the reason (`Messages.md`) | client |
 | `MESSAGE_TOO_LARGE` | The payload is over `kMaxMessagePayloadBytes`. Past admission, so only a correspondent ever sees it | server |
 | `CONTACT_RATE_LIMITED` | This destination is taking too many contact requests, or has too many waiting. Transient; says nothing about who is served there | server |
@@ -36,11 +36,11 @@ HTTP transports map typed errors onto appropriate status codes; the JSON body is
 | `FACADE_UPSTREAM` | The facade could not reach the server behind it. The only error a facade generates itself | facade |
 | `DELIVERY_REJECTED` | Delivery refused. Deliberately combines "unknown pass", "unknown mailbox" and "recipient not served here" into one externally indistinguishable result (anti-enumeration; see `Contacts.md`). A contact request, which presents nothing, is the only alternative admission path | server |
 | `CONTACT_REQUEST_TOO_LARGE` | Contact request exceeds `kMaxContactRequestBytes` (17590, a protocol constant - not an operator setting) | server |
-| `ALIAS_TAKEN` | Requested alias is already registered. Defined, but no component emits it: the alias registry reports a held name on its own portal page, not with this code | none |
+| `ALIAS_TAKEN` | Requested alias is already held. The registry's portal answers a buy request for it with 409 and this code | alias registry |
 | `ALIAS_UNKNOWN` | Alias resolution found no such alias. Aliases are intended to be discoverable, so this is reported explicitly and is not subject to anti-enumeration | alias registry |
 | `CLIENT_UNREGISTERED` | Request carries a client ID that is not registered for this user (see `DeviceSync.md`) | server |
 | `ACCOUNT_PENDING_APPROVAL` | The account exists but is frozen: a moderated server has not approved it yet, so its destination is not brought up. The message carries the operator's instructions for finishing registration | service node |
-| `I2P_UNAVAILABLE` | The embedded I2P router is not available; direct I2P (e.g. placing/accepting a call) is impossible | client-side |
+| `I2P_UNAVAILABLE` | Retired: I2P is not optional, so there is nothing for it to report. The name is never reused | none |
 
 The registry grows as APIs are specified; codes are append-only and never reused.
 

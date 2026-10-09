@@ -1,4 +1,4 @@
-# Federation API (Server <-> Server)
+# Federation API (Client -> Serving Destination)
 
 Status: draft skeleton.
 
@@ -48,11 +48,11 @@ response: {"delivered":<bool>,"errorCode":...,"errorMessage":...,
            "deliveryId":<id>,"signerPub":<base64>,"sig":<base64>}\n
 ```
 
-The recipient runs the same delivery pipeline whoever dialled (dedup -> admission -> size/quota -> store), so a client's delivery and a discovery fetch share one served code path.
+Both ops arrive on the user's serving destination through one accept loop, one per-peer rate limit and one frame dispatcher; `deliver` runs the delivery pipeline (dedup -> admission -> size/quota -> store), `card` answers from the stored card.
 
 The confirmation is carried **in that reply**: on storing the envelope the recipient signs the `deliveryId` with the **serving destination's own per-destination signing key** (`signerPub` carries the public half; see *Authentication*), never with the server's root identity. The reply is the only available path, the dialling party being a client on an address that publishes no leaseset and accepts no inbound connections. As `deliveryId` is sealed inside the envelope, only a server that unsealed it can state it, and the signature binds that statement to the destination that answered. The sending client accepts a `delivered` result **only** when the signature verifies against the id it sent; an unsigned or incorrectly signed claim is treated as no answer and the attempt is repeated.
 
-Operational note: a freshly created destination must publish its leaseset before peers can reach it; the first connect after startup may return `CANT_REACH_PEER` ("LeaseSet not found") and should be retried with backoff. Verified end to end against a live i2pd (`i2p-federation-smoke`, and the full cross-server `demo-federation-i2p.sh`).
+Operational note: a freshly created destination must publish its leaseset before peers can reach it; the first connect after startup may return `CANT_REACH_PEER` ("LeaseSet not found") and should be retried with backoff. Verified end to end against a live i2pd.
 
 ## Destination routing
 
@@ -133,15 +133,15 @@ DeliveryEnvelope:
 | `deliver` | Deliver an envelope (message or contact request) for a local mailbox |
 | `card` | Return **this destination's own user's** contact card for a fingerprint query - the first-contact card fetch (`FederatedResolve.md`). A destination answers for the one user it belongs to and for nobody else: answering node-wide made every published address an oracle for "is this fingerprint served here", and two invites proved their owners co-located |
 
-Alias resolution (`alias` -> descriptor) is **not** an operator-to-operator
-verb; it is served by the separate central resolver over its own I2P endpoint
+Alias resolution (`alias` -> descriptor) is **not** a request of this API; it
+is served by the separate central resolver over its own I2P endpoint
 (`FederatedResolve.md`).
 
 ## Facade locality
 
 A facade is the client<->own-server last mile and **never** crosses a server
-boundary (see `Facade.md`). Servers reach each other only over the federation
-transport (I2P), and a client connects only to its own server's facade. So no
+boundary (see `Facade.md`). A client reaches another server only on its users'
+serving destinations over I2P, and a facade only of its own server. So no
 cross-server operation - delivery, contact request, or alias resolution - may
 require a client to connect to, learn, or carry a foreign facade URL. The unit
 of cross-server reachability is the recipient's **serving destination** (its

@@ -10,23 +10,25 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 |---|---|---|
 | **Server** | daemon (C++) | Core messaging: pending content storage, delivery, federation over hidden networks |
 | **Service node** | separate daemon (C++) | User management: accounts, portal, moderation. Isolated from messaging logic |
-| **Facade** | daemon (C++) | "Last mile" between client and server infrastructure. First implementation: HTTP REST behind a reverse proxy at a secret URI |
+| **Facade** | daemon (C++) | "Last mile" between client and server infrastructure. First implementation: HTTP over its own I2P destinations at a secret path |
 | **Client** | separate repositories | Qt6 desktop app (`client-qt`); the same client core behind a REST API for bots (`client-daemon`) |
-| **I2P router** | in-process or external | Transport for federation and calls. How a component hosts its router is an implementation choice, not part of the protocol |
+| **I2P router** | in-process or external | Transport for the client API, federation and calls. How a component hosts its router is an implementation choice, not part of the protocol |
 | **Storage** | disk | Pending encrypted content |
 
 ## Topology
 
 ```
-             clearnet              operator-controlled private channel
-                 |      +.........................................................+
-[Client] --I2P or HTTPS--> [Facade] --the sealed tunnel--> [Server] --> [Storage: disk]
-                 |      |                                     |                   |
-                 |      |          signed, user named in path  v                   |
-                 |      |                              [Service node] --> [its own records]
-                 |      +..........................................|..............+
-                 |                                                 |
-                 |                        [embedded i2pd router] <==+==> other servers (federation)
+                                   operator-controlled private channel
+                        +.........................................................+
+[Client] -------I2P------> [Facade] --the sealed tunnel--> [Server] --> [Storage: disk]
+    |                   |                                     |                   |
+    |                   |          signed, user named in path  v                   |
+    |                   |                              [Service node] --> [its own records]
+    |                   +..........................................|..............+
+    |                                                              |
+    |                                     [embedded i2pd router] <==+== correspondents' clients (federation)
+    |
+    +--clearnet--> portal, reseed
 ```
 
 The facade has exactly one backend. The service node is **not** reachable from it:
@@ -95,7 +97,7 @@ docs-main/                       # this repository - canonical protocol specific
 +-- api/
     |-- ClientApi.md             # client <-> facade <-> {server, service node}
     |-- Facade.md                # last-mile contract
-    |-- Federation.md            # server <-> server over I2P (destination-routed)
+    |-- Federation.md            # client -> serving destination over I2P (destination-routed)
     |-- InviteAnonymity.md       # destination-routed contact cards (invite anonymity)
     |-- FederatedResolve.md      # descriptor + card fetch, alias -> descriptor
     |-- SignInWithKey.md         # authentication by signature

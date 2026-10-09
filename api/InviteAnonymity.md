@@ -1,7 +1,7 @@
 # Invite Anonymity: destination-routed contact cards
 
-Status: **implemented and live-validated** over real I2P (single-server +
-cross-server `demo-federation-i2p.sh`, 2026-06-17). Supersedes the old
+Status: **implemented and live-validated** over real I2P (single-server and
+cross-server, 2026-06-17). Supersedes the old
 invite/server-card shape; `../Identity.md`, `../Contacts.md`, `Facade.md` and
 `Federation.md` have been updated to match.
 
@@ -86,11 +86,9 @@ sealed header is what kept the "sender's own server never learns the recipient"
 invariant (`Federation.md`) even when it did;
 it is what keeps the serving key bound to the destination rather than the server.
 
-**Ownership** (so this is not a "server signs" step): for a personal dest
-the client may **generate `sealingKey_U` itself and delegate the private half to
-its server** (like the offline destination key), making it fully
-client-originated. Either way the card still
-carries only U's signature.
+**Ownership** (so this is not a "server signs" step): the server mints and
+holds the serving key for each destination; the client publishes its public half
+in the card, which carries only U's signature.
 
 ## Routing by destination
 
@@ -277,10 +275,10 @@ server-wide signer either (a delivery confirmation is signed per destination).
 2. **server-core** - per-destination serving sealing keys (generate, persist,
    select by the destination a connection arrived on); `GET /v1/messaging/destination`
    returns the assigned dest + public serving sealing key; the delivery envelope
-   is keyed by `toDest`; federation routes/accepts by destination and **dials the
-   b33** (not the raw destination - an encrypted leaseset is only reachable via
-   the b33); local short-circuit only on same-destination. TCP federation removed;
-   `i2p.enabled` mandatory.
+   is keyed by `toDest`; the server only accepts on the users' destinations and
+   initiates no connections - the client **dials the b33** (not the raw
+   destination - an encrypted leaseset is only reachable via the b33). TCP
+   federation removed; `i2p.enabled` mandatory.
 3. **client** - `createInvite` / `addByInvite` / contact-request bootstrap /
    `addByAlias` on the contact card and route-by-dest; `deliver`
    targets a destination; `Client::myDestination()` fetches the assigned routing.

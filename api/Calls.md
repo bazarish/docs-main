@@ -68,13 +68,6 @@ where the 12-byte nonce is `role(1) || track(1) || 0 0 || sequence(8, big-endian
 
 The audio payload is the Opus packet.
 
-## Strict I2P requirement
-
-A call is impossible without the embedded I2P router. Placing a call
-(startAudioCall) or accepting one (acceptCall) brings the router up first and, if
-I2P is unavailable, fails immediately with the typed, readable error
-`I2P_UNAVAILABLE` - no call is placed and nothing is partially started.
-
 ## Signaling message types
 
 Call signaling is ordinary Layer-2 content (see `../Messages.md`): each signal is
@@ -117,10 +110,9 @@ and `sentAt` are already on the wire.
 
 ## Flow (I2P)
 
-1. **Caller** builds a one-time RAW datagram destination on the embedded router
-   (strict: I2P unavailable -> `I2P_UNAVAILABLE`), generates a per-call AES key, and
-   sends a `call.invite` carrying its media b33 and the key over the normal E2E
-   delivery path.
+1. **Caller** builds a one-time RAW datagram destination on the embedded router,
+   generates a per-call AES key, and sends a `call.invite` carrying its media b33
+   and the key over the normal E2E delivery path.
 2. **Callee** receives the invite (on sync), alerts the user, and answers the
    caller with `call.ring` so that the caller's state is known rather than
    inferred. On acceptance it builds its own RAW datagram destination, replies

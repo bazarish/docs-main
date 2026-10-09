@@ -8,11 +8,11 @@ The facade is the "last mile" between the client and the server infrastructure. 
 
 - **The facade's own I2P destination is the way in.** With `i2p.enabled` (plus
   `state` for the keys and `i2p.destinations` for how many) the facade
-  publishes the same API on one or more encrypted-LeaseSet destinations, and
+  publishes its API on one or more encrypted-LeaseSet destinations, and
   those are the only facades a client dials (below). The addresses are stable
   across restarts because they travel in the server descriptor. The I2P front
-  parses no HTTP: an accepted stream is relayed to the facade's own listener, so
-  routing, the secret prefix and streaming behave identically on both fronts. The
+  parses no HTTP: an accepted stream is relayed to the facade's plain listener
+  (`listen`, on loopback), which applies the routing and the secret prefix. The
   stream is torn down only after the client has read the reply (or a bounded
   drain elapses): closing it immediately after the last write truncates the
   reply, and the client then sees an empty stream rather than a response. The log
@@ -31,15 +31,16 @@ The facade is the "last mile" between the client and the server infrastructure. 
   beside the facades: clearnet, fetched once, and never queried again once the
   router is up. They are a separate list because they serve a different
   purpose; a reseed serves no API and a facade is never a reseed.
-- **A reseed address is an https base URL, and the archive under it is
-  `i2pseeds.su3`** - the form every I2P reseed already has, so a router reads it
-  with no special case anywhere. It is not a facade and speaks no Bazarish API:
-  the client's I2P engine appends that name, fetches the archive, unpacks it and
-  loads the routers, each of which carries its own signature. The archive's own
-  signature is not required - a reseed an operator runs privately is signed by
-  nobody a stock client trusts, so requiring it would mean no private reseeds -
-  which is why the address must be **https**: the transport is what stands
-  between the archive and the network.
+- **A reseed address is an https base URL and nothing else, and the archive
+  under it is `i2pseeds.su3`** - the form every I2P reseed already has, so a
+  router reads it with no special case anywhere. It is not a facade and speaks no
+  Bazarish API: the client's I2P engine appends that name, fetches the archive,
+  unpacks it and loads the routers, each of which carries its own signature. The
+  archive's own signature is not required - a reseed an operator runs privately
+  is signed by nobody a stock client trusts, so requiring it would mean no
+  private reseeds - which is why the address must be **https**: the transport is
+  what stands between the archive and the network. The router refuses a reseed
+  entry of any other form.
 - **A server may pack its own**, and its **portal** publishes it at
   `i2pseeds.su3` - never a facade. A facade is an I2P address and this is the one
   file a client needs before it has I2P; the portal is on the clearnet in any
@@ -56,8 +57,8 @@ The facade is the "last mile" between the client and the server infrastructure. 
 - This is the **only** I2P address the server side publishes. Federation runs on
   the users' own destinations (`InviteAnonymity.md`), never a shared one, so a
   facade address discloses nothing about which users a server hosts.
-- Published under a **secret URI** known only to clients of this server, and that secrecy is **mandatory, not a deployment option**: `bazarish-facade-http` refuses to start without `basePath <secret>`, which it requires on every request and strips before forwarding. The single exception is an explicit `public`, and it means one thing only - a fronting reverse proxy (Caddy, nginx, ...) already publishes this facade under a secret URI of its own. The secret reaches a client solely inside the facade URL of the server descriptor (below); it is never advertised, never derived from the server fingerprint, and never sent anywhere else.
-- The whole clearnet API therefore lives under the secret prefix. Nothing is left outside it: the reseed is no longer part of this API at all (`ClientApi.md`), so a facade answers only requests from a client that already holds the secret.
+- Published under a **secret URI** known only to clients of this server, and that secrecy is **mandatory, not a deployment option**: `bazarish-facade-http` refuses to start without `basePath <secret>`, which it requires on every request and strips before forwarding. The secret reaches a client solely inside the facade URL of the server descriptor (below); it is never advertised, never derived from the server fingerprint, and never sent anywhere else.
+- The whole API therefore lives under the secret prefix. Nothing is left outside it: the reseed is no longer part of this API at all (`ClientApi.md`), so a facade answers only requests from a client that already holds the secret.
 - **Two paths exist, and the facade reads neither.** Once the secret prefix is
   stripped, both are relayed over the **operator private channel** to the
   messaging server, which is the facade's only backend. That channel is TLS
@@ -87,7 +88,7 @@ The facade is the "last mile" between the client and the server infrastructure. 
 - Everything outside the secret prefix answers the same bare **404** - the API root, an unknown path, and the operator liveness endpoint alike - so a probe of the host learns nothing. `/healthz` is not on the client-facing socket at all: it is served on a separate private **ops listener** (`opsListen`) that is never published to clients (`AdminPanel.md`).
 - The ops listener also carries the facade's **own configuration**, operator-signed
   like `/healthz`: `GET /settings` and `PUT /settings` (the secret base path, the
-  backend, both sockets, the I2P side, the log level) and `POST /restart`.
+  backend, the three sockets, the I2P side, the log level) and `POST /restart`.
   They are on the ops socket for the same reason `/healthz` is - on the public one
   they would reveal that the host is a facade. Only the log level applies at
   once; the rest is written into the facade's config file and read at its next
@@ -129,24 +130,26 @@ should be read as claiming it.
 A client reaches a facade through a single **facade URL**:
 
 ```
-http[s]://host[:port]/secret-path
+http://<b33>.b32.i2p/secret-path
 ```
 
-- **scheme** - `http` or `https`. `https` is for facades fronted by a
-  TLS-terminating reverse proxy; the client does **not** verify the TLS
-  certificate (a self-signed or reverse-proxy certificate is acceptable), because the facade is the
-  untrusted last mile - all security is end-to-end and anchored in the server
-  fingerprint, not in TLS PKI.
-- **host[:port]** - the facade's address. The port defaults to `443` (https) /
-  `80` (http) when omitted.
+- **`<b33>.b32.i2p`** - one of the facade's own I2P destinations, by the b33 of
+  its encrypted LeaseSet2. The client dials it over I2P and speaks plain HTTP on
+  the stream: the stream is encrypted to the destination dialled, and the facade
+  is the untrusted last mile in any case - all security is end-to-end and
+  anchored in the server fingerprint.
 - **/secret-path** - the secret URI prefix, e.g. `/h9fd/kshdcy/secretdkg`. The
   client prepends it to **every** request path it sends a facade (a reseed is
-  fetched from its own address, above, and carries none); the facade (or the
-  fronting proxy) strips it before forwarding. It is excluded from
-  the signed canonical path, so the backend verifies the stripped, query-less
-  path, and one signature is valid across all of a server's facades. A URL
-  without a path is only ever correct when the fronting proxy holds the secret
-  instead.
+  fetched from its own address, above, and carries none); the facade strips it
+  before forwarding. It is excluded from the signed canonical path, so the
+  backend verifies the stripped, query-less path, and one signature is valid
+  across all of a server's facades.
+
+A clearnet facade URL (`http[s]://host[:port]/secret-path`) exists only for a
+client started with `--allow-facade-without-i2p-for-dev-purposes` (above);
+without it, a descriptor that names one is refused. A client that hosts its own
+server reaches that server's facade on its own loopback, which leaves the
+machine for nothing.
 
 ### Connections
 
@@ -203,8 +206,8 @@ Consequences for first contact (`Contacts.md`, `Federation.md`):
 
 ### Multiple facades and failover
 
-A server may publish **several** facade URLs (different hosts, proxies, or
-secret paths). The client holds them as an ordered list and **fails over** across
+A server may publish **several** facade URLs (different destinations or secret
+paths). The client holds them as an ordered list and **fails over** across
 it: it sends to the current facade, and on an *unreachable* facade (transport
 failure) advances to the next, cycling without end across attempts; an
 HTTP error *response* is final (the facade is reachable and the request was
@@ -261,7 +264,7 @@ intermediaries are trusted for availability only (`Identity.md` /
 ## Open questions
 
 - Facade registration/rotation flow: how a server **operator** issues and revokes secret URIs. (Clients already learn a server's facades from the configuration link above, and can add/edit the list locally; what remains is the operator-side issuance/revocation and whether updated facades should also propagate via the server card.)
-- Whether the facade enforces any rate limiting or leaves it entirely to the reverse proxy.
+- Whether the facade enforces any rate limiting.
 - ~~Streaming/long-poll support imposed by the incoming-delivery mechanism~~ -
   settled: incoming mail is one held-open request (`ClientApi.md`) and there is
   no second mechanism behind it, so a facade **must** carry a request answered

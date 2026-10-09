@@ -85,24 +85,26 @@ write a device makes to its own account, `POST /v1/messaging/self`, which reache
 no other party.
 
 A **contact request**, which presents nothing, is capped by the protocol at **17590 sealed
-bytes** (`kMaxContactRequestBytes`) - not by any operator setting, and without
-a margin: this is the one thing a stranger may put in a mailbox, so the cap
-is the measured worst case and nothing above it.
+bytes** (`kMaxContactRequestBytes`) - not by any operator setting, and with
+almost no margin: this is the one thing a stranger may put in a mailbox, so the
+cap sits just above the measured worst case.
 
 The worst case is **17558 bytes**, measured through the real path: the two hybrid
 sealing keys the bootstrap carries, the delivery pass the requester provides
 so the peer can answer, the ML-KEM ciphertext of the seal, the authorship
 block with the sender's keys in it (a request has no card and no pass, so the
 signature is the only thing naming them), the longest greeting a user may write
-and the longest name an account may carry. The additional 32 bytes are what the
-variable-length parts can add - a CBOR integer is as wide as its value (an
-Ed25519 signature is always 64 bytes).
+and the longest name an account may carry. The body is padded to the 16384-byte
+step of the padding ladder before it is sealed, and the seal frame adds 1174
+bytes, so every body up to 16380 bytes seals to exactly 17558: the
+variable-length parts move nothing until the body outgrows that step. The cap
+leaves 32 bytes over that size.
 
-Two client-side caps are what make that number fixed: the greeting is at most
-**100 bytes** (`kMaxContactGreetingBytes`) and an account's own display name at
-most **64 bytes** (`kMaxAccountNameBytes`, about 32 characters of a non-Latin
-alphabet). A value over either cap is refused where it is typed rather than at
-the recipient's server.
+Two client-side caps are what keep the body inside that step: the greeting is
+at most **100 bytes** (`kMaxContactGreetingBytes`) and an account's own display
+name at most **64 bytes** (`kMaxAccountNameBytes`, about 32 characters of a
+non-Latin alphabet). A value over either cap is refused where it is typed rather
+than at the recipient's server.
 
 - A contact acceptance is not a separate endpoint: it is an ordinary content
   message presenting the pass received in the request (see `../Contacts.md`).
@@ -152,9 +154,8 @@ A server need not publish it at all. What a client is given is a reseed
 `i2pseeds.su3` to it. So the address may name this portal or any other reseed
 anywhere, and no client or router needs a special case to read it.
 
-A server descriptor may name **reseed addresses**, and each is a full `https://`
-URL to an **su3 archive** - the ordinary I2P reseed format. Nothing Bazarish is
-spoken there: the client's own I2P engine fetches the archive, unpacks it and
+A server descriptor may name **reseed addresses** of that form. Nothing Bazarish
+is spoken there: the client's own I2P engine fetches the archive, unpacks it and
 loads the routers, exactly as it would from any reseed. What the addresses provide is
 that a client's first start does not have to reach the public reseed hosts its
 router carries, and that the operator may publish them anywhere at all, which is

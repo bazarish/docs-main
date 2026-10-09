@@ -52,6 +52,7 @@ service node and the panel.
 | server-core | service-node, admin-panel |
 | service-node | admin-panel |
 | facade-http | admin-panel |
+| gateway | admin-panel |
 
 ## Status: `GET /healthz`
 
@@ -74,9 +75,9 @@ socket asks for a client certificate and admits only the keys in its
 `opsClients`, so an unlisted caller is refused at the handshake and never
 reaches the signature check. Neither certificate decides what a caller may do -
 that is still the signature and the `operators` list; TLS binds the two sockets
-to each other. For **facade-http** this is what keeps the endpoint off the API
-listener, which is the clearnet one: there `/healthz` would answer a caller who
-does not know the secret prefix and would thereby identify the host as a facade
+to each other. For **facade-http** this is what keeps the endpoint off the
+sockets its clients reach: there `/healthz` would answer a caller who does not
+know the secret prefix and would thereby identify the address as a facade
 (`Facade.md`).
 The panel probes every configured service concurrently and renders status,
 version, uptime, current/peak RAM and round-trip latency.
@@ -119,7 +120,7 @@ A sidebar carries the views:
   | Addresses | the facades and reseeds clients reach this server by, the descriptor built from them, the node's own operator API and the messaging server it is bound to, and the log level |
   | Accounts | the storage a new account gets and how long an idle one is kept, beside the two numbers that show whether that promise can still be kept: what the quotas have allocated and what the disk holds (`GET /v1/messaging/storage`) |
   | Server | server-core's own file: log level and libi2pd's logging, its I2P privacy and tunnel count, the inbound federation rate limit, its private listener and the node it reports to |
-  | Facade | the facade's own file, read and written over its ops socket: the secret base path, both listeners, the messaging server it forwards to, and its I2P side |
+  | Facade | the facade's own file, read and written over its ops socket: the secret base path, its three listeners (`listen`, `directListen`, `opsListen`), the messaging server it forwards to, and its I2P side |
   | Panel | the panel's own file: who may sign in, the words it signs under, the services it manages, and where it listens - plus what it cannot change (its fingerprint, its config file, its state and web directories, its version) |
 
   Every tab that holds a start-only setting also carries a **restart** control
@@ -154,7 +155,7 @@ node with many accounts does not transfer the whole set to locate one.
 | `GET /api/panel`, `PUT /api/panel` | nothing - the panel's own configuration file |
 | `POST /api/panel/restart` | nothing - the panel's own process |
 | `GET /api/service-settings?kind=`, `PUT /api/service-settings?kind=` | server-core `/v1/messaging/settings`, service-node `/v1/account/settings`, facade `/settings` (ops socket) |
-| `POST /api/restart?kind=` | the matching service's restart endpoint |
+| `POST /api/restart?kind=` | server-core `POST /v1/messaging/restart`, service-node `POST /v1/account/restart`, facade `POST /restart` (ops socket) |
 
 The quota is set **on the service node**, which is the component that grants it and
 pushes it to server-core. Setting it directly on server-core, as an earlier
@@ -212,9 +213,9 @@ Between them, the tabs cover every value in all four config files except the
 ones that would let the panel lock itself out or move a service's data: the state
 and asset directories, the operator fingerprint lists, and a server's own
 identity. Those are shown read-only. **Everything else an operator would edit
-over SSH is editable here, and every service can be restarted from here**, which
-is the rule this page is built to: managing a Bazarish server should not require
-a shell on it.
+over SSH is editable here, and every service but a gateway, which the panel only
+reads, can be restarted from here**, which is the rule this page is built to:
+managing a Bazarish server should not require a shell on it.
 
 ## First run
 

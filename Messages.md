@@ -204,7 +204,7 @@ from the request that started the dialog. A message from somebody it has no keys
 for is one it cannot check, and it is dropped exactly like a message from a
 stranger.
 
-Measured: **3396 bytes** for the two signatures, **5471** when the keys are
+Measured: **3388 bytes** for the two signatures, **5417** when the keys are
 included. Every message pays the first figure - a reaction and a read receipt as
 much as a letter. That is what the contact-request cap is
 measured against (`api/ClientApi.md`): a request carries no pass and no card, so
@@ -266,7 +266,7 @@ face, with the same retry.
 | `edit` | content | An in-place edit of a message the sender previously sent: `ref` (the target message's `id`), `text` (new text), `keyboard` (new inline keyboard, `[]` to clear). The recipient replaces its copy. Applied only to a message sent by `from`. See *Editing and deleting messages*. |
 | `delete` | content | A delete-for-everyone of a message the sender previously sent: `ref` (the target message's `id`). The recipient removes its copy with **no tombstone** left behind. Scoped, like `edit`, to a message sent by `from`. See *Editing and deleting messages*. |
 | `chat.clear` | content | Asks the peer to clear the **whole** one-to-one conversation with the sender (no `ref`). The recipient's client wipes its transcript with `from` and leaves a single "cleared the chat" notice. The chat itself remains. The "clear for everyone" choice in the chat-info panel. |
-| `avatar` | content | The sender's avatar pushed to a contact: `avatar` = `{ mime, data }`, `data` being base64 of a square PNG/JPEG compressed client-side to at most **500 KB**. A silent service message - stored as that contact's picture, never shown as a chat bubble. Sent once the dialog is mutually established and re-sent to every contact when the avatar changes. See *Avatars and display names* and `Contacts.md`. |
+| `avatar` | content | The sender's avatar pushed to a contact: `avatar` = `{ mime, data }`, `data` being the bytes of a square PNG/JPEG (a CBOR byte string, as in an `image`) compressed client-side to at most **500 KB**. A silent service message - stored as that contact's picture, never shown as a chat bubble. Sent once the dialog is mutually established and re-sent to every contact when the avatar changes. See *Avatars and display names* and `Contacts.md`. |
 | `device.avatar` | device | Self-sync of the user's own avatar to their other devices: the same `avatar` block, sealed to the user's own key and stored through `POST /v1/messaging/self`. See `DeviceSync.md`. |
 | `device.contact-name` | device | Self-sync of a local contact rename to the user's other devices: `peer` (fingerprint), `name`. A purely local label, never sent to the contact. See `DeviceSync.md`. |
 | `device.i2p-master` | device | Self-sync of the user's own I2P master key to their other devices: `i2pMaster` (base64), sealed to the user's own key and stored through `POST /v1/messaging/self`, so every device keeps the same personal address. Applied only when `from` is the user themselves. See `DeviceSync.md`, `Identity.md`. |
@@ -342,7 +342,7 @@ acts on the `data` and may reply (e.g. with a new message or a fresh keyboard).
 
 Because all three are `content`-class deliveries, the server, facades,
 federation and storage are unchanged and never learn that a conversation
-involved a bot. The full model and the reference bot runtime are in `Bots.md`.
+involved a bot. The full model is in `Bots.md`.
 
 ### Editing and deleting messages
 
@@ -419,7 +419,9 @@ else.
 
 **Avatar.** A user's own avatar is chosen locally, cropped **square** and
 compressed (PNG/JPEG) to at most **500 KB** before it leaves the device (the
-protocol rejects a larger one). It travels as a silent `avatar` service message -
+protocol rejects a larger one). Its bytes are a CBOR byte string, as a picture's
+and a voice message's are, so an avatar at that limit fits the 512 KiB message
+limit signed and sealed. It travels as a silent `avatar` service message -
 stored as the sender's picture, never rendered as a chat bubble:
 
 - **On establishing a dialog** - exchanged symmetrically the moment the dialog is

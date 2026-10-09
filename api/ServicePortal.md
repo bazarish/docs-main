@@ -179,7 +179,8 @@ This mechanism is moderation, not a charge.
 | `DELETE /v1/account/user?user=` | Operator-signed: delete the account (certificate, grants, destination) |
 | `POST /v1/account/ban` | Operator-signed: delete the account and refuse this key from now on (reason defaults to "Banned") |
 | `POST /v1/account/unban` | Operator-signed: lift a ban |
-| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed, and the whole of what an operator can change: registration mode and its two messages, `loginConsumer`, `portalLinks`, `facades`, `reseeds`, `defaultQuotaBytes`, `idleDeleteDays`, `logLevel`, and the three addresses `listen`, `portalListen`, `messaging` - plus the account count and the sum of the quotas. Everything is written back into the node's config file, so a restart keeps it; `logLevel` and the portal's own words apply at once, the three addresses at the next start |
+| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed, and the whole of what an operator can change: registration mode and its two messages, `loginConsumer`, `portalLinks`, `facades`, `reseeds` (each an `https` URL and not a `.b32.i2p` address, or the write is refused; a config file naming a reseed that is not `https` is refused at start), `defaultQuotaBytes`, `idleDeleteDays`, `logLevel`, and the three addresses `listen`, `portalListen`, `messaging` - plus the account count and the sum of the quotas. Everything is written back into the node's config file, so a restart keeps it; `logLevel` and the portal's own words apply at once, the three addresses at the next start |
+| `POST /v1/account/restart` | Operator-signed, on the operator socket: the node exits with the restart code (90) so that its supervisor starts it again |
 
 A ban outlives the account it removed - it is what stops the same key from
 registering again - so it is stored apart from the record it deletes, and a
@@ -252,6 +253,7 @@ in that directory, of a type the portal publishes, are served.
 | Client | `POST /v1/account/registration` | key | the same registration, with no page to visit |
 | Panel | `POST /v1/account/approve` | operator sig | moderation |
 | Panel | `GET /v1/account/users`, `GET /v1/account/user`, `PUT /v1/account/quota` | operator sig | the operator's account list, search and quota |
+| Panel | `POST /v1/account/restart` | operator sig | restart the node, so that a start-only setting takes effect |
 | Client | `POST /v1/account/card` | key | publish the card, redeem the grant |
 | Client | `POST /v1/account/i2p-dest` | key | upload a signed offline transient (refused while the account is unapproved) |
 | Client | `GET /v1/account/i2p-status` | key | approval state and the recorded transient validity |

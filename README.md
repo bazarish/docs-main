@@ -23,7 +23,7 @@ component implements.
 - API contracts:
   - [ClientApi](api/ClientApi.md) - client <-> facade <-> {server, service node}
   - [Facade](api/Facade.md) - the last-mile contract
-  - [Federation](api/Federation.md) - server <-> server over I2P (destination-routed)
+  - [Federation](api/Federation.md) - client -> a user's serving destination over I2P (destination-routed)
   - [InviteAnonymity](api/InviteAnonymity.md) - destination-routed contact cards
   - [SignInWithKey](api/SignInWithKey.md) - authentication by signature: the signed request, the login challenge and blob, and who consumes a signature
   - [ServicePortal](api/ServicePortal.md) - sign-in-with-key portal, account onboarding, grants
@@ -76,7 +76,7 @@ conversation), direct client-to-client file transfer, bots and interactive
 messages, message editing and read receipts, multiple accounts, at-rest
 encryption of all local state, and client-to-client audio calls (Opus over I2P
 RAW datagrams to b33 destinations, per-call AES-256-GCM, minimal-length media
-tunnels, strict I2P requirement; the embedded `libi2pd_bazarish` carries the
+tunnels; the embedded `libi2pd_bazarish` carries the
 datagram-to-b33 routing in-process). There is no video - see `api/Calls.md` for
 why. The shipped client is built with the production resolver's coordinate
 (`defaultResolverCoordinate`), and the desktop client reads invite and
