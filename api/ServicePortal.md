@@ -81,7 +81,9 @@ Per user (`subscriptions/<fp>.json` - the account record - and `grants/<fp>.json
   granted quota, the published card and when a destination was last delegated.
   The account itself has no term - only the delegated transient expires (below):
   `GET /v1/account/i2p-status` reports what the client needs to see, and the node
-  deletes an account idle for `idleDeleteDays` (180).
+  deletes an account idle for `idleDeleteDays` (180). Idle counts from the last
+  accepted delegation, or from registration for an account that never delegated;
+  a revocation is not a delegation and does not restart the count.
 - **approval** - `requestedAt` and `approvedAt`. On an open node an account is
   approved the moment it is created; on a moderated one it stays pending (see
   below). Publishing the card again restarts neither `requestedAt` nor the
