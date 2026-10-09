@@ -8,7 +8,8 @@ descriptor path the fingerprint anchors it outright, and on the name path the
 signature chain leaves the central registry as the one party trusted for anything
 (*Residual trust*, below). The identity/certificate formats are in `../Identity.md` and the I2P transport
 in `Federation.md`. How the registry daemon is built and run is not public and
-is not here: it lives in its own repository (`alias-resolver/docs/Daemon.md`).
+is not here: it is documented in its own repository
+(`alias-resolver/docs/Daemon.md`).
 
 ## Two artifacts
 
@@ -52,15 +53,15 @@ home server never sees who is being added (below).
 
    The **destination is the capability**. A blinded `.b32.i2p` address cannot be
    guessed and cannot be recovered from the network - a floodfill holds only the
-   day's blinded key - so the only way to reach the card is to have been handed
+   day's blinded key - so the only way to reach the card is to have received
    the descriptor. The destination answers for its own user alone, so the fetch
    cannot be used to ask a server whether it hosts some other fingerprint. A
    caller whose descriptor is out of date reaches nothing and knows to ask for a
    fresh one. Raising a new destination retires every descriptor already shared,
-   and mints a new serving key with it.
+   and generates a new serving key with it.
 2. **Alias resolve - `fp` is unknown.** `alias` -> descriptor. This is the only
-   step without an `fp` anchor, so it is where MITM and the trusted alias->identity
-   binding live. Served by the single central resolver.
+   step without an `fp` anchor, so it is the step where MITM and the trusted
+   alias->identity binding apply. Served by the single central resolver.
 
 ## Address / contact forms
 
@@ -133,7 +134,7 @@ the descriptor. A free/unknown name returns `ALIAS_UNKNOWN`.
   fingerprint** - transport-independent, so anything in the path can only DoS,
   never forge. The resolver's b32 also authenticates the destination.
 - **Confidentiality** of *which* name is looked up: the client dials the resolver
-  itself from a throwaway destination, so nothing between the two learns the name.
+  itself from a transient destination, so nothing between the two learns the name.
   Nothing is sealed on top of that, and there is no key for it: the resolver signs
   what it serves and has to read the question to answer it, so app-layer sealing
   would hide the name from nobody. The coordinate a client is built with is
@@ -166,8 +167,8 @@ never be confused.
 
 `ALIAS_UNKNOWN` is the only negative, and it covers every reason a name does not
 resolve: never registered, released, bound to nothing, or lapsed and inside the
-registry's own grace. A client therefore cannot tell those apart and has no
-business trying.
+registry's own grace. A client therefore cannot tell those apart and should
+not attempt to.
 
 A name that stops resolving is not a contact lost: resolve is an **onboarding**
 step, and whoever already holds a descriptor keeps messaging over dest-routing
@@ -179,9 +180,9 @@ On the same I2P face, an owner keeps their own names working. Each request is
 signed by the owner's identity - the signature is what names them, so no request
 carries a fingerprint field anybody could fill in and there is no way to ask
 about somebody else - and each answer is signed by the resolver's delegated key
-and travels with its delegation certificate, so a device handed an answer by a
-sibling device checks it against the same baked-in root as a record it fetched
-itself.
+and travels with its delegation certificate, so a device that receives an
+answer from a sibling device checks it against the same built-in root as a
+record it fetched itself.
 
 ```
 POST /v1/op/alias.status            every name this account holds
@@ -197,7 +198,7 @@ POST /v1/op/alias.transfer.accept   take a name offered to this account
 clears the stored descriptor, so the name answers nobody while the account keeps
 holding it and keeps paying for it; switching it on makes the name resolvable
 again and leaves the client to repoint it with `alias.update`. The same switch
-exists on the registry's own website, and either side may work it.
+exists on the registry's own website, and either side may operate it.
 
 **Two flags per name, and only one of them is the client's.** `alias.status`
 reports both. `bindingWanted` is whether the name resolves, and either the client
@@ -215,7 +216,7 @@ A request carries its own `issuedAt` and is refused outside a freshness window;
 the op named in the envelope must be the op the signature covers, so relabelling
 an envelope cannot turn a status into an update. A status answer carries its own
 window too, which is how long it may stand in for a freshly fetched one when a
-device hands it to the account's other devices.
+device forwards it to the account's other devices.
 
 ### What the face refuses, and what it counts
 
@@ -235,9 +236,9 @@ encrypts - so nothing a client holds goes stale when the resolver rotates its
 signing material behind the same root. The root fingerprint is the single
 constant `bazarish::kResolverRootFingerprint`, the same one the daemon is built
 with. With either half empty the alias path reports that resolution is
-unavailable rather than guessing. A test or a differently-pointed client is handed
-its coordinate explicitly (`Session::setResolverCoordinate`); there is no ambient
-second way in.
+unavailable rather than guessing. A test or a client pointed at another
+resolver is given its coordinate explicitly (`Session::setResolverCoordinate`);
+there is no second, ambient way to set it.
 
 ### Why one registry at all
 
@@ -245,11 +246,11 @@ A globally unique sellable name needs a single registry, as a domain does. The
 centralization is bounded to the name binding: the resolver is **out of the
 delivery path** (routing is federated and never consults it after the one-time
 lookup), it cannot forge an identity (descriptors and cards are user-signed), and
-it cannot see who talks to whom. Names are sugar over a base that works without
-them - two people can always exchange `bazarish://invite?...` descriptors by QR
-or link and never touch the resolver (`../Identity.md`). How that registry is
-built, what it charges and how it is operated are its own business and are not
-specified here.
+it cannot see who talks to whom. Names are a convenience layer over a base
+that works without them - two people can always exchange `bazarish://invite?...`
+descriptors by QR or link and never contact the resolver (`../Identity.md`). How
+that registry is built, what it charges and how it is operated are its own
+concern and are not specified here.
 
 ## What is hidden from whom
 
@@ -260,7 +261,7 @@ specified here.
 | Target (the serving server / resolver) | the `fp` (it serves that card) and that someone holding the descriptor asked | the alias (it owns the namespace); requester unlinkable on direct path |
 | Client | the verified card | the verified descriptor -> card |
 
-Namespace anti-enumeration is out of scope for the resolver (resolve is unauthenticated by design). The **card fetch** is not: it answers only on the account's own destination, which has to have been handed out, and is not routed through the clearnet facade at all - otherwise a contact could take the descriptor it legitimately holds and try it against every facade it knows until one answered "yes, here".
+Namespace anti-enumeration is out of scope for the resolver (resolve is unauthenticated by design). The **card fetch** is not: it answers only on the account's own destination, which has to have been shared, and is not routed through the clearnet facade at all - otherwise a contact could take the descriptor it legitimately holds and try it against every facade it knows until one answered "yes, here".
 
 ## Phasing
 
@@ -293,7 +294,7 @@ Namespace anti-enumeration is out of scope for the resolver (resolve is unauthen
    takes effect on the next record with no restart. The destination is not this
    daemon's at all: an operator i2pd HTTP server tunnel is pointed at its loopback
    API, so custody of that key is the operator's i2pd configuration and moving the
-   daemon is a tunnel change. Its root fingerprint and that address are baked into
+   daemon is a tunnel change. Its root fingerprint and that address are built into
    the client (`defaultResolverCoordinate`), enabling the `<alias>` path in
    production.
 5. **docs + live** - *done.* Both the card-fetch (`fp:b33`) path and the full

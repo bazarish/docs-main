@@ -12,13 +12,13 @@ The facade is the "last mile" between the client and the server infrastructure. 
   client prefers those over clearnet as soon as it has a transport of its own.
   The addresses are stable across restarts because they travel in the server
   descriptor beside the clearnet URLs. The I2P front parses no HTTP: an accepted
-  stream is pumped to the facade's own listener, so routing, the secret prefix
+  stream is relayed to the facade's own listener, so routing, the secret prefix
   and streaming behave identically on both fronts. The stream is torn down only
   after the client has read the reply (or a bounded drain elapses): closing it
-  straight after the last write truncates the reply, and the client then sees an
-  empty stream rather than a response. The log records when each destination's
-  leaseset has actually published ("i2p facade ready"), because until then a dial
-  fails for reasons that have nothing to do with the facade.
+  immediately after the last write truncates the reply, and the client then
+  sees an empty stream rather than a response. The log records when each
+  destination's leaseset has published ("i2p facade ready"), because until then
+  a dial fails for reasons that have nothing to do with the facade.
 - **A facade is an I2P address, and the API is spoken over nothing else.** A
   clearnet facade is not tried at all, so there is no first connection in the
   clear either - which is when a client would otherwise show its address to the
@@ -28,11 +28,11 @@ The facade is the "last mile" between the client and the server infrastructure. 
   both are disabled by default.
 - **Clearnet is the bootstrap, and only the bootstrap.** A client with no netDb
   cannot dial anything on I2P, so the descriptor carries **reseed** addresses
-  beside the facades: clearnet, fetched once, and never asked again once the
-  router is up. They are a separate list because they are a different job; a
-  reseed serves no API and a facade is never a reseed.
+  beside the facades: clearnet, fetched once, and never queried again once the
+  router is up. They are a separate list because they serve a different
+  purpose; a reseed serves no API and a facade is never a reseed.
 - **A reseed address is an https base URL, and the archive under it is
-  `i2pseeds.su3`** - the shape every I2P reseed already has, so a router reads it
+  `i2pseeds.su3`** - the form every I2P reseed already has, so a router reads it
   with no special case anywhere. It is not a facade and speaks no Bazarish API:
   the client's I2P engine appends that name, fetches the archive, unpacks it and
   loads the routers, each of which carries its own signature. The archive's own
@@ -104,14 +104,14 @@ should be read as claiming it.
   like `/healthz`: `GET /settings` and `PUT /settings` (the secret base path, the
   backend, both sockets, the I2P side, the log level) and `POST /restart`.
   They are on the ops socket for the same reason `/healthz` is - on the public one
-  they would admit a facade is here. Only the log level applies at once; the rest
-  is written into the facade's config file and read at its next start, which is
-  what `POST /restart` is for. **Changing the base path invalidates every server
-  descriptor already handed out**, so the new prefix has to reach clients (a new
-  descriptor) before the old one stops answering.
+  they would reveal that the host is a facade. Only the log level applies at
+  once; the rest is written into the facade's config file and read at its next
+  start, which is what `POST /restart` is for. **Changing the base path
+  invalidates every server descriptor already distributed**, so the new prefix
+  has to reach clients (a new descriptor) before the old one stops answering.
 - Everything outside the secret prefix answers the same bare **404** - the API root, an unknown path, and the operator liveness endpoint alike - so a probe of the host learns nothing. `/healthz` is not on the client-facing socket at all: it is served on a separate private **ops listener** (`opsListen`) that is never published to clients (`AdminPanel.md`).
 - Nothing streams through the facade: the only large payload there ever was - a file upload - now goes directly between clients (see `FileTransfer.md`).
-- Holds no keys, parses no content (there is nothing left to parse: authentication happens inside the seal, at the backend), stores nothing. An unreachable backend yields a `FACADE_UPSTREAM` 502 - the facade is a dumb pipe.
+- Holds no keys, parses no content (there is nothing left to parse: authentication happens inside the seal, at the backend), stores nothing. An unreachable backend yields a `FACADE_UPSTREAM` 502 - the facade is only a relay.
 - Implemented in `facade-http/` of the `bazarish-server` repository (`Facade`; covered by tests and live-verified relaying to a running server-core).
 
 ## Client addressing
@@ -203,8 +203,8 @@ be added or edited at any time without touching the server.
 
 ### Configuration links
 
-So a user can add a server with no manual entry, its whole configuration rides in
-one link (also rendered as a QR):
+So that a user can add a server with no manual entry, its whole configuration is
+carried in one link (also rendered as a QR):
 
 ```
 bazarish://server?v=1&fp=<server fingerprint>&facade=<facade URL>[&facade=<facade URL>...]
@@ -214,8 +214,8 @@ Every field is human-readable (no base64): the fingerprint is the trust anchor
 (everything the server signs is verified against it as usual) and each `facade`
 parameter is one facade URL, in client failover order. The service node renders
 this exact string in the user's cabinet after sign-in, so a client reads back
-precisely what the server published. Facade URLs ride verbatim, so they must not
-contain `&`.
+precisely what the server published. Facade URLs are carried verbatim, so they
+must not contain `&`.
 
 This is the **only** artifact that carries facade URLs, and it has a single
 purpose: configuring the client's **own** server. Its audience is the prospective
@@ -254,5 +254,5 @@ intermediaries are trusted for availability only (`Identity.md` /
   settled: incoming mail is one held-open request (`ClientApi.md`) and there is
   no second mechanism behind it, so a facade **must** carry a request answered
   late - up to 30 seconds - and its own upstream timeouts must outlast that. A
-  facade that closes a parked request under a client is not slow, it is broken:
+  facade that closes a client's parked request is not slow, it is broken:
   the client has no other way to hear that mail arrived.

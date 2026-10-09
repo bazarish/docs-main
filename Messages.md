@@ -22,15 +22,15 @@ other message. The sender shrinks it first (long edge 1600, re-encoded, at most
 256 KiB) so that its base64 and the envelope around it stay inside the 512 KiB
 message limit.
 
-Before it is rendered it must decode as an image; a decoder that rejects it is the
-answer. Such a message is not reclassified as a file: it is reported as broken,
+Before it is rendered it must decode as an image; a rejection by the decoder is
+final. Such a message is not reclassified as a file: it is reported as broken,
 a fallback amounting to the client reinterpreting what it received. The bytes are
 held in the account database, encrypted with the remainder of its contents, and
 are exported by an explicit save action.
 
 A `file` is the other path and keeps the announcement: the metadata travels in
-the message, the bytes travel client to client on demand, and nothing is bounded
-but patience.
+the message, the bytes travel client to client on demand, and the size has no
+limit other than the time the transfer takes.
 
 The message that announces a transfer is a small message like any other: the
 progress bar belongs to the transfer that follows it, not to the announcement.
@@ -39,7 +39,7 @@ progress bar belongs to the transfer that follows it, not to the announcement.
 
 The body inside the seal is **CBOR**, not JSON text: the same document with the
 same field names, but binary values travel as themselves. That is what lets a
-picture or a voice message ride inside the message rather than being announced
+picture or a voice message travel inside the message rather than being announced
 and fetched. Base64 would add a third to every such payload (measured at 1.333x),
 and compression yields nothing, both JPEG/PNG and Opus being already
 entropy-coded (gzip on a JPEG: 0.986x; on a PNG: 1.000x).
@@ -57,9 +57,9 @@ so a message a server would refuse is never built.
 
 Anything larger is a file: `sendFile` puts only its metadata (name, size,
 sha256, mime) in the message and the bytes travel client to client over a
-one-time destination, so a file never enters a mailbox and is bounded by nothing
-but patience. Pictures sent from the composer are scaled and re-encoded to a few
-hundred KiB before they go.
+one-time destination, so a file never enters a mailbox and its size has no limit
+other than the time the transfer takes. Pictures sent from the composer are
+scaled and re-encoded to a few hundred KiB before they are sent.
 
 ## Principle: two independent layers
 
@@ -116,13 +116,13 @@ Sealed envelope as the server sees it:
 ```
 
 `pass` is the one value the recipient issued to this correspondent, whatever the
-message weighs (`Contacts.md`, pass lifecycle). The recipient's server hashes it
+message's size (`Contacts.md`, pass lifecycle). The recipient's server hashes it
 and looks it up; it never derives anything from the payload, whose only visible
 property is its length - and that is padded to a step of the ladder before the
 seal, so what a mailbox's server measures is the step. The recipient's server computes the
 same number from the payload and refuses an envelope that carries any other.
 
-The account database it all lands in carries a **schema version** of its own
+The account database that stores it all carries a **schema version** of its own
 (SQLite's `user_version`, stamped when the tables are laid out and checked on
 every open). A database written against another number is refused with both
 numbers rather than read through guesswork. It is **1** and stays 1 until the
@@ -140,7 +140,7 @@ envelope carrying it:
 
 | | **e2e id** (`id` in the layer-2 envelope) | **delivery id** (`deliveryId` everywhere) |
 |---|---|---|
-| Names | the message | one envelope handed to a server |
+| Names | the message | one envelope delivered to a server |
 | Who knows it | the two clients, and the sender's other devices - it is sealed | the sending client and the recipient's server - it is in the clear |
 | Used for | replies, reactions, edits, read receipts, deletes; the recipient's client recognising a redelivery | the mailbox blob name, the recipient server's dedup and seen-set, and what its confirmation is signed over |
 | Chosen by | the sending client, at random, once per message | derived by the sending client: `HMAC(account secret, e2e id + mailbox)` |
@@ -179,12 +179,12 @@ versioned envelope:
 **`auth` - who wrote it.** Nothing else in the path answers that question. A
 delivery pass is *admission*: it says somebody the recipient issued a pass to
 put this in their mailbox, not which of their correspondents it was. The seal
-says only who may read. `from` on its own is the sender's word for it, so every
+says only who may read. `from` on its own is a claim by the sender, so every
 envelope carries the author's own proof: their identity public keys and both
 signatures over the CBOR of the envelope with the `auth` key removed. Hybrid,
 like every identity statement here - both signatures must verify.
 
-A receiver takes the author out of the signature, not out of `from`: the keys
+A receiver determines the author from the signature, not from `from`: the keys
 give a fingerprint, that fingerprint must be what `from` claims, and an envelope
 that fails either test is consumed before it reaches a chat, a contact entry or
 the user. Without this an admitted contact could put another contact's name on a
@@ -199,20 +199,20 @@ from the request that started the dialog. A message from somebody it has no keys
 for is one it cannot check, and it is dropped exactly like a message from a
 stranger.
 
-Measured: **3396 bytes** for the two signatures, **5471** when the keys ride
-along. Every message pays the first figure - a reaction and a read receipt as
+Measured: **3396 bytes** for the two signatures, **5471** when the keys are
+included. Every message pays the first figure - a reaction and a read receipt as
 much as a letter. That is what the contact-request cap is
 measured against (`api/ClientApi.md`): a request carries no pass and no card, so
 its signature is the only thing that names the sender.
 
 **`routing` - where to answer, sent once when it changes.** A destination is not
-for life: raising a new I2P key changes the address, and the serving sealing key
+permanent: raising a new I2P key changes the address, and the serving sealing key
 is re-minted with it. The moved account then sends every contact one
 `contact.routing` message carrying `{dest, servingKey}`, and a receiver whose
-stored pair differs adopts the new one and persists it. It rides on that message
-alone - an ordinary letter carries no `routing`, because the pair changes once in
-a long while and paying 227 bytes on every reaction and read receipt to say so
-was not worth it. The sender's queue keeps retrying a contact it could not reach,
+stored pair differs adopts the new one and persists it. It is carried by that
+message alone - an ordinary letter carries no `routing`, because the pair changes
+rarely and adding 227 bytes to every reaction and read receipt to announce it
+was not justified. The sender's queue keeps retrying a contact it could not reach,
 so the update is not lost to one offline device.
 
 The resulting rule is: **after changing an address, tell everyone.** No other
@@ -228,13 +228,13 @@ The queue is written when the server has confirmed the move - the answer to
 `POST /v1/account/i2p-dest` carries the new `{dest, servingKey}`
 (`api/ClientApi.md`) - and it holds every contact, plus the alias registry when
 this account holds a name that resolves. It is
-tried once there and then, once again whenever the account comes back online, and
-by hand. The two kinds of entry report differently, because the remedy differs:
+tried once immediately, once again whenever the account comes back online, and
+manually. The two kinds of entry report differently, because the remedy differs:
 
 - a **contact** that could not be reached leaves a notice in that contact's own
   chat, saying the new details did not arrive, with a **Try again** beside it.
-  One notice per contact, not one global warning, and it goes when the update
-  lands;
+  One notice per contact, not one global warning, and it is removed when the
+  update is delivered;
 - the **alias registry** is asked again every 10 seconds, silently, until it
   takes the new descriptor. It is one global service whose permanent absence is
   out of scope, and the person has nothing to decide about it.
@@ -250,16 +250,16 @@ face, with the same retry.
 | `contact.routing` | content | A routing change pushed to an established contact: the `routing` block, on a message with nothing else in it. The only message that carries one. |
 | `device.chat-pin` | device | One conversation pinned or unpinned, on every device of the account. |
 | `contact.request` | contact | Carries a `bootstrap` block (`sealing` - the same account sealing key the card publishes -, `dest`, `servingKey`, `pass`) plus `text`. The first message; see `Contacts.md`. |
-| `contact.accept` | content | Agreeing to a received `contact.request`: an empty-bodied message whose first-reply `bootstrap` hands the requester our descriptor + our pass, making the pair mutual contacts. The requester's client auto-completes the add and surfaces a note. See `Contacts.md`. |
+| `contact.accept` | content | Agreeing to a received `contact.request`: an empty-bodied message whose first-reply `bootstrap` delivers our descriptor + our pass to the requester, making the pair mutual contacts. The requester's client completes adding the contact automatically and surfaces a note. See `Contacts.md`. |
 | `file` | content | An announcement: `name`, `size`, `sha256` and `mime`. The bytes stay on the sender's disk until the recipient asks for them. See `api/FileTransfer.md`. |
-| `image` | content | A picture, carried inline: the bytes ride in the envelope rather than being fetched. Its body block is named `image`. |
+| `image` | content | A picture, carried inline: the bytes travel in the envelope rather than being fetched. Its body block is named `image`. |
 | `audio` | content | A voice note: the same shape as `image`, plus `durationMs` and a waveform. Its body block is named `audio`. |
 | `receipt` | content | `ref` (the read message's `id`). A **read** receipt - the recipient's client sends it only on a genuine read (the chat is open, the app window focused, and the message scrolled into the visible area), confirming the "green" delivery state below. `ref` is the newest read incoming id, so it acknowledges that message and every earlier one **the sender got as far as the recipient's server** (a read high-water); one that never arrived is not carried up by it. Optional/toggleable. **Never sent about a contact request**: reading a request is not answering it, and a requester who learns that a stranger's client is running and has opened their message has been told something they never agreed to be told. Until the request is accepted, the requester's own plate stops at *delivered*. |
 | `reaction` | content | A reaction to a message: `ref` (the target message's `id`), `text` (**at most 4 characters and 20 bytes** - enough for an emoji with a modifier or a joined pair; **empty removes** the reactor's reaction). Both limits are checked when sending and again on receipt: a peer's client is not the receiver's to trust, and an oversized one is dropped rather than rendered on someone's message. One reaction per user per message - a new one overwrites the old at every recipient. A single sealed delivery to the peer. Never a chat bubble - clients render it as a chip on the target message. See *Reactions*. |
 | `bot.command` | content | A command invocation aimed at a bot: `command` (name, no leading slash), `args` (raw argument string). See *Bots & interactive messages*. |
 | `bot.callback` | content | An inline-keyboard button press: `data` (the button's payload), `ref` (the `id` of the keyboard message). See *Bots & interactive messages*. |
-| `edit` | content | An in-place edit of a message the sender previously sent: `ref` (the target message's `id`), `text` (new text), `keyboard` (new inline keyboard, `[]` to clear). The recipient replaces its copy. Applied only to a message `from` actually sent. See *Editing and deleting messages*. |
-| `delete` | content | A delete-for-everyone of a message the sender previously sent: `ref` (the target message's `id`). The recipient removes its copy with **no tombstone** left behind. Scoped, like `edit`, to a message `from` actually sent. See *Editing and deleting messages*. |
+| `edit` | content | An in-place edit of a message the sender previously sent: `ref` (the target message's `id`), `text` (new text), `keyboard` (new inline keyboard, `[]` to clear). The recipient replaces its copy. Applied only to a message sent by `from`. See *Editing and deleting messages*. |
+| `delete` | content | A delete-for-everyone of a message the sender previously sent: `ref` (the target message's `id`). The recipient removes its copy with **no tombstone** left behind. Scoped, like `edit`, to a message sent by `from`. See *Editing and deleting messages*. |
 | `chat.clear` | content | Asks the peer to clear the **whole** one-to-one conversation with the sender (no `ref`). The recipient's client wipes its transcript with `from` and leaves a single "cleared the chat" notice. The chat itself remains. The "clear for everyone" choice in the chat-info panel. |
 | `avatar` | content | The sender's avatar pushed to a contact: `avatar` = `{ mime, data }`, `data` being base64 of a square PNG/JPEG compressed client-side to at most **500 KB**. A silent service message - stored as that contact's picture, never shown as a chat bubble. Sent once the dialog is mutually established and re-sent to every contact when the avatar changes. See *Avatars and display names* and `Contacts.md`. |
 | `device.avatar` | contact | Self-sync of the user's own avatar to their other devices: the same `avatar` block, sealed to the user's own key and delivered to their own destination. See `DeviceSync.md`. |
@@ -282,17 +282,17 @@ content and one additive field:
 "forwarded": true
 ```
 
-That is the whole of it. It names no original sender, carries no chain of who
-passed it on before, and proves nothing about who wrote the content: a client can
-set the field on anything it sends. Recipients render it as a "Forwarded" mark on
-the message, which is the whole of its meaning: the content was passed on rather than
-typed here.
+Nothing else is added. The forward names no original sender, carries no chain of
+who passed it on before, and proves nothing about who wrote the content: a
+client can set the field on anything it sends. Recipients render it as a
+"Forwarded" mark on the message, which is the whole of its meaning: the content
+was passed on rather than typed here.
 
 What travels is what the forwarding device holds: text always; a voice message and
-a picture, which ride inside the message; a file only while its bytes are still on
-that device, since a file is announced from a path and served from it.
+a picture, which travel inside the message; a file only while its bytes are still
+on that device, since a file is announced from a path and served from it.
 
-One further field is additive and may ride on any content message:
+One further field is additive and may be carried by any content message:
 
 - **`replyTo`** - the `id` of the message this one replies to. The recipient
   renders a quote of that message and, when it holds the original locally, a
@@ -356,8 +356,8 @@ equals `ref` outright, leaving **no tombstone** (a true delete-for-everyone, not
 an empty edit). The client always removes its own copy; for a one-to-one message
 it sends the `delete` so the peer removes theirs too.
 
-A client applies an `edit` or a `delete` **only** to a message the `from` party
-actually sent (for a recipient, an incoming message from that peer); it must not
+A client applies an `edit` or a `delete` **only** to a message sent by the `from`
+party (for a recipient, an incoming message from that peer); it must not
 let a peer rewrite or remove messages it did not author. History of prior
 revisions is not retained by the protocol (a client may keep its own).
 
@@ -453,23 +453,24 @@ envelope and never its contents, so no server is in a position to say when a
 message was written - and none is asked. The local arrival clock stands in only
 for an envelope that carries no `sentAt` at all.
 
-Two things scramble the order before the reader sees it, and each is repaired
+Two things disturb the order before the reader sees it, and each is repaired
 where it happens:
 
-- **In flight.** A send takes as long as I2P takes, and each message travels its
-  own way, so two messages written half a second apart can reach the recipient's
-  mailbox seconds apart and in either order. The recipient repairs this by
-  sorting on `sentAt`.
-- **In the mailbox.** A mailbox hands its waiting items out in the order it took
+- **In flight.** The duration of a send is set by I2P, and each message travels
+  its own way, so two messages written half a second apart can reach the
+  recipient's mailbox seconds apart and in either order. The recipient repairs
+  this by sorting on `sentAt`.
+- **In the mailbox.** A mailbox returns its waiting items in the order it received
   them (`api/ClientApi.md`), so a burst is fetched in the order it arrived rather
   than in whatever order the server's storage happens to enumerate.
 
 Concretely each message gets a stable **order key**, which is its `sentAt`. The
 conversation is kept sorted by it, so a message written long ago and delivered
 only now appears where it was written, in history, rather than at the bottom.
-That it can therefore arrive above the fold is not left to the reader's eye: the
-unread mark is kept as a high-water over *stored* rows, in the order they were
-received, so a late arrival is unread whatever its timestamp says.
+Such a message can therefore appear above the visible part of the conversation,
+and noticing it is not left to the reader: the unread mark is kept as a
+high-water over *stored* rows, in the order they were received, so a late arrival
+is unread whatever its timestamp says.
 
 The cost of ordering by a clock the recipient does not control is stated plainly:
 a correspondent whose clock is wrong (or who lies about it) places their own
@@ -520,7 +521,7 @@ are determined by the sending client. The protocol fixes the following:
 ## Media: announced, transferred directly
 
 Bulk content (files, photos, audio, voice) is **never** inlined in the mailbox
-envelope, and it is not parked on a storage service either - there is none. The
+envelope, and it is not held on a storage service either - there is none. The
 message **announces** the file and the bytes stay with the sender until the
 recipient asks for them, at which point the sender serves that one file over a
 one-time I2P destination (full design in `api/FileTransfer.md`):

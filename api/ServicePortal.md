@@ -36,8 +36,8 @@ A portal session is bound to a **userId = the user's key fingerprint**, proven b
 a signature - the same identity used for messaging. The private key never enters
 the browser.
 
-The wire contract is one for the whole project and lives in
-`SignInWithKey.md`: the portal mints a challenge naming its **consumer**, the
+The wire contract is one for the whole project and is specified in
+`SignInWithKey.md`: the portal issues a challenge naming its **consumer**, the
 user signs it in their client, the portal verifies the blob and consumes the
 challenge, and the signer's fingerprint is the userId. On success the portal sets
 a session cookie carrying `userId` and an expiry (HttpOnly, SameSite=Strict).
@@ -65,7 +65,8 @@ GET /v1/account/portal  ->
 The client shows the message and the link(s); the user opens one in a browser.
 Several links allow mirrors/onion/clearnet alternatives. There is no service
 catalogue because nothing is sold here: the only variables are whether an
-operator has to approve the account and the one storage quota everybody gets.
+operator has to approve the account and the one storage quota every user
+receives.
 (The global `alias` namespace is a separate product sold by the central
 alias-resolver, not the service node, and is not specified here.)
 
@@ -120,9 +121,9 @@ client publishes its routing then instead.
 The transient is short (~= 1 week). The client re-issues a fresh one ~= 2 days
 before it lapses, with a few hours of per-device **jitter**, and always **polls
 `GET /v1/account/i2p-status` before issuing** - so when one of the user's devices
-has already renewed, the others stand down (the multi-device race). Keeping the
-transient fresh is therefore an unconditional background duty of the client: let
-it lapse and the destination goes down and senders cannot deliver.
+has already renewed, the others do not issue one (the multi-device race).
+Keeping the transient fresh is therefore an unconditional background duty of
+the client: if it lapses, the destination goes down and senders cannot deliver.
 
 On install/enable the client also sends the master to its **other devices** as a
 `device.i2p-master` service message - sealed to the account's own sealing key and
@@ -134,9 +135,9 @@ The server provisions/serves the destination on its embedded I2P router
 per-user-destination endpoint) and reports its state on
 `GET /v1/messaging/destination` (`none` -> `building` -> `active` -> `expired`).
 
-> Off the box: minting the offline transient and the master `.dat` is the
-> client's job (vendored libi2pd); the server consumes and serves the blob but
-> never generates it.
+> Outside the server: generating the offline transient and the master `.dat`
+> is the client's job (vendored libi2pd); the server consumes and serves the
+> blob but never generates it.
 
 ## 4. Registration: open or moderated
 
@@ -185,7 +186,7 @@ start. A write that cannot be persisted is refused rather than applied.
 destination address**, and `state` is
 `all` / `pending` / `approved`; the answer carries the page (`users`) and the
 number of matches (`total`). The search belongs here rather than in the panel:
-the node is the only side that has the accounts, and shipping them all to filter
+the node is the only side that has the accounts, and sending them all to filter
 one would be both slow and a leak of the whole roster into a browser.
 
 ## 5. Web frontend (JS-free)
@@ -204,7 +205,7 @@ or, on a moderated node, the "waiting for the operator" notice with the
 operator's instructions. An account's owner can also end it from here.
 `POST /logout` drops the session.
 
-The portal's **web files live on disk**, not in the binary: `portal.assets
+The portal's **web files are stored on disk**, not in the binary: `portal.assets
 <dir>` (mandatory with `portal.listen`) holds one template per state of the
 flow, the stylesheet, the logo, the fonts and an optional `portal.js`. Every word
 on the page is in those files; the node only fills in the values a template asks
@@ -223,11 +224,11 @@ for by name:
 
 `error` and `message` carry a whole notice or nothing at all, because a
 placeholder in a file cannot remove its own box when there is nothing to say.
-A placeholder with no value is left standing, so a typo in a template shows up as
-itself rather than vanishing.
+A placeholder with no value is left in place, so a typo in a template appears
+verbatim rather than vanishing.
 
 The script is progressive enhancement only: it adds a copy button to the blocks
-meant to be taken away, and a browser without scripts loses nothing else. Each file is read once
+meant to be copied, and a browser without scripts loses nothing else. Each file is read once
 and served from memory afterwards, so an edit takes effect on restart; only files
 in that directory, of a type the portal publishes, are served.
 
@@ -255,7 +256,8 @@ in that directory, of a type the portal publishes, are served.
   the account. Nothing of a payment layer is left here, not even an abstraction.
 - The captcha, and with it `GET /portal/captcha`, `POST /register` and
   `register.html`. A puzzle a person can read is a puzzle a solver can read, so
-  it bought nothing and cost a page; what is left is the two modes above.
+  it provided no benefit and required an extra page; what is left is the two
+  modes above.
 
 ## 8. Security notes
 

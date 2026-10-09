@@ -9,8 +9,8 @@ Status: draft skeleton. The single client-facing API, reached through a facade (
 - **Everything below travels inside one sealed tunnel.** The paths named in this
   document are what the *server* sees after it opens a frame; on the wire there
   is a single `POST /t` carrying an opaque body, and a facade in the middle can
-  read none of it (`Facade.md`). The paths still mean what they say - they are
-  simply not visible outside:
+  read none of it (`Facade.md`). The paths keep their meaning - they are not
+  visible outside:
   - `/v1/messaging/*` - answered by the messaging server itself
   - `/v1/account/*` - forwarded by it to the service node, under its own
     signature, with the user named in the path it signs
@@ -28,37 +28,38 @@ them.
   and the hybrid signature that says who is opening it. The answer - the
   tunnel's lifetime - is sealed to that one-time key.
   The server's sealing key **must be hybrid**: sealing needs the ML-KEM half, and
-  a server whose key predates hybrid sealing keys cannot be talked to at all. It
-  refuses to start rather than let every client sit at "connecting".
-- **carry** - everything afterwards. The request rides under AES-256-GCM with a
-  key derived from the same secret (a different derivation from the session MAC
-  key: one secret, two purposes, and holding one is not holding the other),
+  no tunnel can be opened to a server whose key predates hybrid sealing keys. Such
+  a server refuses to start rather than leave every client in "connecting".
+- **carry** - everything afterwards. The request is encrypted under AES-256-GCM
+  with a key derived from the same secret (a different derivation from the session
+  MAC key: one secret, two purposes, and holding one is not holding the other),
   addressed by the per-request handle described below. No asymmetric work per
   request, which matters when a client polls every few seconds.
 - **A tunnel cannot open the next tunnel.** That is structural rather than
-  checked: a hello is only ever hybrid-sealed and signature-verified, and a
-  carried frame is only ever opened with a tunnel key. Otherwise a leaked secret
+  checked: a hello is only hybrid-sealed and signature-verified, and a carried
+  frame is only opened with a tunnel key. Otherwise a leaked secret
   could renew itself indefinitely and the identity would never be presented
   again, which is exactly what the lifetime below exists to bound.
-- **The answer's status rides inside.** Outside it is always `200`, because a
-  code visible to the facade would say what the seal was meant to hide.
+- **The answer's status is carried inside.** Outside it is always `200`, because
+  a code visible to the facade would say what the seal was meant to hide.
 - **Payloads are padded** to a step of a fixed ladder before they are encrypted.
-  Without it the length of a waiting-mail list would still count the mail.
+  Without it the length of a waiting-mail list would still reveal the number of
+  messages.
 - Authentication, first contact: a **signed request** with both identity keys (`SignInWithKey.md`, section 1), the device line included when the request names a device. The server derives the caller UID from the presented keys - no prior key exchange - and remembers every accepted nonce for the freshness window, so a captured request replayed verbatim is rejected.
 - Authentication, afterwards: a **session**, which is the tunnel. The signature above is presented once, in the hello, and every later request carries `X-Bazarish-Session` (this request's handle), `X-Bazarish-Seq` and `X-Bazarish-Mac` (HMAC-SHA256 over the base string of `SignInWithKey.md` section 1 - no nonce line - plus `seq + "\n"`) - **~174 bytes**, and an HMAC instead of an ML-DSA verification. Two properties beyond the size:
   - a signature is evidence a server can show a third party that this user made this request at this time; a MAC is not, because the server could have produced it itself;
   - the handle is `HMAC(secret, seq)`, different on every request, so nothing in the middle can tie a session's requests together by it. Nothing is transmitted to arrange this: both sides derive handles, and the server keeps only the next 64 of them indexed (a client runs two connections, so requests overtake each other).
-- Sessions expire at a point drawn at random between **1 and 2 hours**: a fixed lifetime would have every client renew on the same schedule, and the short life is what makes a leaked session key worth little. The issue response carries `expiresUnix`, so a client renews ahead of time (5 minutes early) rather than discovering the lapse from a refused request. A lapsed or unknown session answers `SESSION_INVALID`, which the client answers by opening another tunnel and sending the request through it - never by retrying the same way. Three refusals in a row and it stops asking for 15 minutes; a server with no tunnel face is the same case. A session that could not be opened because **nobody answered** is not that case and waits only a minute: the server said nothing about sessions, the network was down, and it is over as soon as it is over.
-- The client ID travels in the `X-Bazarish-Client` header, and is **signed with the request** (it is a line of the base string, so both schemes cover it). It has to be: the server picks a device's mail queue by it, so while it was only a header, anything between the two ends could re-label a request as another device of the same account and acknowledge that device's mail away - the message would be dropped before that device ever fetched it. A request that names no device (an operator push, a login blob) signs the string without that line, so those paths are unchanged.
+- Sessions expire at a point drawn at random between **1 and 2 hours**: a fixed lifetime would have every client renew on the same schedule, and the short life is what makes a leaked session key worth little. The issue response carries `expiresUnix`, so a client renews ahead of time (5 minutes early) rather than discovering the lapse from a refused request. A lapsed or unknown session answers `SESSION_INVALID`, which the client answers by opening another tunnel and sending the request through it - never by retrying the same way. After three consecutive refusals it stops requesting for 15 minutes; a server with no tunnel face is the same case. A session that could not be opened because **no answer arrived** is not that case and waits only a minute: the server said nothing about sessions, the network was down, and the outage may end at any moment.
+- The client ID travels in the `X-Bazarish-Client` header, and is **signed with the request** (it is a line of the base string, so both schemes cover it). It has to be: the server picks a device's mail queue by it, so while it was only a header, anything between the two ends could re-label a request as another device of the same account and acknowledge that device's mail - the message would be dropped before that device ever fetched it. A request that names no device (an operator push, a login blob) signs the string without that line, so those paths are unchanged.
 - All errors follow `../Errors.md`.
 
 ## Account (service node)
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /v1/account/card` | Publish the user-signed **contact card** (`{card}`): the sealing key plus the serving **destination** + **serving sealing key** the client fetched from `GET /v1/messaging/destination` (see `../Identity.md`, `InviteAnonymity.md`). The card names no server and carries no validity window. This call is also what turns a portal registration into an account - the first one redeems the grant (`ServicePortal.md`) - and it is repeated whenever the routing changes; a repeat grants nothing. The destination can only be delegated once the account exists, so the first card carries no routing: the client delegates its transient and publishes again straight after. Responds `{quotaBytes, serverCard, approval, registrationMessage}` |
+| `POST /v1/account/card` | Publish the user-signed **contact card** (`{card}`): the sealing key plus the serving **destination** + **serving sealing key** the client fetched from `GET /v1/messaging/destination` (see `../Identity.md`, `InviteAnonymity.md`). The card names no server and carries no validity window. This call is also what turns a portal registration into an account - the first one redeems the grant (`ServicePortal.md`) - and it is repeated whenever the routing changes; a repeat grants nothing. The destination can only be delegated once the account exists, so the first card carries no routing: the client delegates its transient and publishes again immediately afterwards. Responds `{quotaBytes, serverCard, approval, registrationMessage}` |
 | `DELETE /v1/account/registration` | Terminate the account. The destination is revoked, the node discards the account record and the grants, and the messaging server is instructed to discard the mailbox and all other state held for that fingerprint (`DELETE /v1/messaging/account`, operator-signed). The request is signed with the account's own identity key, the only credential that can authorise it; a client therefore performs this call before removing its local profile and removes it only on success. **Idempotent**: a key for which the node holds nothing receives the same response as a deletion, with nothing revoked or discarded, so that a client whose account an operator has already removed can still complete the operation locally. A client treats any 4xx response likewise: no state for the account remains on the server, and it removes its local copy. Only the absence of a response (or a 5xx) leaves both sides unchanged, with the reason reported to the user |
-| `POST /v1/account/i2p-dest` | Upload a signed offline **transient** (`{transient, expiresUnix}`; empty revokes). Every account owns a destination - it is the base protocol, not a purchase - so the only gates are that the account exists here and, on a moderated node, that it is approved (`ACCOUNT_PENDING_APPROVAL` until then). The node hands the transient to the messaging server, which operates the destination, and records its validity. Responds `{dest, servingKey}`: the address this delegation gives and the base64 SPKI of the key that destination seals deliveries with. The client needs both to issue its card, and the serving key is the half it cannot work out for itself - so the card is published from this answer rather than from a second question. A transient over a new address also means the old destination is dropped at once (`ServerServiceNode.md`), which is what makes the fan-out that follows obligatory (`../Messages.md`) |
+| `POST /v1/account/i2p-dest` | Upload a signed offline **transient** (`{transient, expiresUnix}`; empty revokes). Every account owns a destination - it is the base protocol, not a purchase - so the only gates are that the account exists here and, on a moderated node, that it is approved (`ACCOUNT_PENDING_APPROVAL` until then). The node passes the transient to the messaging server, which operates the destination, and records its validity. Responds `{dest, servingKey}`: the address this delegation gives and the base64 SPKI of the key that destination seals deliveries with. The client needs both to issue its card, and the serving key is the half it cannot derive itself - so the card is published from this answer rather than from a second request. A transient over a new address also means the old destination is dropped at once (`ServerServiceNode.md`), which is what makes the fan-out that follows obligatory (`../Messages.md`) |
 | `GET /v1/account/i2p-status` | `{approval, registrationMessage, transientExpires, transientUpdatedAt, ...}` - the client polls this to drive transient re-issue and to see whether a moderated account is still awaiting approval |
 | `GET /v1/account/card?user=X` | The contact card behind a descriptor: returns `{user, card}`. Reached from the messaging server, which serves a peer's query **on the user's own destination** - that destination is the capability, and it answers for its own user alone, so this cannot be used to ask whether a server hosts some other fingerprint. There is no lookup by fingerprint through a facade. The `alias` namespace lives on the central resolver (`api/FederatedResolve.md`) |
 
@@ -82,20 +83,20 @@ write a device makes to its own account, `POST /v1/messaging/self`, which reache
 no other party.
 
 A **contact request**, which presents nothing, is capped by the protocol at **17590 sealed
-bytes** (`kMaxContactRequestBytes`) - not by any operator setting, and not with
-room to spare: this is the one thing a stranger may put in a mailbox, so the cap
+bytes** (`kMaxContactRequestBytes`) - not by any operator setting, and without
+a margin: this is the one thing a stranger may put in a mailbox, so the cap
 is the measured worst case and nothing above it.
 
 The worst case is **17558 bytes**, measured through the real path: the two hybrid
-sealing keys the bootstrap carries, the delivery pass the requester hands
-over so the peer can answer, the ML-KEM ciphertext of the seal, the authorship
+sealing keys the bootstrap carries, the delivery pass the requester provides
+so the peer can answer, the ML-KEM ciphertext of the seal, the authorship
 block with the sender's keys in it (a request has no card and no pass, so the
 signature is the only thing naming them), the longest greeting a user may write
-and the longest name an account may carry. The 32 bytes on top are what the
+and the longest name an account may carry. The additional 32 bytes are what the
 variable-length parts can add - a CBOR integer is as wide as its value (an
 Ed25519 signature is always 64 bytes).
 
-Two client-side caps are what make that number a number: the greeting is at most
+Two client-side caps are what make that number fixed: the greeting is at most
 **100 bytes** (`kMaxContactGreetingBytes`) and an account's own display name at
 most **64 bytes** (`kMaxAccountNameBytes`, about 32 characters of a non-Latin
 alphabet). Both are refused where they are typed rather than at the recipient's
@@ -112,15 +113,15 @@ server.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /v1/messaging/destination` | Returns the caller's assigned `{dest, servingKey, state}` - the destination this server operates for the user (its standard-LeaseSet2 b32, equal to the master b32 the client holds), the public serving sealing key for it, and `state` (empty when the user delegated none, else `building` -> `active` -> `expired`). `dest` is empty until the destination publishes, so a client that has just delegated fills the card with its own master b32 - the same address either way. The client folds dest+key into the contact card it signs |
+| `GET /v1/messaging/destination` | Returns the caller's assigned `{dest, servingKey, state}` - the destination this server operates for the user (its standard-LeaseSet2 b32, equal to the master b32 the client holds), the public serving sealing key for it, and `state` (empty when the user delegated none, else `building` -> `active` -> `expired`). `dest` is empty until the destination publishes, so a client that has just delegated fills the card with its own master b32 - the same address either way. The client includes dest+key in the contact card it signs |
 | `GET /v1/messaging/storage-usage` | The authenticated caller's own mailbox storage: `{usedBytes, quotaBytes}` - bytes of pending content currently held, and the effective quota (the user's override, else the server default). Read-only; the client shows it as used/free/total in per-account settings. |
 
 ### Receiving
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /v1/messaging/events` | Hold the request open until something is pending for this client (or `wait` seconds pass, capped at 30), then answer in the same shape as `pending`. How a server holds it open is its own business; what the protocol requires is that a delivery ends the wait, at once. This is the **only** way a client learns that mail has arrived: there is no second, slower mechanism to fall back to, and a wait that ends in an error is asked again rather than handed to one |
-| `GET /v1/messaging/pending` | List pending entries for this client ID: `{pending: [{id, class}]}` where `class` is the delivery class `content` or `contact` (the admission selector, not the content type - see `../Messages.md`). **Oldest arrival first**, and `events` answers in the same order: a burst is fetched in the order the mailbox took it, not in whatever order the server's storage enumerates. The order is arrival only - where each message sits in the conversation is decided by the `sentAt` inside the sealed envelope, which no server sees |
+| `GET /v1/messaging/events` | Hold the request open until something is pending for this client (or `wait` seconds pass, capped at 30), then answer in the same shape as `pending`. How a server holds it open is an implementation matter; what the protocol requires is that a delivery ends the wait, at once. This is the **only** way a client learns that mail has arrived: there is no second, slower mechanism to fall back to, and a wait that ends in an error is repeated rather than delegated to one |
+| `GET /v1/messaging/pending` | List pending entries for this client ID: `{pending: [{id, class}]}` where `class` is the delivery class `content` or `contact` (the admission selector, not the content type - see `../Messages.md`). **Oldest arrival first**, and `events` answers in the same order: a burst is fetched in the order the mailbox took it, not in whatever order the server's storage enumerates. The order is arrival only - the position of each message in the conversation is decided by the `sentAt` inside the sealed envelope, which no server sees |
 | `GET /v1/messaging/pending/{blobId}` | Fetch the raw E2E payload bytes |
 | `POST /v1/messaging/ack` | Confirm receipt for this client ID; when all registered client IDs of the user have acked, the server deletes the content immediately |
 
@@ -138,11 +139,11 @@ and it is not an API:
 
 | Where | What |
 |---|---|
-| `GET <portal>/i2pseeds.su3` | This server's netDb as an **su3 reseed archive** - the ordinary I2P format, under the name that format gives it, read by any router. Unauthenticated by necessity (a client fetching its first netDb holds nothing yet) and safe by construction (every RouterInfo inside carries its own router's signature). Packed from a random sample of about sixty routers and rebuilt no more than once an hour: one archive for everyone who asks within that hour, so repeated asking learns no more of the netDb than a single one |
+| `GET <portal>/i2pseeds.su3` | This server's netDb as an **su3 reseed archive** - the ordinary I2P format, under the name that format gives it, read by any router. Unauthenticated by necessity (a client fetching its first netDb holds nothing yet) and safe by construction (every RouterInfo inside carries its own router's signature). Packed from a random sample of about sixty routers and rebuilt no more than once an hour: one archive for everyone who asks within that hour, so repeated requests learn no more of the netDb than a single one |
 
-It is published by the **portal**, not by a facade, and that is not an accident:
+It is published by the **portal**, not by a facade, and that is deliberate:
 a facade is an I2P address, and a client needs this file *before* it has I2P. The
-portal is on the clearnet anyway.
+portal is already on the clearnet.
 
 A server need not publish it at all. What a client is given is a reseed
 **address** - a base URL, exactly as for any I2P reseed - and the router appends
@@ -152,7 +153,7 @@ anywhere, and no client or router needs a special case to read it.
 A server descriptor may name **reseed addresses**, and each is a full `https://`
 URL to an **su3 archive** - the ordinary I2P reseed format. Nothing Bazarish is
 spoken there: the client's own I2P engine fetches the archive, unpacks it and
-loads the routers, exactly as it would from any reseed. What the addresses buy is
+loads the routers, exactly as it would from any reseed. What the addresses provide is
 that a client's first start does not have to reach the public reseed hosts its
 router carries, and that the operator may publish them anywhere at all, which is
 what keeps the bootstrap from pointing at the server (`Facade.md`).
@@ -179,7 +180,7 @@ Every request carries the client's unique random **client ID**; the "delete when
 
 ## Open questions
 
-- **Incoming delivery mechanism** - settled: one held-open request (`events`), no periodic polling and no fallback. A facade carrying it learns when an event happened and nothing else - the request rides the tunnel, so the client, the path and the answer are opaque to it.
+- **Incoming delivery mechanism** - settled: one held-open request (`events`), no periodic polling and no fallback. A facade carrying it learns when an event happened and nothing else - the request travels inside the tunnel, so the client, the path and the answer are opaque to it.
 - **Pagination / batching** for `/pending` with many messages.
 - Retention period of completed send attempts before they are dropped.
 - Endpoint naming and request/response schemas - to be specified per endpoint once flows are agreed.

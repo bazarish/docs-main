@@ -29,12 +29,13 @@ fingerprint** (`DeliveryEnvelope.toServer`; the sender's own server resolves the
 fingerprint to an I2P destination), and the envelope is sealed to **one shared
 server sealing key**. Both are server-wide, so both are shared.
 
-## Key lever
+## Key idea
 
 The subscription certificate is **user-signed**. Fold the routing into it and
 drop the root-signed server card entirely. Route **by destination**, not by
 server fingerprint. Then the only fields a card carries are the user's own, plus
-a destination - and the destination is the single tunable anonymity knob.
+a destination - and the destination is the single tunable anonymity
+parameter.
 
 ```
 ContactCard  (hybrid-signed by user U - the only artifact a contact fetches):
@@ -128,7 +129,7 @@ destination routing removes. With delivery performed by the client the question
 does not arise: the client holds a destination and dials it, and cannot determine
 which server operates it.
 
-## The destination knob (`dest_U`)
+## The destination parameter (`dest_U`)
 
 **Fundamental rule: a server has no single, shared federation destination.** Every
 user is served by `dest_U` (their own per-user destination), at which their mail
@@ -140,7 +141,7 @@ source would both expose a common address and, where sender and recipient share 
 server, cause one user's destination to dial another's.
 
 - Every user's `dest_U` is their own: an offline-key master held by the client,
-  delegated to the server as a time-boxed transient. There is deliberately no
+  delegated to the server as a time-limited transient. There is deliberately no
   shared fallback - a shared address would let anyone holding two contact cards
   prove their owners are hosted together, which is the metadata the
   project treats as a critical bug.
@@ -196,8 +197,8 @@ statement - and told both which server serves the user. Both halves are gone:
   `issuedAt`/`notAfter`, and no server signature. Nothing peer-visible names the
   server.
 - **The subscription is gone entirely.** Registration opens an unbounded channel;
-  the client authenticates every request by signature anyway, so a signed "I
-  subscribe here" told the node nothing it had not already verified. The only
+  the client authenticates every request by signature in any case, so a signed
+  "I subscribe here" told the node nothing it had not already verified. The only
   clock is the **delegation** of the destination, which the I2P network itself
   enforces, and an account with none for the node's idle window is deleted.
 - The card fetch is answered on the account's own destination and for that
@@ -228,7 +229,7 @@ mapping.
 - **createInvite** - emit the single user-signed contact card; no server card.
 - **addByInvite** - verify the card; deliver to `card.dest`, seal the envelope
   to `card.servingSealingKey`. No server card, no fingerprint resolve.
-- **contact-request bootstrap** (`../Contacts.md`) - the bootstrap ships the
+- **contact-request bootstrap** (`../Contacts.md`) - the bootstrap carries the
   sender's **contact card** (dest + serving sealing key + sealing key) instead of the
   sender's server card, so the peer replies by federating to the sender's dest.
 - **addByAlias / alias resolve** - the resolved trust chain becomes the
@@ -294,7 +295,7 @@ server-wide signer either (a delivery confirmation is signed per destination).
    `Federation.md`, `Architecture.md`, `Messages.md`, `DeviceSync.md`,
    `ClientApi.md`; the server card is retired from the invite/contact path.
 
-Live-validated end-to-end over real I2P (2026-06-17, vs i2pd 2.60.0): full
+Live-validated end-to-end over real I2P (2026-06-17, against i2pd 2.60.0): full
 single-server dialog and full cross-server Alice<->Bob conversation via invite,
 with no `peers.json`, dialling each other's b33.
 

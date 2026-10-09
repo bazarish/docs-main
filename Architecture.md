@@ -30,23 +30,23 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 ```
 
 The facade has exactly one backend. The service node is **not** reachable from it:
-an account call rides the same tunnel as everything else and the messaging server
-is what passes it on.
+an account call travels in the same tunnel as everything else and the messaging
+server is what forwards it.
 
 - The server has **no public IP interfaces**. Its only public presence is in hidden networks (I2P first).
 - Facade <-> Server / Service node communication goes over an **operator-controlled private channel** (unix socket, localhost, or VPN - deployment choice). Splitting facade and server across hosts is an operator concern.
 - **The facade carries one sealed tunnel and reads nothing.** A client's requests
   all arrive as opaque frames on a single path; the messaging server opens them
-  and runs what was inside through its own routes. Account calls go on from there
+  and runs what was inside through its own routes. Account calls continue from there
   to the service node, forwarded under the server's own signature with the user
   named in the path it signed - so the node authorises them against the server
   card it is already bound to, without a shared secret or a new setting. The node
   is not reachable from the facade at all. See `api/Facade.md`, `api/ClientApi.md`.
 - What the node gives up for that is the user's own signature on each account
-  call: it now has the server's word for whose call it is. What must be
+  call: it now relies on the server's statement of whose call it is. What must be
   self-evident still is - the contact card is signed by its owner and the I2P
   transient carries an offline signature by the user's master key - so the
-  artifacts that matter prove themselves, and only the fact of the call is
+  artifacts that matter are self-verifying, and only the fact of the call is
   vouched for.
 
 ## Key decisions
@@ -57,7 +57,7 @@ is what passes it on.
 4. **Wire format** - JSON for control messages, raw HTTP bodies for binary content (no base64 overhead). E2E-encrypted payloads are opaque blobs to all server-side components.
 5. **Destination routing** - delivery routes by the recipient's I2P **destination** (its b33), carried in the user-signed contact card, not by server fingerprint; the sender dials it directly (no resolver, no `peers.json`). A server has **no single federation address**: every user is served by their own destination, which admits what arrives and initiates no connections. The sending **client** performs the dialling, from a destination held for that one correspondent; a server that initiates no connections cannot derive a correspondence graph from the addresses it contacted. A contact is shared as a **descriptor** (`fp:b33`); an **alias** resolves at the central resolver. Every routing target is a `.b32.i2p` host. See `Identity.md`, `api/Federation.md`, `api/InviteAnonymity.md`, `api/FederatedResolve.md`, `api/FederatedResolve.md`.
 6. **Single facade entry point** - the client uses one secret URI, and behind it one path: the tunnel. The facade fans out to nothing, because there is one backend; the messaging server is what reaches the service node.
-6a. **Routing travels with every message** - a message carries its sender's current destination and serving sealing key (`routing`), and a receiver adopts the pair whenever it differs. Regenerating an I2P key changes the address, and a contact who learned the old one at introduction would dial it forever; one message from the moved side repairs the way back, in either direction and of any type. There is no second recovery path: a request for someone's new address could only go to their old one. The rule is that a party which changes its address sends first. See `Messages.md`.
+6a. **Routing travels with every message** - a message carries its sender's current destination and serving sealing key (`routing`), and a receiver adopts the pair whenever it differs. Regenerating an I2P key changes the address, and a contact who learned the old one at introduction would dial it forever; one message from the moved side repairs the return path, in either direction and of any type. There is no second recovery path: a request for someone's new address could only go to their old one. The rule is that a party which changes its address sends first. See `Messages.md`.
 6b. **Tunnel length is a user setting** - three levels: minimal (1 hop each way, no variance), middle (1 hop, variance 1: I2P adds between zero and one hop and never subtracts), maximum (3 hops, no variance, the depth I2P itself defaults to). The client defaults to minimal and states what one hop does and does not conceal; call media remains minimal at every setting, three hops in each direction introducing audible delay in a live call. Server components accept `i2p.privacy` and default to maximum.
 7. **Docs language** - English (code comments are English per codestyle).
 8. **Shared code** - protocol types, OpenSSL wrappers, and JSON helpers live in the `common` repository, consumed by the other components via CMake (FetchContent or submodule). No duplicated crypto code.
@@ -69,7 +69,7 @@ is what passes it on.
 14. **Device sync via the own mailbox** - E2E self-messages (contacts, settings, full message-history echo) written through a dedicated endpoint of their own and read back through the standard pending/ack path.
 15. **The contact card is what answers** "where and how do I deliver?" - the user-signed sealing key, destination and serving key, published to the serving server and fetched by contacts. It also anchors the account's lifecycle on that server. It answers "where and how do I deliver?". Exactly one serving server at a time; migration is a hard cutover: mail in flight during it fails at the sender, who resends when the new routing has arrived (messages delayed, not lost). Registration is grant-gated through the service portal. See `Identity.md`, `api/ServicePortal.md`, `api/InviteAnonymity.md`.
 16. **All certificates are one composite CBOR frame over a JSON body** (contact card, alias, server card) - both signatures and both public keys in one frame, consistent with the JSON wire format.
-17. **Sealed alias resolution** - first-contact lookups are encrypted to the target server's resolve key and dialled by the client itself; the requester's own server is not on the path and never learns the alias. The response is a self-verifying chain (alias cert + the user's contact card). Cross-server resolution (central-resolver `resolve` + sealed card fetch) is implemented and live-validated over real I2P, as is invite-based first contact; only the production resolver deployment (baking the resolver coordinate into the client) remains.
+17. **Sealed alias resolution** - first-contact lookups are encrypted to the target server's resolve key and dialled by the client itself; the requester's own server is not on the path and never learns the alias. The response is a self-verifying chain (alias cert + the user's contact card). Cross-server resolution (central-resolver `resolve` + sealed card fetch) is implemented and live-validated over real I2P, as is invite-based first contact; only the production resolver deployment (embedding the resolver coordinate in the client) remains.
 18. **The post-quantum hybrid covers sealing as well as signing (mandatory)** - signing is Ed25519 + ML-DSA-65, and every identity statement is dual-signed and valid only when both verify; the fingerprint covers both public keys. Sealing is X25519 + ML-KEM-768 and covers everything encrypted anywhere in the project, because it all goes through one `hybrid::seal`, whose key is derived from both shared secrets at once (`Identity.md`).
 
 ## Trust boundaries

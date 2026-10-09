@@ -101,8 +101,8 @@ A sidebar carries the views:
   the key. The open account is in the address bar (`#/users/<fingerprint>`), so a
   link points at one account.
 - **Settings** - every setting of the deployment, in five tabs, because one long
-  page of similar-looking blocks is where an operator loses the one they came
-  for. Each tab saves on its own and is in the address bar
+  page of similar-looking blocks is where an operator cannot find the one they
+  came for. Each tab saves on its own and is in the address bar
   (`#/settings/<tab>`), so a link points at one subject:
 
   | Tab | What it holds |
@@ -110,7 +110,7 @@ A sidebar carries the views:
   | Registration | open or moderated, the message a new client is told and the one a waiting account is shown |
   | Portal | the login consumer (name, address, role) the client shows before a user signs, the portal's public links, and the socket the portal binds |
   | Network | the facades and reseeds clients reach this server by, the descriptor built from them, the node's own operator API and the messaging server it is bound to, and the log level |
-  | Accounts | the storage a new account gets and how long an idle one is kept, beside the two numbers that say whether the promise still fits: what the quotas have allocated and what the disk actually holds (`GET /v1/messaging/storage`) |
+  | Accounts | the storage a new account gets and how long an idle one is kept, beside the two numbers that show whether that promise can still be kept: what the quotas have allocated and what the disk holds (`GET /v1/messaging/storage`) |
   | Messaging server | server-core's own file: log level and libi2pd's logging, its I2P privacy and tunnel count, the inbound federation rate limit, how long unacknowledged mail is kept, its private listener and the node it reports to |
   | Facade | the facade's own file, read and written over its ops socket: the secret base path, both listeners, the messaging server it forwards to, and its I2P side |
   | Panel | the panel's own file: who may sign in, the words it signs under, the services it manages, and where it listens - plus what it cannot change (its fingerprint, its config file, its state and web directories, its version) |
@@ -119,17 +119,17 @@ A sidebar carries the views:
   for the service that owns it (and the Panel tab one for the panel itself).
   Without it the rule this page exists for would not hold: a setting saved into a
   config file is inert until the process reads it again, and the operator would
-  be back in a terminal. The service exits cleanly with a distinct code and its
-  unit starts it again; a service whose unit has no restart policy says so
-  instead of offering a button that does nothing.
+  have to return to a terminal. The service exits cleanly with a distinct code
+  and its unit starts it again; a service whose unit has no restart policy says
+  so instead of offering a button that does nothing.
 
   Two distinctions are made visually rather than in prose. A value the operator
   owns is an input; a value the panel only knows is plain text against a rule,
-  never a box that invites typing. And a setting the service reads only at start
-  carries a **restart** mark beside the field - said next to the control, because
-  by the time the value has been typed the sentence under it has been read and
-  forgotten. The log level is the exception on the Network tab: it applies at
-  once, which is the point of having it there.
+  never a field that looks editable. And a setting the service reads only at
+  start carries a **restart** mark beside the field - shown next to the control,
+  because by the time the value has been typed the sentence under it has been
+  read and forgotten. The log level is the exception on the Network tab: it
+  applies at once, which is the reason it is there.
 
 The **search is performed on the service node**, not in the browser: the panel
 passes `q`, `state`, `limit` and `offset` through and displays the result, so a
@@ -197,9 +197,9 @@ a shell on it.
 
 A fresh install has no `admin` key at all (or an empty one), and that is not an
 error: it is an **unclaimed** panel. In that state `/` and `/login` redirect to
-`/setup`, which asks for one signature and hands the panel to the key that
+`/setup`, which asks for one signature and assigns the panel to the key that
 provides it. The panel says so on its console at startup, because that is where
-whoever just installed it is looking:
+the person who installed it is looking:
 
 ```
 no administrator configured yet: open http://127.0.0.1:8460/setup and sign in -
@@ -208,11 +208,11 @@ the first key to sign there administers this panel
 
 The claim is first-come, checked and written under one lock, so two people
 opening the wizard at the same moment cannot both become the owner. The moment
-it succeeds `/setup` stops answering and redirects to `/login` for good; there
-is no second wizard and no way back to it except editing the config file by
-hand. **The window is open from the first start until that first signature**, so
-a panel that will be reachable from outside should be claimed before it is
-published, or published only after it is claimed.
+it succeeds `/setup` stops answering and redirects to `/login` permanently;
+there is no second wizard and no way back to it except editing the config file
+manually. **The window is open from the first start until that first
+signature**, so a panel that will be reachable from outside should be claimed
+before it is published, or published only after it is claimed.
 
 Removing the last administrator through the panel is refused for the same
 reason: an empty list would reopen the wizard to whoever found the page next.

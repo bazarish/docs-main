@@ -13,12 +13,13 @@ one-time hidden-network tunnel, so no server or facade ever sees call traffic.
 
 ## Transport
 
-Media rides **I2P RAW datagrams** (UDP-like, low
+Media is carried over **I2P RAW datagrams** (UDP-like, low
 overhead), one short-lived destination per call, torn down when the
 call ends. RAW carries no per-packet source (so a frame stays small) and no
 I2P-layer authentication - the call layer authenticates every datagram itself
-(see Media encryption). Datagrams are the right fit for realtime media: a
-reliable stream would retransmit, and a late retransmitted frame is useless.
+(see Media encryption). Datagrams are the appropriate transport for realtime
+media: a reliable stream would retransmit, and a late retransmitted frame is
+useless.
 
 An audio frame always fits in a single datagram, so nothing is ever fragmented.
 
@@ -26,10 +27,10 @@ An audio frame always fits in a single datagram, so nothing is ever fragmented.
 
 The media destination uses **minimal-length tunnels** (one hop each way, no
 length variance) regardless of the tunnel profile the user picked for everything
-else, the single biggest latency and jitter lever for realtime media. This does not weaken identity anonymity: the media destination is
+else, the setting with the largest effect on latency and jitter for realtime media. This does not weaken identity anonymity: the media destination is
 one-time and unlinked from the user's identity destination, so a short tunnel
 there exposes nothing about who the user is. Variance is off so the path length
-cannot jump mid-call.
+cannot change mid-call.
 
 ### Encrypted LeaseSet (b33)
 
@@ -37,7 +38,7 @@ The call's media destination publishes an **encrypted LeaseSet2 (b33)**, like
 every other Bazarish destination. An implementation must therefore be able to
 send RAW datagrams to a blinded address: routers that address datagrams by
 identity hash alone cannot carry this media, and how a given one is made to do it
-is that implementation's problem to record. The destination is one-time and torn
+is for that implementation to document. The destination is one-time and torn
 down with the call, and its b33 routing address is shared only with the peer
 inside the E2E-encrypted invite.
 
@@ -72,7 +73,7 @@ The audio payload is the Opus packet.
 A call is impossible without the embedded I2P router. Placing a call
 (startAudioCall) or accepting one (acceptCall) brings the router up first and, if
 I2P is unavailable, fails immediately with the typed, readable error
-`I2P_UNAVAILABLE` - no call is placed and nothing half-starts.
+`I2P_UNAVAILABLE` - no call is placed and nothing is partially started.
 
 ## Signaling message types
 
@@ -83,7 +84,7 @@ Server-side components see only opaque blobs of a generic message.
 | Type | Direction | Payload |
 |---|---|---|
 | `call.invite` | caller -> callee | `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b33 routing address), `key` (base64 per-call media key) |
-| `call.ring` | callee -> caller | `callId`. Sent when a device of the callee presents the call. Until it arrives the caller only knows the invitation reached their server; from it, the caller's screen says their device is ringing and the ringing tone starts |
+| `call.ring` | callee -> caller | `callId`. Sent when a device of the callee presents the call. Until it arrives the caller only knows the invitation reached their server; from it, the caller's screen shows their device is ringing and the ringing tone starts |
 | `call.accept` | callee -> caller | `callId`, `media` (`audio`), `dest` (the callee's media b33 routing address) |
 | `call.decline` | callee -> caller | `callId`, `reason` (`declined` / `busy` / `refused`). Honoured only while the caller is still calling: with several devices on one account, one of them answering and another refusing must not end the call that was answered |
 | `call.end` | either | `callId` |
@@ -93,8 +94,8 @@ Adding or evolving a call signal is a client-only change.
 
 Media is real-time and the rest of a client's traffic is not. How an
 implementation keeps the two from competing - for threads, for a router's
-workers, for anything else it shares - is its own business and belongs in its own
-documentation.
+workers, for anything else it shares - is an implementation matter and belongs in
+its own documentation.
 
 Both sides run their own ring timeout, so an unanswered call terminates without
 user action. The caller's interval starts when the peer's device reported ringing,
@@ -102,16 +103,16 @@ or, if no such report arrived, when the invitation was delivered to the peer's
 server; the callee's starts when the invitation arrived. Neither side requires a
 signal from the other in order to stop ringing.
 
-An invitation is only good while it would still be ringing. A signal carries the
+An invitation is valid only while it would still be ringing. A signal carries the
 `sentAt` every message carries, and a callee **must** ignore a `call.invite`
 older than its ring timeout: the mailbox holds what it is given until the device
-comes for it, so an invitation can arrive long after the caller stopped waiting,
-and ringing for it then is ringing at nobody.
+fetches it, so an invitation can arrive long after the caller stopped waiting,
+and ringing for it then would ring with no caller on the other end.
 
 The end of a call and its beginning are two mailbox items, and the mailbox does
-not promise the order they are handed over in. A callee that has seen
+not guarantee the order in which they are delivered. A callee that has seen
 `call.end` or `call.decline` for a `callId` **must** ignore a `call.invite` for
-that same call, whenever it turns up. Neither rule needs a new field: `callId`
+that same call, whenever it arrives. Neither rule needs a new field: `callId`
 and `sentAt` are already on the wire.
 
 ## Flow (I2P)
@@ -137,7 +138,7 @@ and `sentAt` are already on the wire.
 
 Call media requires RAW datagrams addressed to a b33 destination. Any router that
 carries both serves this protocol; how a client obtains one, and what it tests
-that against, is its own business to record.
+that against, is for that client's implementation to document.
 
 ## Open / not done
 
@@ -147,7 +148,7 @@ that against, is its own business to record.
   `reason: busy`; richer call-waiting is future work.
 - **Calls turned off** - an account may refuse incoming calls entirely (a privacy
   setting, on by default). An invitation is then answered at once with
-  `reason: refused`, so the caller learns it instead of ringing into nothing. The
+  `reason: refused`, so the caller learns it instead of ringing unanswered. The
   caller's call control is unchanged: the setting may be re-enabled at any time and
   is not published. The refusal is the only signal, and it conveys nothing beyond
   unavailability at that moment.

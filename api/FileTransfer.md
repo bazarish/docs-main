@@ -4,8 +4,8 @@ Status: implemented (transport + protocol; the sender must be online).
 
 A file is **announced**, not uploaded. The message carries the file's name, size
 and digest; the bytes stay on the sender's disk until the recipient asks for
-them, at which point the sender raises a one-time I2P destination and serves that
-one file over it. There is no storage service: nothing is ever parked on a third
+them, at which point the sender creates a one-time I2P destination and serves that
+one file over it. There is no storage service: nothing is ever stored on a third
 party's disk.
 
 ```
@@ -40,7 +40,7 @@ The threshold is therefore the server's own advertised limit, and it adapts per
 server with nothing to keep in sync.
 
 Operators should size that limit against the mailbox quota rather than against
-the smallest thing that works: too small a limit pushes ordinary attachments into
+the smallest value that works: too small a limit pushes ordinary attachments into
 a transfer that needs both sides online.
 
 ## Service messages
@@ -56,7 +56,7 @@ All four are ordinary sealed E2E messages, silent (never a chat bubble):
 
 **Devices.** A user's devices share one mailbox, so every one of them sees these
 messages. A request names the device that made it; the offer names the same
-device, and the others ignore it - the one-time destination in it was raised for
+device, and the others ignore it - the one-time destination in it was created for
 that device alone. A second device requiring the file issues its own request, and
 the sender serves it over a separate destination: several transfers proceed
 concurrently,
@@ -73,9 +73,9 @@ transfer that can never start.
 A transfer is stopped from **either** side, and stopping it ends **both** halves:
 the side that stops sends `file.cancel`, and the other side ends its half of the
 same transfer on receipt. A transfer costs both of them a destination and a set of
-tunnels, so a stop that ended only the half it was pressed on would leave the
-other serving nobody until its window ran out - which is up to half an hour of
-tunnels for a file nobody is receiving.
+tunnels, so a stop that ended only the half on which it was issued would leave
+the other half serving no one until its window expired - which is up to half an
+hour of tunnels for a file no one is receiving.
 
 `device` names the client that is pulling the file, in both directions, because
 that is what identifies the half: one contact may be pulling the same file onto
@@ -84,8 +84,8 @@ them leaves the other transfer running, and a `file.cancel` naming a device that
 is not the recipient's own changes nothing there.
 
 A stop is reported as an ended transfer with its reason, not as a failure of the
-transport, and the side that pressed it and the side that was told are told
-apart: neither is left with a bar that goes on moving.
+transport, and the side that issued it and the side that was notified are
+distinguished: neither is left with a progress bar that continues to move.
 
 ## The one-time destination
 
@@ -99,7 +99,7 @@ sealed offer.
 
 ## Wire protocol
 
-Deliberately tiny - no HTTP:
+Deliberately minimal - no HTTP:
 
 ```
 fetcher -> server:  offset   (8 bytes, big-endian)
@@ -107,15 +107,16 @@ server  -> fetcher: total    (8 bytes, big-endian), then every byte from offset 
 ```
 
 A dropped stream is not a special case: the fetcher reconnects and sends the next
-offset. The driver gives up after a bounded number of attempts that move no
-bytes, so a sender that goes quiet does not hang the transfer forever.
+offset. The driver stops after a bounded number of attempts that transfer no
+bytes, so a sender that stops responding does not block the transfer
+indefinitely.
 
 ## Encryption and integrity
 
 The sender encrypts the file to a temp ciphertext with a fresh per-transfer key
 (CMS password-based envelope, RFC 3211 PWRI, AES-256-CBC - standard primitives
-only). Encrypting up front, rather than on the fly, is what makes arbitrary byte
-ranges servable and gives the digest before the first byte moves.
+only). Encrypting in advance, rather than on the fly, is what makes arbitrary byte
+ranges servable and gives the digest before the first byte is sent.
 
 The key and the **ciphertext** digest travel in the sealed offer. The recipient
 assembles the ciphertext, verifies that digest, and only then decrypts
@@ -130,8 +131,8 @@ A file is available only while the sender is online **and** the file remains at
 the path from which it was announced. This is the consequence of operating no
 storage service, and a client must report it rather than imply delivery:
 
-- `eRequested` - asked; waiting for the sender to come up
-- `eRunning` - bytes moving (progress is over the ciphertext stream)
+- `eRequested` - asked; waiting for the sender to come online
+- `eRunning` - bytes being transferred (progress is over the ciphertext stream)
 - `eDone`
 - `eFailed` - with the reason, including "the sender no longer has this file"
 
@@ -140,5 +141,5 @@ storage service, and a client must report it rather than imply delivery:
 | Component | Role |
 |---|---|
 | `client-qt` | everything: announce, request, serve (one-time dest + temp ciphertext), fetch with resume, verify, decrypt, and report progress |
-| `server-core` | untouched - it only ever carries the small announcement and the four service messages |
+| `server-core` | untouched - it carries only the small announcement and the four service messages |
 | `facade-http` | untouched - nothing streams through the facade any more |

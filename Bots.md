@@ -66,8 +66,8 @@ label (`text`) and exactly one action field:
 | `data` | The client sends a `bot.callback` to the message's sender, carrying this `data` and `ref` = the keyboard message's `id`. |
 | `command` | The client sends a `bot.command` to the sender with this command name. |
 
-If both are present, `data` wins. A keyboard rides on a message; it is not a
-content type of its own and never appears in Layer 1.
+If both are present, `data` takes precedence. A keyboard is carried by a message;
+it is not a content type of its own and never appears in Layer 1.
 
 ### `bot.callback` - a button press
 

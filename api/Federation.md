@@ -18,7 +18,7 @@ Status: draft skeleton.
   keeps several destinations pre-built so that a lookup does not incur cold
   tunnel-build latency. The
   pool size adapts from demand; it is not configurable, and there is no flag or
-  config key that bounds it. With no warm destination to hand a fetch builds its
+  config key that bounds it. With no warm destination available a fetch builds its
   own one-time dest and waits for it - slower, never a shared address. Delivery
   still dials from the sender's own **serving** dest (the recipient acks back to it),
   never a one-time dest.
@@ -117,12 +117,12 @@ DeliveryEnvelope:
 3. Recipient's server unseals and processes in strict order:
    1. **deliveryId dedup** - if the `deliveryId` is still pending in the mailbox, or is in the retained **seen-deliveryId set** (every admitted id, kept independently of the blob until the TTL sweep ages it out), respond success. This makes client retries idempotent and blocks replays of an already-delivered envelope, on both admission paths - and with a reusable pass it is the only thing that does;
    2. **admission** - for `content`, hash the presented pass and look it up in the mailbox's registered set (`../Contacts.md`); no match -> `DELIVERY_REJECTED`, and nothing is consumed. For `contact`, which presents nothing, the size cap below IS the admission;
-   3. **size/quota checks** - explicit typed errors (`STORAGE_FULL`, `MESSAGE_TOO_LARGE`), revealed only past a valid pass. The order is load-bearing: checked before admission, an over-sized payload with a garbage pass answered differently on the destination that serves the named mailbox and on one that does not, which is the "is this fingerprint served here" answer nothing on this path may give;
+   3. **size/quota checks** - explicit typed errors (`STORAGE_FULL`, `MESSAGE_TOO_LARGE`), revealed only past a valid pass. The order is significant: checked before admission, an over-sized payload with an invalid pass answered differently on the destination that serves the named mailbox and on one that does not, which is the "is this fingerprint served here" answer nothing on this path may give;
    4. **store** as pending content, and add the `deliveryId` to the seen set.
 4. Recipient's server -> sending client: the confirmation is returned **in the reply on the same stream**, signed over the stored `deliveryId` with the signing key of the destination that admitted it. No other path is available, the client having dialled from an address that accepts no inbound connections. The client accepts a `delivered` result only when that signature verifies against the delivery id it sent; an unsigned claim is treated as no answer.
 5. A reply constitutes an answer. A typed refusal (unknown pass, size, quota, contact rate limit) fails the delivery immediately and repetition does not change the outcome. Only the absence of a reply warrants a further attempt; the number of attempts is the sending client's policy, as nothing is spooled anywhere and no server retries on another party's behalf. A repeated delivery carries the same delivery id, so a recipient's server that stored the first copy recognises it, stores no second copy.
 
-6. `DELIVERY_REJECTED` is the one refusal that says something about the **capability**: the presented pass is not in the mailbox's registered set. There is nothing else to offer instead - a correspondent holds one pass - so a sender that meets it has been cut off, and the way back is a new contact request. No refusal costs a sender anything: a pass is not spent, so `STORAGE_FULL` and `MESSAGE_TOO_LARGE` leave it exactly as it was, and so does this one.
+6. `DELIVERY_REJECTED` is the one refusal that says something about the **capability**: the presented pass is not in the mailbox's registered set. There is nothing else to offer instead - a correspondent holds one pass - so a sender that receives it can no longer deliver, and restoring delivery requires a new contact request. No refusal costs a sender anything: a pass is not spent, so `STORAGE_FULL` and `MESSAGE_TOO_LARGE` leave it exactly as it was, and so does this one.
 
 `contact-request` deliveries skip the pass check, are capped in payload size (`kMaxContactRequestBytes`, a protocol constant measured against the real worst case - see `ClientApi.md`), and are subject to per-origin-server rate limiting and a cap on how many may be waiting at once. There is no quota of their own: a mailbox has one, and every class is stored against it.
 
@@ -141,7 +141,7 @@ verb; it is served by the separate central resolver over its own I2P endpoint
 
 A facade is the client<->own-server last mile and **never** crosses a server
 boundary (see `Facade.md`). Servers reach each other only over the federation
-transport (I2P), and a client only ever talks to its own server's facade. So no
+transport (I2P), and a client connects only to its own server's facade. So no
 cross-server operation - delivery, contact request, or alias resolution - may
 require a client to connect to, learn, or carry a foreign facade URL. The unit
 of cross-server reachability is the recipient's **serving destination** (its
@@ -158,7 +158,7 @@ over I2P, having learned only that destination - not a server fingerprint.
 
 First contact needs the peer's UID and contact card (sealing key + destination +
 serving sealing key) without leaking to intermediaries and without the client
-touching a foreign facade. The model is specified in `FederatedResolve.md`; in
+contacting a foreign facade. The model is specified in `FederatedResolve.md`; in
 summary:
 
 - A **descriptor** (`fp:b33` plus the serving sealing key, shared as a QR or link)
@@ -174,8 +174,8 @@ summary:
 **Implementation status.** The facade-locality and `.b32.i2p` address invariants
 are enforced in code. The descriptor / card-fetch and the central-resolver
 `resolve` flows (`FederatedResolve.md`) are **implemented and live-validated over
-real I2P**; only the production resolver deployment (baking the resolver
-coordinate into the client) remains.
+real I2P**; only the production resolver deployment (embedding the resolver
+coordinate in the client) remains.
 
 ## Authentication
 

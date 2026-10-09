@@ -71,10 +71,10 @@ nothing. The five headers come to 8258 bytes, measured.
    in either slot fails: a classical key in the pq slot is a downgrade.
 3. Both signatures verify over the signed string, rebuilt from the request as it
    arrived.
-4. The signer's **fingerprint** falls out of the keys: lowercase unpadded base32
-   (RFC 4648) of `sha256(Ed25519 SPKI DER || ML-DSA SPKI DER)`, 52 characters -
-   the identity fingerprint of `Identity.md`. This is *who signed*, with no prior
-   key exchange.
+4. The signer's **fingerprint** is derived from the keys: lowercase unpadded
+   base32 (RFC 4648) of `sha256(Ed25519 SPKI DER || ML-DSA SPKI DER)`, 52
+   characters - the identity fingerprint of `Identity.md`. This is *who signed*,
+   with no prior key exchange.
 
 Where a request must be accepted once, the verifier also remembers every
 accepted `n` for the window and refuses it a second time. A legitimate resend
@@ -115,7 +115,7 @@ what a verifier compares. Strings are UTF-8 with no `\u` escapes: a non-ASCII
 name is written as itself. Only the verifier that minted a challenge ever computes
 its tag; the client does not check it.
 
-The site hands the challenge to the user and takes it back together with the
+The site gives the challenge to the user and receives it back together with the
 blob. Because of the tag it does not have to remember what it issued, only which
 nonces have been consumed.
 
@@ -129,7 +129,7 @@ nonces have been consumed.
 
 All three are required and non-empty, and `place` holds at least one address. No
 field may carry control characters (U+0000-U+001F, U+007F): a `name` with a
-newline in it could paint a `place` line of its own in the client's window -
+newline in it could render a `place` line of its own in the client's window -
 which is also why `place` is a list rather than one field with a separator in it.
 A challenge that breaks any of these rules is not signed.
 
@@ -141,7 +141,7 @@ list", which is still a question they can answer. It stays answerable only while
 the list is short, hence the cap, and the client says **"If the address you came
 to is not in the list, do not sign."** when there is more than one.
 
-What each of ours puts there:
+What each of the project's verifiers puts there:
 
 | Verifier | name | place | role |
 |---|---|---|---|
@@ -152,18 +152,19 @@ What each of ours puts there:
 
 Each of those settings is a **list** in the configuration file.
 
-A deployment that cannot say where it lives does not start. An address nobody can
-compare is the same as no address at all. `place` is what the user has in their
-address bar, so a verifier fronted under a name of its own says so in its config.
+A deployment that cannot state where it is reachable does not start. An address
+nobody can compare is the same as no address at all. `place` is what the user
+has in their address bar, so a verifier fronted under a name of its own says so
+in its config.
 
 The service node's three are **live**: they are among the settings an operator
 edits in the admin panel (`loginConsumer` on `/v1/account/settings`), a change
 takes effect on the next challenge, and it is written back to `portal.name` /
 `portal.address` / `portal.role` in the node's config file. A challenge issued
 before the change names the old consumer and stops verifying - it was shown to a
-user under words the portal no longer stands behind, and re-labelling it is what
-the tag exists to prevent. The user simply loads a fresh challenge. The other
-verifiers keep their consumer in their own config and pick it up at start.
+user under words the portal no longer asserts, and re-labelling it is what the
+tag exists to prevent. The user loads a fresh challenge. The other verifiers
+keep their consumer in their own config and read it at start.
 
 ## 3. The blob
 
@@ -175,7 +176,7 @@ Produced by the client, `base64(JSON)`:
 
 It is a signed request (section 1) whose five values travel as the blob's fields
 rather than as headers, over method `BZ-LOGIN`, path `/portal/login` and body =
-the challenge string exactly as issued, base64 and all. A login blob names no
+the challenge string exactly as issued, still in base64. A login blob names no
 device, so its base string has no device line. The string signed is therefore
 
 ```
@@ -185,7 +186,7 @@ device, so its base string has no device line. The string signed is therefore
 | Field | Value of | Meaning |
 |---|---|---|
 | `k` | `X-Bazarish-Keys` | The signer's public keys, Ed25519 + ML-DSA. The verifier derives the fingerprint from them: this is *who signed*. |
-| `t` | `X-Bazarish-Timestamp` | When it was signed, a decimal string. Outside the freshness window the blob is dead. |
+| `t` | `X-Bazarish-Timestamp` | When it was signed, a decimal string. Outside the freshness window the blob is invalid. |
 | `n` | `X-Bazarish-Nonce` | The per-request nonce, signed along with the rest. Without it a re-signed blob would be byte-identical to the first. |
 | `c` | `X-Bazarish-Sig-Classical` | Ed25519 signature. |
 | `p` | `X-Bazarish-Sig-Pq` | ML-DSA-65 signature. Both must verify - one alone proves nothing. |
@@ -200,13 +201,13 @@ over any real API call, and no API signature is a login.
 3. `ts` is within the freshness window.
 4. `tag` matches - the challenge was minted here. The comparison is constant-time.
 5. The blob verifies as a signed request (section 1) over the login's method,
-   path and challenge: `t` fresh, both key types right, both signatures good. The
-   fingerprint falls out of `k`.
+   path and challenge: `t` fresh, both key types correct, both signatures valid.
+   The fingerprint is derived from `k`.
 6. The challenge's `nonce` is consumed: remembered for the window and refused a
-   second time. It is consumed **after** the signature check, so a bad blob cannot
-   burn a good challenge.
+   second time. It is consumed **after** the signature check, so an invalid blob
+   cannot consume a valid challenge.
 
-What the fingerprint is then allowed to open is the verifier's own business: an
+What the fingerprint is then allowed to open is for the verifier to decide: an
 account at the portal, a configured administrator at the panel.
 
 Steps 2 and 4 are what bind a signature to one place: a blob captured at one
@@ -219,13 +220,13 @@ Before signing, the client **reads the consumer out of the challenge and shows
 all three fields**, and it **refuses to sign** a challenge that does not decode,
 is of another version, or does not name a complete consumer. Both halves matter:
 a window that shows nothing leaves the user with nothing to compare, and a client
-that signs an unnamed challenge hands over a signature for a place it could not
+that signs an unnamed challenge issues a signature for a place it could not
 name.
 
 The words are shown as a claim, never as a verdict. The client says who the
 challenge says it is for and tells the user to compare that with the site in
 front of them; it does not say "trusted", it does not rank sites, and it does not
-badge anything as safe.
+mark anything as safe.
 
 ## 6. What this stops, and what it does not
 

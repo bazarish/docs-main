@@ -30,8 +30,8 @@ HTTP transports map typed errors onto appropriate status codes; the JSON body is
 | `RECIPIENT_SERVER_UNREACHABLE` | The recipient's server returned no answer: it could not be dialled, the stream failed, or it asserted a delivery without a verifiable signature. Not a refusal; the sending client may repeat the attempt, and on exhausting its attempts reports this as the reason (`Messages.md`) | client |
 | `MESSAGE_TOO_LARGE` | The payload is over `kMaxMessagePayloadBytes`. Past admission, so only a correspondent ever sees it | server |
 | `CONTACT_RATE_LIMITED` | This destination is taking too many contact requests, or has too many waiting. Transient; says nothing about who is served there | server |
-| `SESSION_INVALID` | The session a request authenticated with is gone. Answered by opening a new tunnel, never by retrying the same way | server |
-| `FACADE_UPSTREAM` | The facade could not reach the server behind it. The one error a facade makes up itself | facade |
+| `SESSION_INVALID` | The session a request authenticated with no longer exists. Answered by opening a new tunnel, never by retrying the same way | server |
+| `FACADE_UPSTREAM` | The facade could not reach the server behind it. The only error a facade generates itself | facade |
 | `DELIVERY_REJECTED` | Delivery refused. Deliberately combines "unknown pass", "unknown mailbox" and "recipient not served here" into one externally indistinguishable result (anti-enumeration; see `Contacts.md`). A contact request, which presents nothing, is the only alternative admission path | server |
 | `CONTACT_REQUEST_TOO_LARGE` | Contact request exceeds `kMaxContactRequestBytes` (17590, a protocol constant - not an operator setting) | server |
 | `ALIAS_TAKEN` | Requested alias is already registered | service node |

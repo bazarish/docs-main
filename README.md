@@ -54,11 +54,11 @@ client's settings and policies are in `client-qt/docs/`.
 
 ## Cryptography
 
-The post-quantum hybrid is not the signatures alone - it is everything.
+The post-quantum hybrid is not limited to the signatures - it applies throughout.
 **Signing** is Ed25519 + ML-DSA-65: every identity statement carries both and
-is valid only when both verify. **Sealing** is X25519 + ML-KEM-768: every
-encrypted thing in the project - a message body end to end, a delivery envelope's
-header, a federation query - goes through the same `hybrid::seal`, whose key is
+is valid only when both verify. **Sealing** is X25519 + ML-KEM-768: every piece
+of encrypted data in the project - a message body end to end, a delivery
+envelope's header, a federation query - goes through the same `hybrid::seal`, whose key is
 derived from both shared secrets at once, so opening one needs both private
 halves. Breaking one scheme alone forges nothing and reveals nothing. Keys are
 PEM and DER, the composite frame is CBOR, and the password envelope is CMS. Every
@@ -66,7 +66,7 @@ primitive is OpenSSL's; no custom cryptographic algorithms.
 
 ## Status and near-term plan
 
-The protocol is implemented across all components, with unit tests green and the
+The protocol is implemented across all components, with unit tests passing and the
 core flows live-validated over real I2P: E2EE first contact, destination-routed
 federation, the central alias resolver (claim -> resolve -> card fetch ->
 conversation) including its offline-key serving-dest hot-swap, direct
@@ -80,11 +80,12 @@ in-process). There is no video - see `api/Calls.md` for why.
 Near-term work (not yet done):
 
 - **Incoming QR scan** - showing/sharing a QR works; decoding a scanned QR on the
-  client is not yet wired (paste-link is the fallback).
+  client is not yet integrated (paste-link is the fallback).
 - **Service-portal inline QR** - the pay page is JS-free with a refresh fallback;
   an inline payment QR is still planned (`api/ServicePortal.md`).
-- **Resolver deployment** - baking the resolver coordinate into the shipped client
-  (`defaultResolverCoordinate`) is an ops step once a resolver is deployed; the
+- **Resolver deployment** - embedding the resolver coordinate in the shipped
+  client (`defaultResolverCoordinate`) is an operational step once a resolver is
+  deployed; the
   seamless offline-key hot-swap requires i2pd >= 2.61.0.
 
 The `admin-panel` provides one web interface to monitor and manage the fleet:
