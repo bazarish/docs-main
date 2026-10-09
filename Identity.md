@@ -131,6 +131,17 @@ a `contact.routing` message carrying the new destination and serving key
 (`Messages.md`); nothing rides on ordinary messages, and a card is not
 re-broadcast on a schedule.
 
+**Raising a new destination is one action, not three.** A client offers a single
+destructive control - *New key* - and it mints a fresh offline key, delegates it,
+takes the `{dest, servingKey}` the server answers with
+(`api/ClientApi.md`), publishes the card from that answer, hands the new master
+key to the account's own other devices, and only then starts the fan-out. There
+is no separate way to re-mint the serving key and no grace period on the old
+address: the serving key follows the destination, and the old destination stops
+answering inside the same call, which is the whole point when the reason for
+moving is a flood. The invite links already handed out stop working, and the
+aliases repoint themselves.
+
 ### One serving server, hard-cutover migration
 
 A user is served by **exactly one server at a time**. Migration S1 -> S2:

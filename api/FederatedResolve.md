@@ -189,8 +189,27 @@ POST /v1/op/alias.update            point one of them at {fp, dest}, with
                                     the owner's alias certificate over the name
 POST /v1/op/alias.renew             pay for another term from the deposit
 POST /v1/op/alias.autorenew         let the service pay, or stop it
+POST /v1/op/alias.binding           make one of them resolve, or stop it
 POST /v1/op/alias.transfer.accept   take a name offered to this account
 ```
+
+`alias.binding` carries a boolean, like `alias.autorenew`. Switching it off
+clears the stored descriptor, so the name answers nobody while the account keeps
+holding it and keeps paying for it; switching it on makes the name resolvable
+again and leaves the client to repoint it with `alias.update`. The same switch
+exists on the registry's own website, and either side may work it.
+
+**Two flags per name, and only one of them is the client's.** `alias.status`
+reports both. `bindingWanted` is whether the name resolves, and either the client
+or the website may set it. The second flag says whether the name belongs in the
+messenger at all, and **only the website sets it**: an account may hold a hundred
+names for other purposes while five are the ones it wants to be reachable by, and
+a client lists those five alone. Switching a name's resolving off in the client
+does not take it out of that list - it stays, switched off, and can be switched
+back on without the website. A client therefore filters its own display on the
+website flag and services every name that carries `bindingWanted`, including ones
+it does not show: after a move, each of them has to be repointed by the key that
+signed it, and nobody else can do it.
 
 A request carries its own `issuedAt` and is refused outside a freshness window;
 the op named in the envelope must be the op the signature covers, so relabelling

@@ -224,6 +224,24 @@ contacts; what it must not do is lose the obligation, which is why the fan-out i
 a queue in the profile database that survives a restart and is cleared one
 contact at a time, on success.
 
+The queue is written when the server has confirmed the move - the answer to
+`POST /v1/account/i2p-dest` carries the new `{dest, servingKey}`
+(`api/ClientApi.md`) - and it holds every contact, plus the alias registry when
+this account holds a name that resolves. It is
+tried once there and then, once again whenever the account comes back online, and
+by hand. The two kinds of entry report differently, because the remedy differs:
+
+- a **contact** that could not be reached leaves a notice in that contact's own
+  chat, saying the new details did not arrive, with a **Try again** beside it.
+  One notice per contact, not one global warning, and it goes when the update
+  lands;
+- the **alias registry** is asked again every 10 seconds, silently, until it
+  takes the new descriptor. It is one global service whose permanent absence is
+  out of scope, and the person has nothing to decide about it.
+
+A client with no chat window (the daemon) lists the pending entries on its own
+face, with the same retry.
+
 ### Content-type registry (v1)
 
 | `type` | Delivery class | Purpose / payload |
