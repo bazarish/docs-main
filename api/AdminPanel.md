@@ -19,7 +19,7 @@ fingerprints, so a deployment with several operators need not share one key.
 
 Login is the project's one sign-in-with-key contract (`SignInWithKey.md`), with
 the panel as a self-contained verifier: **no backend has to be online to log
-in**.
+in**. What follows is only what the panel adds to it.
 
 1. The operator puts their own fingerprint - the one their client shows for their
    account - in the panel config `admin` field.
@@ -31,29 +31,17 @@ in**.
    fingerprint to be one of the configured admins, consumes the challenge, and
    sets a session cookie (`HttpOnly; SameSite=Strict`).
 
-What the panel puts in the consumer:
-
-| Field | Value |
-|---|---|
-| `name` | `consumer.name`, or "Bazarish admin panel" plus the fleet name when the config names exactly one |
-| `place` | `consumer.place`, or the address the panel listens on |
-| `role` | `Administrator` |
-
-The challenge is **single-use** and names the panel. A login blob captured from
-any other verifier (a service-node portal, say) carries a challenge the panel
-never minted and is rejected even though its signature is valid; conversely a
-panel challenge cannot be replayed at a portal, and an operator who is sent one
-sees a name that is not the panel's before signing anything.
+What the panel puts in the consumer is listed with the other verifiers' in
+`SignInWithKey.md`.
 
 ## Operator authentication (panel <-> services)
 
 Privileged service endpoints are authenticated by **hybrid signature**, not a
 shared secret. The panel has its own identity (generated on first start, kept in
-its state directory); it signs every service call with the request-auth headers
-(common `auth::signRequest`). Each service authorises a configured set of operator
-fingerprints (`operators`, repeatable) and verifies the request with
-`auth::authorizeRequest` (verify both signatures, then require the caller
-fingerprint to be authorised). The service node likewise signs its own
+its state directory); every service call it makes is a signed request
+(`SignInWithKey.md`, section 1). Each service verifies it and then requires the
+signer's fingerprint to be one of its configured operators (`operators`,
+repeatable). The service node likewise signs its own
 quota/transient pushes with its identity, so server-core authorises both the
 service node and the panel.
 

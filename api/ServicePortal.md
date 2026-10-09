@@ -18,7 +18,7 @@ own I2P destination - is included.
 
 ```
             +----------- browser -----------+         +---- Client (holds key) ----+
-            | Service portal (HTML, JS/JS-free)|<------| sign-login <challenge>     |
+            | Service portal (HTML, JS/JS-free)|<------| signs the challenge        |
             +---------------------------------+  paste | (key never enters browser) |
                            | HTTP                 sig   +----------------------------+
                   +--------v---------+
@@ -42,24 +42,8 @@ user signs it in their client, the portal verifies the blob and consumes the
 challenge, and the signer's fingerprint is the userId. On success the portal sets
 a session cookie carrying `userId` and an expiry (HttpOnly, SameSite=Strict).
 
-What this node puts in the consumer:
-
-| Field | Value |
-|---|---|
-| `name` | `portal.name`, or "Bazarish service node" |
-| `place` | `portal.address`, or the first advertised portal link |
-| `role` | `portal.role`, or `Account owner` |
-
-All three are also **live settings**: the operator edits them in the admin panel
-(`loginConsumer` on `/v1/account/settings`), the next challenge carries the new
-words, and they are written back to the config file so a restart keeps them.
-Challenges issued under the old words stop verifying, which is what the tag over
-the consumer is for; the user loads a fresh one.
-
-`place` is what the user has in their address bar, so a node fronted under a name
-of its own says so in the config; a node that can name no address at all does not
-start. The client shows those words before it signs, and a user who is on one
-site while the challenge names another can stop there.
+What this node puts in the consumer, and how an operator changes it without a
+restart, is in `SignInWithKey.md`.
 
 ## 2. Portal discovery (server -> links)
 
@@ -252,7 +236,7 @@ in that directory, of a type the portal publishes, are served.
 | Caller | Endpoint | Auth | Purpose |
 |---|---|---|---|
 | Client | `GET /v1/account/portal` | none | onboarding text + portal links + registration terms |
-| Client | `sign-login <challenge>` (local) | key | produce the login signature |
+| Client | signs the challenge (local) | key | produce the login blob |
 | Browser | `GET /`, `POST /login` | sig -> session | sign-in-with-key, which is the registration |
 | Client | `POST /v1/account/registration` | key | the same registration, with no page to visit |
 | Panel | `POST /v1/account/approve` | operator sig | moderation |
@@ -275,8 +259,8 @@ in that directory, of a type the portal publishes, are served.
 
 ## 8. Security notes
 
-- The key never enters the browser; login is a relayed one-shot signature bound
-  by `purpose` + `audience` + a fresh, HMAC-bound, single-use nonce.
+- The key never enters the browser; login is a relayed one-shot signature, bound
+  to this portal by the consumer and the tag (`SignInWithKey.md`).
 - Sessions are short-lived signed cookies.
 - Approval and deletion are operator-signed actions on the private channel; the
   portal itself can neither approve an account nor see who is waiting.
