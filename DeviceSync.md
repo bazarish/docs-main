@@ -31,11 +31,11 @@ which every answer carries, so a client always knows which of the two happened.
 
 1. An existing device publishes a one-shot blinded destination and shows two things: a link naming it, `bazarish://pair?v=1&dest=<b33>[&reseed=<https url>]`, and a four-digit code. The link is a QR code and a string; the code is only on the screen. The destination is blinded so a floodfill cannot disclose it to anyone who did not receive the link.
 2. The new device dials that destination and sends `GET /hello`, carrying the code in `X-Bazarish-Pair`. The existing device compares the code in constant time and only then builds the account bundle, sealed with that same code, and streams it in the response body. A request with a wrong code is refused with `403` and counted; after ten wrong codes the destination is taken down. A request with no code header is refused with `400` and not counted, so a port scan cannot spend the budget. Nothing leaves the device without the code, so the link may travel over any channel.
-3. The bundle is the account backup: identity private keys (classical + post-quantum), the serving sealing key, the destination key, the server endpoint, the address book and the block list. It is never written to disk on either device. Message history is not in it.
+3. The bundle is the account backup: identity private keys (classical + post-quantum), the account's sealing key, the destination key, the server endpoint, the address book and the block list. It is never written to disk on either device. Message history is not in it.
 4. A reseed address in the link is what a new device uses to start its own router when it has no network database yet. It is the only coordinate a device can be given before it has an account, so it is an `https` URL and nothing else.
 5. The new device authenticates as the user and **registers its client ID**.
 6. It asks for the address book (`device.contacts-request`); every other device that has contacts answers.
-7. Content delivered and fully acked *before* registration is gone by design and is not replayed; prior history arrives with the address book and the message echo.
+7. Content delivered and fully acked *before* registration is gone by design and is not replayed. Prior message history does not arrive either: the address book carries no messages, and the message echo is sent as messages are written, not replayed.
 
 ## Retirement (removing a device)
 
@@ -44,7 +44,7 @@ which every answer carries, so a client always knows which of the two happened.
 
 ## Account sync (avatar & contact names)
 
-Two pieces of account state propagate to the user's other devices as dedicated **self-messages** - sealed to the user's own key and delivered to their own destination - independent of the journal above:
+Account state propagates to the user's other devices as dedicated **self-messages**, sealed to the user's own key and written to their own mailbox (`POST /v1/messaging/self`):
 
 - `device.avatar` - the user's own avatar, re-sent whenever it changes.
 - `device.contact-name` - a local contact rename, carrying `peer` (fingerprint) and the new `name`.
@@ -56,6 +56,7 @@ Two pieces of account state propagate to the user's other devices as dedicated *
 - `device.contact-block` - `peer` and `blocked`: mail and contact requests from them are dropped as they are read, on every device. The conversation is not touched.
 - `device.contact-prefs` - `peer`, `notifications` and `allowCalls`: what one contact may do here.
 - `device.contact-accepted` - `peer`: a contact request agreed to. Every device holds the same request, so without this the others continue offering an Agree that has been given - and, more seriously, continue treating the contact as one nothing may be sent to. Receiving it sends the correspondent nothing: the device that agreed carries the exchange.
+- `device.chat-pin` - `peer` and `pinned`: a conversation pinned or unpinned, on every device.
 - `device.chat-clear` - `peer`: this account's copy of one conversation, emptied. Distinct from the `chat.clear` sent to a correspondent, which asks *them* to empty theirs.
 - `device.read` - `peer` and `ts`: this conversation has been read through the
   message sent at that moment. Reading is the account's act, not the device's, so
@@ -75,6 +76,7 @@ Two pieces of account state propagate to the user's other devices as dedicated *
   left.
 - `device.account-name` - `name`: the account renamed itself.
 - `device.account-prefs` - `acceptCalls` and `sendReceipts`: the account's own answers, which must be the same wherever it is reached from. A notice carries what it knows about; a field it omits is left as it was.
+- `device.alias-status` - `status` and `delegation`: the registry's signed answer about the names this account holds, passed on as fetched. A receiver checks it against the built-in resolver root and adopts it only when it is about this account and not older than the answer it holds (`api/FederatedResolve.md`).
 - `call.taken` - the device that answered or refused an incoming call, stopping the others ringing (`api/Calls.md`).
 - `device.contacts-request` - `device`: the asking device wants the address book. Sent once, automatically, on a device's first sync that reaches the server, and manually from the account window. A device ignores its own request; with no other device the mailbox holds it.
 - `device.contacts` - `forDevice`, `contacts`: the book, or a part of it. Every other device that has contacts answers, so several answers may arrive; each is taken in turn.
@@ -83,7 +85,7 @@ Two pieces of account state propagate to the user's other devices as dedicated *
 
 A device that has just joined cannot learn a contact from the network: a correspondent is reached by destination, and nothing turns a fingerprint into one. The account's other devices are the only place the book can come from - so it is asked for, over the same self-channel.
 
-One entry carries what a contact **is**: their fingerprint, their identity keys (what every message of theirs is checked against, `Messages.md`), their sealing key, destination and serving key, the local display name, the per-contact switches, whether this account has issued to them, whether they are blocked, and their avatar.
+One entry carries what a contact **is**: their fingerprint, their identity keys (what every message of theirs is checked against, `Messages.md`), their sealing key, destination and serving key, the local display name, the per-contact switches, whether this account has issued a delivery pass to them, whether they are blocked, and their avatar.
 
 It carries the contact's **delivery pass** along with everything else about them, and this is the one thing it deliberately did not carry before: a one-time token could not be in two places, so a device that learned a contact this way had to obtain its own before it could write. A pass is not spent, so every device holds the same one and a device that learns a contact can write to them at once. It still carries nothing that belongs to one device or to one exchange in flight.
 
@@ -95,7 +97,7 @@ Merging **fills gaps only**. A contact this device already has is not overwritte
 
 All are local-only facts that must never reach a contact, so they travel the self-channel exclusively. The routing-key sibling `device.i2p-master` (preserving the user's I2P address across devices, see `Identity.md`) uses the same mechanism. Wire shapes are in `Messages.md`.
 
-**`device.i2p-master-request` (`{device, host}`)** is the other half of that pair. An account has **one** address, and it is the address every contact holds; a device that finds its server serving an address it has no keys for asks for them here, naming the address it needs (`host`) and itself (`device`). A device answers with `device.i2p-master` only when it holds the address that was named (an unnamed `host` asks for whatever the answerer has), and the asker takes the one whose address matches what the server serves. A device answers its own request never, and a device that already holds the served address has nothing to ask.
+**`device.i2p-master-request` (`{device, host}`)** is the other half of that pair. An account has **one** address, and it is the address every contact holds; a device that finds its server serving an address it has no keys for asks for them here, naming the address it needs (`host`) and itself (`device`). A device answers with `device.i2p-master` only when it holds the address that was named (an unnamed `host` asks for whatever the answerer has), and the asker takes the one whose address matches what the server serves. A device never answers its own request, and a device that already holds the served address has nothing to ask.
 
 A `device.i2p-master` that carries a **different** master than the receiving device holds is not ignored either: the account's address has moved, and a device still announcing the old one in its outgoing routing keeps its contacts writing to an address nobody serves. It is adopted - replacing the stale master and the delegation signed by it - **only when the server confirms that address is the one it serves**, so a stale or replayed copy cannot take a working address away from a device.
 
@@ -107,7 +109,7 @@ A self-message is named by a **delivery id of its own**, unrelated to the one th
 
 ## Quota interplay
 
-`device.message` with attachments doubles outgoing traffic and temporarily occupies the user's own quota: echo blobs are retained only until every registered client has fetched them, so for devices that are normally online the occupancy is brief. An offline device accumulates echoes for the retention period; substantial attachment traffic on the free tier (50 MB) will exhaust the quota. This is an accepted trade-off, to be reviewed against operational experience.
+`device.message` with attachments doubles outgoing traffic and temporarily occupies the user's own quota: echo blobs are retained only until every registered client has fetched them, so for devices that are normally online the occupancy is brief. An offline device accumulates echoes for the retention period; substantial attachment traffic on the default quota (50 MB unless the operator sets another) will exhaust it. This is an accepted trade-off, to be reviewed against operational experience.
 
 ## Open questions
 

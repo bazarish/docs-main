@@ -26,7 +26,7 @@ component implements.
   - [Federation](api/Federation.md) - server <-> server over I2P (destination-routed)
   - [InviteAnonymity](api/InviteAnonymity.md) - destination-routed contact cards
   - [SignInWithKey](api/SignInWithKey.md) - authentication by signature: the signed request, the login challenge and blob, and who consumes a signature
-  - [ServicePortal](api/ServicePortal.md) - sign-in-with-key portal, payments, grants
+  - [ServicePortal](api/ServicePortal.md) - sign-in-with-key portal, account onboarding, grants
   - [ServerServiceNode](api/ServerServiceNode.md) - internal server <-> service node API
   - [FileTransfer](api/FileTransfer.md) - direct client-to-client file transfer over I2P
   - [Storage](api/Storage.md) - pending-content storage backends
@@ -43,7 +43,9 @@ One repository per component, developed side by side:
 |---|---|
 | Shared C++ library | [common-cpp](https://github.com/bazarish/common-cpp) |
 | Server fleet: messaging server, service node, HTTP facade, admin panel | [bazarish-server](https://github.com/bazarish/bazarish-server) |
-| Client (core, CLI, Qt6 GUI) | [client-qt](https://github.com/bazarish/client-qt) |
+| Client (core, Qt6 GUI) | [client-qt](https://github.com/bazarish/client-qt) |
+| Client daemon (the same core behind a REST API and a web UI, for bots) | [client-daemon](https://github.com/bazarish/client-daemon) |
+| Gateway (runs the I2P router for a client that does not run its own) | [bazarish-gateway](https://github.com/bazarish/bazarish-gateway) |
 | Alias registry (signed resolve + portal; the one paid component; closed, and documented in its own repository) | [alias-resolver](https://github.com/bazarish/alias-resolver) |
 | Specification | this repository |
 
@@ -56,37 +58,29 @@ client's settings and policies are in `client-qt/docs/`.
 
 The post-quantum hybrid is not limited to the signatures - it applies throughout.
 **Signing** is Ed25519 + ML-DSA-65: every identity statement carries both and
-is valid only when both verify. **Sealing** is X25519 + ML-KEM-768: every piece
-of encrypted data in the project - a message body end to end, a delivery
-envelope's header, a federation query - goes through the same `hybrid::seal`, whose key is
-derived from both shared secrets at once, so opening one needs both private
-halves. Breaking one scheme alone forges nothing and reveals nothing. Keys are
-PEM and DER, the composite frame is CBOR, and the password envelope is CMS. Every
-primitive is OpenSSL's; no custom cryptographic algorithms.
+is valid only when both verify. **Sealing** is X25519 + ML-KEM-768: everything
+in the project encrypted to a public key - a message body end to end, a delivery
+envelope's header, a request in the facade tunnel - goes through the same
+`hybrid::seal`, whose key is derived from both shared secrets at once, so opening
+one needs both private halves. Breaking one scheme alone forges nothing and
+reveals nothing. Keys are PEM and DER, the composite frame is CBOR, and the
+password envelope is CMS. Every primitive is OpenSSL's; no custom cryptographic
+algorithms.
 
-## Status and near-term plan
+## Status
 
 The protocol is implemented across all components, with unit tests passing and the
 core flows live-validated over real I2P: E2EE first contact, destination-routed
 federation, the central alias resolver (claim -> resolve -> card fetch ->
-conversation) including its offline-key serving-dest hot-swap, direct
-client-to-client file transfer, bots and interactive messages,
-message editing and read receipts, multiple accounts, at-rest encryption of all
-local state, and client-to-client audio calls (Opus over I2P RAW datagrams to b33
-destinations, per-call AES-256-GCM, minimal-length media tunnels, strict I2P
-requirement; the embedded `libi2pd_bazarish` carries the datagram-to-b33 routing
-in-process). There is no video - see `api/Calls.md` for why.
-
-Near-term work (not yet done):
-
-- **Incoming QR scan** - showing/sharing a QR works; decoding a scanned QR on the
-  client is not yet integrated (paste-link is the fallback).
-- **Service-portal inline QR** - the pay page is JS-free with a refresh fallback;
-  an inline payment QR is still planned (`api/ServicePortal.md`).
-- **Resolver deployment** - embedding the resolver coordinate in the shipped
-  client (`defaultResolverCoordinate`) is an operational step once a resolver is
-  deployed; the
-  seamless offline-key hot-swap requires i2pd >= 2.61.0.
+conversation), direct client-to-client file transfer, bots and interactive
+messages, message editing and read receipts, multiple accounts, at-rest
+encryption of all local state, and client-to-client audio calls (Opus over I2P
+RAW datagrams to b33 destinations, per-call AES-256-GCM, minimal-length media
+tunnels, strict I2P requirement; the embedded `libi2pd_bazarish` carries the
+datagram-to-b33 routing in-process). There is no video - see `api/Calls.md` for
+why. The shipped client is built with the production resolver's coordinate
+(`defaultResolverCoordinate`), and the desktop client reads invite and
+device-pairing QR codes from a camera.
 
 The `admin-panel` provides one web interface to monitor and manage the fleet:
 every service exposes a signed `GET /healthz` (name, version, uptime, current and

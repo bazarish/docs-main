@@ -19,14 +19,14 @@ it; neither the file name nor a sender-supplied MIME value has that role:
 nothing to request, so it arrives once, with the message, and it arrives even if
 the sender goes offline the moment after sending - the mailbox holds it like any
 other message. The sender shrinks it first (long edge 1600, re-encoded, at most
-256 KiB) so that its base64 and the envelope around it stay inside the 512 KiB
-message limit.
+256 KiB) so that it and the envelope around it stay inside the 512 KiB message
+limit.
 
 Before it is rendered it must decode as an image; a rejection by the decoder is
-final. Such a message is not reclassified as a file: it is reported as broken,
-a fallback amounting to the client reinterpreting what it received. The bytes are
-held in the account database, encrypted with the remainder of its contents, and
-are exported by an explicit save action.
+final. Such a message is reported as broken. It is not reclassified as a file:
+that would be a fallback, the client reinterpreting what it received. The bytes
+are held in the account database, encrypted with the remainder of its contents,
+and are exported by an explicit save action.
 
 A `file` is the other path and keeps the announcement: the metadata travels in
 the message, the bytes travel client to client on demand, and the size has no
@@ -51,9 +51,14 @@ specification.
 
 ## Size
 
-One message carries at most **512 KiB** of payload (`kMaxMessagePayloadBytes`). The server checks it before admission and
-answers `MESSAGE_TOO_LARGE`; the client checks the same number before sending,
-so a message a server would refuse is never built.
+One message carries at most **512 KiB** of payload (`kMaxMessagePayloadBytes`).
+The server checks it before storing anything - on a delivery, only after the
+pass has been accepted - and answers `MESSAGE_TOO_LARGE`, a final refusal. The
+client checks the same number before sending: a message whose encoded body is
+over it is refused locally, with a request to send it as a file, and nothing is
+delivered. That check is made on the body before the authorship signatures and
+the seal are added, which take a few KiB more, so a body that close to the limit
+passes it and is then refused by the server.
 
 Anything larger is a file: `sendFile` puts only its metadata (name, size,
 sha256, mime) in the message and the bytes travel client to client over a
@@ -65,9 +70,10 @@ scaled and re-encoded to a few hundred KiB before they are sent.
 
 A message has **two** type discriminators that must never be conflated:
 
-1. **Delivery class** - visible to the destination server, inside the sealed
-   delivery envelope. A closed set of exactly three values. It selects the
-   server's *admission policy*, nothing else.
+1. **Delivery class** - visible to the destination server: inside the sealed
+   delivery envelope, or given by the endpoint a self-delivery is posted to. A
+   closed set of exactly three values. It selects the server's *admission
+   policy*, nothing else.
 2. **Content type** - visible only to the recipient, inside the end-to-end
    encrypted payload. An **open** registry. The server, facades and federation
    relays never see it.
@@ -86,12 +92,14 @@ identical opaque envelope it would for a text line or a call invite.
 ## Layer 1 - delivery class (server-visible)
 
 Carried as the `class` field of the sealed delivery envelope (see
-`api/Federation.md`). Three values, and this set is frozen - content types never
-appear here:
+`api/Federation.md`) for `contact` and `content`; `device` never travels in an
+envelope - the server assigns it to what an account stores through
+`POST /v1/messaging/self`. Three values, and this set is frozen - content types
+never appear here:
 
 | `class` | Admitted by | Server policy |
 |---|---|---|
-| `contact` | nothing | Bootstrap. Size-capped (`kMaxContactRequestBytes`), per-origin rate-limited. The only path into a mailbox that presents nothing. |
+| `contact` | nothing | Bootstrap. Size-capped (`kMaxContactRequestBytes`), rate-limited per serving destination. The only path into a mailbox that presents nothing. |
 | `content` | the recipient's delivery pass (required) | Looked up, not consumed (see `Contacts.md`). The path for every established-contact message, whatever its content type. |
 | `device` | the account's own signature | An account writing to its own other devices, through `POST /v1/messaging/self` rather than through federation. Outside the budget a stranger's request is counted against, and stored only when the account has more than one device. |
 
@@ -119,8 +127,7 @@ Sealed envelope as the server sees it:
 message's size (`Contacts.md`, pass lifecycle). The recipient's server hashes it
 and looks it up; it never derives anything from the payload, whose only visible
 property is its length - and that is padded to a step of the ladder before the
-seal, so what a mailbox's server measures is the step. The recipient's server computes the
-same number from the payload and refuses an envelope that carries any other.
+seal, so what a mailbox's server measures is the step.
 
 The account database that stores it all carries a **schema version** of its own
 (SQLite's `user_version`, stamped when the tables are laid out and checked on
@@ -253,7 +260,7 @@ face, with the same retry.
 | `contact.accept` | content | Agreeing to a received `contact.request`: an empty-bodied message whose first-reply `bootstrap` delivers our descriptor + our pass to the requester, making the pair mutual contacts. The requester's client completes adding the contact automatically and surfaces a note. See `Contacts.md`. |
 | `file` | content | An announcement: `name`, `size`, `sha256` and `mime`. The bytes stay on the sender's disk until the recipient asks for them. See `api/FileTransfer.md`. |
 | `image` | content | A picture, carried inline: the bytes travel in the envelope rather than being fetched. Its body block is named `image`. |
-| `audio` | content | A voice note: the same shape as `image`, plus `durationMs` and a waveform. Its body block is named `audio`. |
+| `audio` | content | A voice note, carried inline like `image`. Its body block is named `audio` and holds `durationMs`, `size` and the Opus bytes in `data`; no waveform is sent - the receiver draws it from the audio. |
 | `receipt` | content | `ref` (the read message's `id`). A **read** receipt - the recipient's client sends it only on a genuine read (the chat is open, the app window focused, and the message scrolled into the visible area), confirming the "green" delivery state below. `ref` is the newest read incoming id, so it acknowledges that message and every earlier one **the sender got as far as the recipient's server** (a read high-water); one that never arrived is not carried up by it. Optional/toggleable. **Never sent about a contact request**: reading a request is not answering it, and a requester who learns that a stranger's client is running and has opened their message has been told something they never agreed to be told. Until the request is accepted, the requester's own plate stops at *delivered*. |
 | `reaction` | content | A reaction to a message: `ref` (the target message's `id`), `text` (**at most 4 characters and 20 bytes** - enough for an emoji with a modifier or a joined pair; **empty removes** the reactor's reaction). Both limits are checked when sending and again on receipt: a peer's client is not the receiver's to trust, and an oversized one is dropped rather than rendered on someone's message. One reaction per user per message - a new one overwrites the old at every recipient. A single sealed delivery to the peer. Never a chat bubble - clients render it as a chip on the target message. See *Reactions*. |
 | `bot.command` | content | A command invocation aimed at a bot: `command` (name, no leading slash), `args` (raw argument string). See *Bots & interactive messages*. |
@@ -262,15 +269,15 @@ face, with the same retry.
 | `delete` | content | A delete-for-everyone of a message the sender previously sent: `ref` (the target message's `id`). The recipient removes its copy with **no tombstone** left behind. Scoped, like `edit`, to a message sent by `from`. See *Editing and deleting messages*. |
 | `chat.clear` | content | Asks the peer to clear the **whole** one-to-one conversation with the sender (no `ref`). The recipient's client wipes its transcript with `from` and leaves a single "cleared the chat" notice. The chat itself remains. The "clear for everyone" choice in the chat-info panel. |
 | `avatar` | content | The sender's avatar pushed to a contact: `avatar` = `{ mime, data }`, `data` being base64 of a square PNG/JPEG compressed client-side to at most **500 KB**. A silent service message - stored as that contact's picture, never shown as a chat bubble. Sent once the dialog is mutually established and re-sent to every contact when the avatar changes. See *Avatars and display names* and `Contacts.md`. |
-| `device.avatar` | contact | Self-sync of the user's own avatar to their other devices: the same `avatar` block, sealed to the user's own key and delivered to their own destination. See `DeviceSync.md`. |
-| `device.contact-name` | contact | Self-sync of a local contact rename to the user's other devices: `peer` (fingerprint), `name`. A purely local label, never sent to the contact. See `DeviceSync.md`. |
-| `device.i2p-master` | contact | Self-sync of the user's own I2P master key to their other devices: `i2pMaster` (base64), sealed to the user's own key and delivered to their own destination, so every device keeps the same personal address. Applied only when `from` is the user themselves. See `DeviceSync.md`, `Identity.md`. |
+| `device.avatar` | device | Self-sync of the user's own avatar to their other devices: the same `avatar` block, sealed to the user's own key and stored through `POST /v1/messaging/self`. See `DeviceSync.md`. |
+| `device.contact-name` | device | Self-sync of a local contact rename to the user's other devices: `peer` (fingerprint), `name`. A purely local label, never sent to the contact. See `DeviceSync.md`. |
+| `device.i2p-master` | device | Self-sync of the user's own I2P master key to their other devices: `i2pMaster` (base64), sealed to the user's own key and stored through `POST /v1/messaging/self`, so every device keeps the same personal address. Applied only when `from` is the user themselves. See `DeviceSync.md`, `Identity.md`. |
 | `call.invite` | content | Places an audio call: `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b32), `key` (base64 per-call media key). See `api/Calls.md`. |
 | `call.accept` | content | Accepts a call: `callId`, `dest` (the callee's media b32). See `api/Calls.md`. |
 | `call.decline` | content | Rejects a call: `callId`, `reason`. See `api/Calls.md`. |
 | `call.end` | content | Hangs up / cancels a call: `callId`. See `api/Calls.md`. |
 | `call.ring` | content | A device of the callee's is showing the call: `callId`. What turns the caller's "invitation delivered" into "their device is ringing". See `api/Calls.md`. |
-| `call.taken` | contact | Self-sync: the device that answered or refused an incoming call, so the account's other devices stop ringing - `callId`, `device`. See `api/Calls.md`, `DeviceSync.md`. |
+| `call.taken` | device | Self-sync: the device that answered or refused an incoming call, so the account's other devices stop ringing - `callId`, `device`. See `api/Calls.md`, `DeviceSync.md`. |
 
 ### Forwarding
 
@@ -518,13 +525,15 @@ are determined by the sending client. The protocol fixes the following:
   user, including after a restart, when a delivery that was in progress is
   reported as not performed.
 
-## Media: announced, transferred directly
+## Files: announced, transferred directly
 
-Bulk content (files, photos, audio, voice) is **never** inlined in the mailbox
-envelope, and it is not held on a storage service either - there is none. The
-message **announces** the file and the bytes stay with the sender until the
-recipient asks for them, at which point the sender serves that one file over a
-one-time I2P destination (full design in `api/FileTransfer.md`):
+A file is **never** inlined in the mailbox envelope, whatever its size, and it
+is not held on a storage service either - there is none. Pictures and voice
+messages are the exception: `image` and `audio` carry their bytes inside the
+message, within the per-message limit (*Types*, *Size*). For a file the message
+**announces** it and the bytes stay with the sender until the recipient asks for
+them, at which point the sender serves that one file over a one-time I2P
+destination (full design in `api/FileTransfer.md`):
 
 1. The sender hashes the plaintext and sends `type: "file"` carrying
    `{name, size, sha256, mime}` - all end-to-end encrypted, no bytes.
@@ -539,11 +548,12 @@ one-time I2P destination (full design in `api/FileTransfer.md`):
 4. `file.unavailable` is returned when the sender no longer holds the
    file.
 
-There is no client-side size threshold: a client sends normally and falls back to
-a direct transfer on the server's typed per-message-limit error, so the threshold
-is the server's own advertised limit.
+The path is chosen by the content type, not by size: a picture or a voice
+message is sent inline and a file is announced. Nothing switches one to the
+other: a message over the limit is refused by the client before sending
+(*Size*), and the server's `MESSAGE_TOO_LARGE` is a final refusal.
 
-Why announce rather than store: the messaging server never carries the bulk
+Why announce rather than store: the messaging server never carries a file's
 bytes, so a **quota-constrained recipient can receive arbitrarily large
 content**, and no third party holds the ciphertext at any point. The constraint
 that follows: a file is available only while the sender is online and still holds

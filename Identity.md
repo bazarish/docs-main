@@ -11,7 +11,7 @@ Status: draft skeleton.
 
 - A user **is** a hybrid keypair set. The canonical UID is the identity fingerprint covering both public keys.
 - Address / contact forms:
-  - `<fingerprint>:<b32>` - the **descriptor**: identity fingerprint + the user's own destination (a `.b32.i2p` host). The primary scannable/QR form; the full link is `bazarish://invite?fp=...&dest=...` (`api/FederatedResolve.md`). A fingerprint is an identity, not a route, so it is always paired with a destination - there is no `@server-fingerprint` form (nothing maps a fingerprint to an endpoint).
+  - `<fingerprint>:<b33>` - the **descriptor**: identity fingerprint + the user's own destination, addressed by the blinded b33 of its encrypted LeaseSet2 (written as a `.b32.i2p` host with a 56-character label, where a plain b32 has 52). `fp:b33` is this specification's shorthand; what a client shows, encodes in a QR and accepts is the link `bazarish://invite?v=1&fp=...&dest=...[&name=...]` (`api/FederatedResolve.md`). A fingerprint is an identity, not a route, so it is always paired with a destination - there is no `@server-fingerprint` form (nothing maps a fingerprint to an endpoint).
   - `<alias>` - an exclusive **alias** on the central resolver (paid; the project's monetization, `api/FederatedResolve.md`). Resolving it yields a descriptor, after which the contact card is fetched and verified.
 - Users have no binding to a server in anything a contact can see. Registration opens an unbounded channel with the server, and the only thing that expires is the delegation of the user's destination - which the network itself enforces. Nothing signed by the user names the server.
 - All clients (devices/app instances) of a user **share the identity keypair set**; a new device receives it during enrollment (see `DeviceSync.md`). Each client registers a unique random **client ID** so the server can track delivery completeness across clients.
@@ -21,8 +21,9 @@ Status: draft skeleton.
 
 - A server's root identity is a hybrid keypair set.
 - **Server card** - a document signed by the server's root key, binding the
-  server's identity to its transport endpoint(s) (`i2p:<b33>`) and a server-level
-  sealing key. It is the server's own identity document (the service node is
+  server's identity to a server-level sealing key
+  (`{ v, t: "server-card", server, sealingKey, issuedAt }`; it names no transport
+  endpoint). It is the server's own identity document (the service node is
   bound to it), and it is also what a **client** fetches in the open before it can
   speak in private: the tunnel is sealed to the sealing key in it, and the card is
   trusted because it is signed by the fingerprint the user already had
@@ -31,9 +32,9 @@ Status: draft skeleton.
   client at all, so it refuses to start rather than fail one connection at a time.
   It is **not** the peer-facing routing artifact and is **not**
   carried in invites: delivery routing and sealing are per-destination and travel
-  in the user's contact card (below); a contact discovers the serving sealing key
-  needed to fetch that card from the **descriptor** (`key`,
-  `api/FederatedResolve.md`), not from a fetched server card. Cross-server
+  in the user's contact card (below); a contact fetches that card from the
+  destination the **descriptor** names, with no key and no server card
+  (`api/FederatedResolve.md`). Cross-server
   alias resolution is served by the separate central resolver
   (`api/FederatedResolve.md`), which signs its own records.
 - **Delivery sealing is per-destination.** Each user's own serving destination
@@ -47,8 +48,9 @@ Status: draft skeleton.
   its serving sealing key - a `(destination, signing key, serving sealing key)`
   group that is never reused on another destination. It is the only key that signs
   live federation traffic (a delivery confirmation, `api/Federation.md`). The server
-  **root identity** (the server card above) signs only **outside** federation -
-  the `bazarish://server` configuration link (`api/Facade.md`) and the
+  **root identity** signs only **outside** federation - the server card above
+  (the `bazarish://server` configuration link carries no signature, only the
+  fingerprint that card is verified against, `api/Facade.md`) and the
   service-node binding - so two users one server hosts on different destinations
   share no signer and cannot be clustered by a common server fingerprint; users
   sharing a destination share its signing key, which is the same k-anonymity set
@@ -154,13 +156,13 @@ Accepted failure mode: if S1 becomes permanently unavailable before the user has
 
 ### Alias certificate
 
-- The user signs the desired nickname: `{ v, alias, user: <fingerprint>, issuedAt, notAfter? }`; the service node registers the mapping alias -> UID.
-- Validity term is set by the server; default unlimited.
+- The user signs the desired nickname: `{ v, t: "alias-certificate", alias, user: <fingerprint>, issuedAt }`; the central resolver registers the mapping alias -> UID (`api/FederatedResolve.md`).
+- The certificate carries no term: an alias is rented, and the resolver keeps its term beside the claim.
 
 ### First-contact trust chain (alias resolution)
 
-Resolving an `alias` returns a **descriptor** (`fingerprint`, serving destination,
-serving sealing key) signed by the central resolver (a delegation chain to a
+Resolving an `alias` returns a **descriptor** (`fingerprint`, serving destination)
+signed by the central resolver (a delegation chain to a
 hardcoded root fingerprint, `api/FederatedResolve.md`). The client then fetches and
 verifies the user-signed **contact card** for that fingerprint. Two trust layers:
 
@@ -170,14 +172,14 @@ verifies the user-signed **contact card** for that fingerprint. Two trust layers
    key) - is **user-signed and verified against the fingerprint**, so no
    intermediary can forge it.
 
-The lookup travels over I2P (a direct fetch over a transient I2P destination, or
-sealed via the client's own server), so the requester's own server never learns which name was looked up
-(`api/FederatedResolve.md`).
+The lookup travels over I2P, as a direct fetch from a transient I2P destination
+of the client's own, so the requester's own server never learns which name was
+looked up (`api/FederatedResolve.md`).
 
 ### Out-of-band invites (the descriptor)
 
-A contact is shared out of band as a small **descriptor** - `<fingerprint>:<b33>`,
-or the link `bazarish://invite?fp=...&dest=...[&name=...]`: identity +
+A contact is shared out of band as a small **descriptor** - the link
+`bazarish://invite?v=1&fp=...&dest=...[&name=...]` (`fp:b33`): identity +
 serving destination, plus an optional advertised
 display name the recipient adopts at add time (static thereafter; see `Messages.md`).
 It fits a single QR. The recipient
@@ -192,7 +194,7 @@ Trust ladder for adding a contact, strongest first:
 
 - **By descriptor / fingerprint** (`fp:b33`, a QR or link) - the contact card is
   fetched and verified against the fingerprint, so a server cannot forge, only
-  withhold; on a direct fetch over a transient I2P destination it cannot even observe the lookup.
+  withhold; the fetch is direct, over a transient I2P destination, so the requester's own server cannot even observe the lookup.
 - **By alias** - the central resolver maps the human-readable name to a
   fingerprint. Convenient, but the **alias->fingerprint mapping is trusted**: a
   hostile resolver could return an attacker's fingerprint, so the UI surfaces the

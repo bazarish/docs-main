@@ -99,10 +99,11 @@ receipt.
 
 ### Read receipts
 
-The reference runtime sends a delivery receipt for the user-visible content it
-receives (text and media), so the sender's tick advances to the delivered
-("green") state - a bot is a normal recipient in this respect. Receipts are not
-sent for the control types (`bot.command`, `bot.callback`, `edit`).
+The framework sends a `receipt` for the user-visible content it receives (text,
+files and media), so the sender's message advances to the *read* ("green") state -
+a bot is a normal recipient in this respect. Receipts are not sent for the
+control types (`bot.command`, `bot.callback`, `edit`). A bot behind
+`client-daemon` sends its own, with `POST /v1/receipts`.
 
 ## Forward compatibility
 
@@ -114,14 +115,20 @@ Nothing here is a breaking change to the envelope, so `v` stays at 1.
 ## Reference runtime
 
 The client core carries a minimal bot framework over the same `Session` logic
-every client uses; the implementation that runs it is `client-daemon`, which runs
-an account without an interface:
+every client uses:
 
 - handlers register per command, for plain text, and for callbacks;
 - a new contact is auto-greeted (it falls back to the `start` command);
-- the bot polls its mailbox, decrypts with `sync`, and dispatches each update;
+- `poll` runs one `sync` of the mailbox and dispatches each update, and `run`
+  repeats it at a fixed interval (2 seconds by default);
 - replies are sent with the normal `content` path, presenting the delivery pass
   exactly as a human client does.
+
+No shipped program runs this framework. `client-daemon`, which runs an account
+without an interface, exposes the account through a REST API instead: a bot is a
+separate program that sends with `POST /v1/messages` and receives with
+`GET /v1/events?since=&wait=`, a request the daemon holds open until there is
+an event after `since` or `wait` seconds have passed.
 
 Because a bot is an ordinary registered identity, the same framework runs against a
 single server or across a federation with no change.

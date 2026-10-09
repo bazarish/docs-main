@@ -8,17 +8,17 @@ The facade is the "last mile" between the client and the server infrastructure. 
 
 - **The facade's own I2P destination is the way in.** With `i2p.enabled` (plus
   `state` for the keys and `i2p.destinations` for how many) the facade
-  publishes the same API on one or more encrypted-LeaseSet destinations, and the
-  client prefers those over clearnet as soon as it has a transport of its own.
-  The addresses are stable across restarts because they travel in the server
-  descriptor beside the clearnet URLs. The I2P front parses no HTTP: an accepted
-  stream is relayed to the facade's own listener, so routing, the secret prefix
-  and streaming behave identically on both fronts. The stream is torn down only
-  after the client has read the reply (or a bounded drain elapses): closing it
-  immediately after the last write truncates the reply, and the client then
-  sees an empty stream rather than a response. The log records when each
-  destination's leaseset has published ("i2p facade ready"), because until then
-  a dial fails for reasons that have nothing to do with the facade.
+  publishes the same API on one or more encrypted-LeaseSet destinations, and
+  those are the only facades a client dials (below). The addresses are stable
+  across restarts because they travel in the server descriptor. The I2P front
+  parses no HTTP: an accepted stream is relayed to the facade's own listener, so
+  routing, the secret prefix and streaming behave identically on both fronts. The
+  stream is torn down only after the client has read the reply (or a bounded
+  drain elapses): closing it immediately after the last write truncates the
+  reply, and the client then sees an empty stream rather than a response. The log
+  records when each destination's leaseset has published ("i2p facade ready"),
+  because until then a dial fails for reasons that have nothing to do with the
+  facade.
 - **A facade is an I2P address, and the API is spoken over nothing else.** A
   clearnet facade is not tried at all, so there is no first connection in the
   clear either - which is when a client would otherwise show its address to the
@@ -73,33 +73,17 @@ The facade is the "last mile" between the client and the server infrastructure. 
     fingerprint the user already had, so a facade may withhold it but cannot put
     one of its own in its place.
   - anything else -> 404 (never forwarded). The reseed archive is not among
-    them: the server serves it on its ops socket and the portal serves it
-    publicly (`ClientApi.md`), and the path the facade once whitelisted for it is
-    gone from the list as well as from the answer.
+    them: the messaging server passes it to the portal over its private channel
+    (`/internal/i2pseeds.su3`) and the portal serves it publicly
+    (`ClientApi.md`), and the path the facade once whitelisted for it is gone
+    from the list as well as from the answer.
 - **Account management is not a separate route any more.** Client calls to the
   service node arrive inside the same tunnel and are forwarded to the node by the
   messaging server under its own signature; the node is no longer reachable from
   the facade at all (`Architecture.md`). That is what leaves one path where there
   used to be two prefixes, and with it goes the one bit that said which of the
   two kinds a request was.
-
-### What the facade still knows
-
-Sealing the traffic removes the **global identifiers** - the caller's public
-keys (which are their identity), their destination, their device ids, the passes
-that admit mail to their mailbox, the private transient that operates their
-address. It does not remove the **flow**, and the difference has to be stated
-rather than glossed over:
-
-- a client dials from a stable outbound destination (a second one holds the long
-  poll), so every request of one device is trivially linkable to the others;
-- when a request happens, and when a parked poll returns - which is when mail
-  arrived;
-- how large it was, to the nearest step of the padding ladder.
-
-"A facade knows the flow but not whose it is, nor what is in it" is what this
-design achieves. "A facade knows nothing" would be untrue, and nothing here
-should be read as claiming it.
+- Everything outside the secret prefix answers the same bare **404** - the API root, an unknown path, and the operator liveness endpoint alike - so a probe of the host learns nothing. `/healthz` is not on the client-facing socket at all: it is served on a separate private **ops listener** (`opsListen`) that is never published to clients (`AdminPanel.md`).
 - The ops listener also carries the facade's **own configuration**, operator-signed
   like `/healthz`: `GET /settings` and `PUT /settings` (the secret base path, the
   backend, both sockets, the I2P side, the log level) and `POST /restart`.
@@ -109,10 +93,28 @@ should be read as claiming it.
   start, which is what `POST /restart` is for. **Changing the base path
   invalidates every server descriptor already distributed**, so the new prefix
   has to reach clients (a new descriptor) before the old one stops answering.
-- Everything outside the secret prefix answers the same bare **404** - the API root, an unknown path, and the operator liveness endpoint alike - so a probe of the host learns nothing. `/healthz` is not on the client-facing socket at all: it is served on a separate private **ops listener** (`opsListen`) that is never published to clients (`AdminPanel.md`).
 - Nothing streams through the facade: the only large payload there ever was - a file upload - now goes directly between clients (see `FileTransfer.md`).
-- Holds no keys, parses no content (there is nothing left to parse: authentication happens inside the seal, at the backend), stores nothing. An unreachable backend yields a `FACADE_UPSTREAM` 502 - the facade is only a relay.
+- Holds no key of the server or of its users (only its own I2P destinations and a self-signed TLS credential), parses no content (there is nothing left to parse: authentication happens inside the seal, at the backend), stores nothing. An unreachable backend yields a `FACADE_UPSTREAM` 502 - the facade is only a relay.
 - Implemented in `facade-http/` of the `bazarish-server` repository (`Facade`; covered by tests and live-verified relaying to a running server-core).
+
+### What the facade still knows
+
+Sealing the traffic removes the **global identifiers** - the caller's public
+keys (which are their identity), their destination, their device ids, the passes
+that admit mail to their mailbox, the private transient that operates their
+address. It does not remove the **flow**, and the difference has to be stated
+rather than glossed over:
+
+- a client dials from one stable outbound destination per account, which also
+  holds the long poll, so every request of one device is trivially linkable to
+  the others;
+- when a request happens, and when a parked poll returns - which is when mail
+  arrived;
+- how large it was, to the nearest step of the padding ladder.
+
+"A facade knows the flow but not whose it is, nor what is in it" is what this
+design achieves. "A facade knows nothing" would be untrue, and nothing here
+should be read as claiming it.
 
 ## Client addressing
 
@@ -130,8 +132,9 @@ http[s]://host[:port]/secret-path
 - **host[:port]** - the facade's address. The port defaults to `443` (https) /
   `80` (http) when omitted.
 - **/secret-path** - the secret URI prefix, e.g. `/h9fd/kshdcy/secretdkg`. The
-  client prepends it to **every** request path, the first reseed included; the
-  facade (or the fronting proxy) strips it before forwarding. It is excluded from
+  client prepends it to **every** request path it sends a facade (a reseed is
+  fetched from its own address, above, and carries none); the facade (or the
+  fronting proxy) strips it before forwarding. It is excluded from
   the signed canonical path, so the backend verifies the stripped, query-less
   path, and one signature is valid across all of a server's facades. A URL
   without a path is only ever correct when the fronting proxy holds the secret
@@ -175,8 +178,8 @@ server's own clients. This is a hard invariant, not a convention:
 
 Consequences for first contact (`Contacts.md`, `Federation.md`):
 
-- **Descriptor / QR** (`bazarish://invite?fp=...&dest=...`, rendered as
-  `fp:b33`) - carries the contact's fingerprint and serving destination. The client fetches the user-signed contact card
+- **Descriptor / QR** (`bazarish://invite?v=1&fp=...&dest=...`, `fp:b33` for
+  short) - carries the contact's fingerprint and serving destination. The client fetches the user-signed contact card
   for that fingerprint over I2P and verifies it against the fingerprint
   (`FederatedResolve.md`) - a direct fetch over a transient I2P destination of
   its own, never through the requester's server and never through the foreign
@@ -207,15 +210,16 @@ So that a user can add a server with no manual entry, its whole configuration is
 carried in one link (also rendered as a QR):
 
 ```
-bazarish://server?v=1&fp=<server fingerprint>&facade=<facade URL>[&facade=<facade URL>...]
+bazarish://server?v=1&fp=<server fingerprint>&facade=<facade URL>[&facade=<facade URL>...][&reseed=<reseed address>...]
 ```
 
 Every field is human-readable (no base64): the fingerprint is the trust anchor
-(everything the server signs is verified against it as usual) and each `facade`
-parameter is one facade URL, in client failover order. The service node renders
-this exact string in the user's cabinet after sign-in, so a client reads back
-precisely what the server published. Facade URLs are carried verbatim, so they
-must not contain `&`.
+(everything the server signs is verified against it as usual), each `facade`
+parameter is one facade URL, in client failover order, and each `reseed` one
+reseed address (above). The service node renders this exact string in the user's
+cabinet after sign-in, so a client reads back precisely what the server
+published. Facade URLs and reseed addresses are carried verbatim, so they must
+not contain `&`.
 
 This is the **only** artifact that carries facade URLs, and it has a single
 purpose: configuring the client's **own** server. Its audience is the prospective
@@ -227,8 +231,8 @@ distinct:
 
 | Artifact | Carries | Audience | Facade? |
 |---|---|---|---|
-| `bazarish://server?...` | server fingerprint + facade URLs | prospective clients of **this** server | **yes** - own server only |
-| `bazarish://invite?...` (descriptor) | fingerprint + own destination (`fp:b32`) | anyone, to add the holder as a contact | no |
+| `bazarish://server?...` | server fingerprint + facade URLs + reseed addresses | prospective clients of **this** server | **yes** - own server only |
+| `bazarish://invite?...` (descriptor) | fingerprint + own destination (`fp:b33`) | anyone, to add the holder as a contact | no |
 
 The descriptor carries no facade URL; the contact card it points at is fetched
 over I2P and is user-signed, so it is verified against the fingerprint and

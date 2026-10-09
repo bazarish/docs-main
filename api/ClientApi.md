@@ -34,7 +34,9 @@ them.
   with a key derived from the same secret (a different derivation from the session
   MAC key: one secret, two purposes, and holding one is not holding the other),
   addressed by the per-request handle described below. No asymmetric work per
-  request, which matters when a client polls every few seconds.
+  request, which matters over a session's life: the held-open `events` request
+  alone is sent again each time it is answered, at most 30 seconds apart, and
+  every fetch and acknowledgement is a request of its own.
 - **A tunnel cannot open the next tunnel.** That is structural rather than
   checked: a hello is only hybrid-sealed and signature-verified, and a carried
   frame is only opened with a tunnel key. Otherwise a leaked secret
@@ -57,7 +59,7 @@ them.
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /v1/account/card` | Publish the user-signed **contact card** (`{card}`): the sealing key plus the serving **destination** + **serving sealing key** the client fetched from `GET /v1/messaging/destination` (see `../Identity.md`, `InviteAnonymity.md`). The card names no server and carries no validity window. This call is also what turns a portal registration into an account - the first one redeems the grant (`ServicePortal.md`) - and it is repeated whenever the routing changes; a repeat grants nothing. The destination can only be delegated once the account exists, so the first card carries no routing: the client delegates its transient and publishes again immediately afterwards. Responds `{quotaBytes, serverCard, approval, registrationMessage}` |
+| `POST /v1/account/card` | Publish the user-signed **contact card** (`{card}`): the sealing key plus the serving **destination** + **serving sealing key** the client received from `POST /v1/account/i2p-dest` or reads back from `GET /v1/messaging/destination` (see `../Identity.md`, `InviteAnonymity.md`). The card names no server and carries no validity window. This call is also what turns a portal registration into an account - the first one redeems the grant (`ServicePortal.md`) - and it is repeated whenever the routing changes; a repeat grants nothing. The destination can only be delegated once the account exists, so the first card carries no routing: the client delegates its transient and publishes again immediately afterwards. Responds `{quotaBytes, serverCard, approval, registrationMessage}` |
 | `DELETE /v1/account/registration` | Terminate the account. The destination is revoked, the node discards the account record and the grants, and the messaging server is instructed to discard the mailbox and all other state held for that fingerprint (`DELETE /v1/messaging/account`, operator-signed). The request is signed with the account's own identity key, the only credential that can authorise it; a client therefore performs this call before removing its local profile and removes it only on success. **Idempotent**: a key for which the node holds nothing receives the same response as a deletion, with nothing revoked or discarded, so that a client whose account an operator has already removed can still complete the operation locally. A client treats any 4xx response likewise: no state for the account remains on the server, and it removes its local copy. Only the absence of a response (or a 5xx) leaves both sides unchanged, with the reason reported to the user |
 | `POST /v1/account/i2p-dest` | Upload a signed offline **transient** (`{transient, expiresUnix}`; empty revokes). Every account owns a destination - it is the base protocol, not a purchase - so the only gates are that the account exists here and, on a moderated node, that it is approved (`ACCOUNT_PENDING_APPROVAL` until then). The node passes the transient to the messaging server, which operates the destination, and records its validity. Responds `{dest, servingKey}`: the address this delegation gives and the base64 SPKI of the key that destination seals deliveries with. The client needs both to issue its card, and the serving key is the half it cannot derive itself - so the card is published from this answer rather than from a second request. A transient over a new address also means the old destination is dropped at once (`ServerServiceNode.md`), which is what makes the fan-out that follows obligatory (`../Messages.md`) |
 | `GET /v1/account/i2p-status` | `{approval, registrationMessage, transientExpires, transientUpdatedAt, ...}` - the client polls this to drive transient re-issue and to see whether a moderated account is still awaiting approval |
@@ -99,8 +101,8 @@ Ed25519 signature is always 64 bytes).
 Two client-side caps are what make that number fixed: the greeting is at most
 **100 bytes** (`kMaxContactGreetingBytes`) and an account's own display name at
 most **64 bytes** (`kMaxAccountNameBytes`, about 32 characters of a non-Latin
-alphabet). Both are refused where they are typed rather than at the recipient's
-server.
+alphabet). A value over either cap is refused where it is typed rather than at
+the recipient's server.
 
 - A contact acceptance is not a separate endpoint: it is an ordinary content
   message presenting the pass received in the request (see `../Contacts.md`).
@@ -113,7 +115,7 @@ server.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /v1/messaging/destination` | Returns the caller's assigned `{dest, servingKey, state}` - the destination this server operates for the user (its standard-LeaseSet2 b32, equal to the master b32 the client holds), the public serving sealing key for it, and `state` (empty when the user delegated none, else `building` -> `active` -> `expired`). `dest` is empty until the destination publishes, so a client that has just delegated fills the card with its own master b32 - the same address either way. The client includes dest+key in the contact card it signs |
+| `GET /v1/messaging/destination` | Returns the caller's assigned `{dest, servingKey, state}` - the destination this server operates for the user (the blinded b33 of its encrypted LeaseSet2, a `.b32.i2p` host equal to the b33 of the master the client holds), the public serving sealing key for it, and `state` (empty when the user delegated none, else `building` -> `active` -> `expired`). `dest` is empty only while nothing is delegated - the server derives it from the delegation at once, before the destination publishes - and a client refreshing its card then fills in its own master's b33, the same address either way. The client includes dest+key in the contact card it signs |
 | `GET /v1/messaging/storage-usage` | The authenticated caller's own mailbox storage: `{usedBytes, quotaBytes}` - bytes of pending content currently held, and the effective quota (the user's override, else the server default). Read-only; the client shows it as used/free/total in per-account settings. |
 
 ### Receiving

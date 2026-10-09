@@ -1,6 +1,6 @@
 # Federated resolution & contact discovery
 
-Status: **design** (supersedes the earlier draft of this document). Specifies how
+Status: **implemented** (supersedes the earlier draft of this document). Specifies how
 a client discovers a contact it knows only by a small scannable identifier or by
 name, over I2P, with the home server learning nothing about it - it is not on the
 path - and nothing between the two ends able to forge the result: on the
@@ -99,15 +99,17 @@ than downgraded silently. The route that formerly provided the relay
 client has descriptor {fp, dest}
   query   = { v, fp }                                        # plain; the I2P stream is the envelope
   -> dial srv (direct dial over a transient I2P destination)
-  srv unseals, looks up the card for fp, returns:
+  srv answers only for its own user's fp, returns:
   response = <card DER>                                      # plain, same reason
-  client: verify card signature; assert card.user == fp and card.dest is .b32.i2p
+  client: verify card signature; assert signer fingerprint == fp, card.dest is .b32.i2p
 ```
 
-The serving key the sender needs for delivery
-admission headers with (`../Identity.md`, `InviteAnonymity.md`); no new key. On
+The card carries the serving key the sender seals delivery admission headers
+with (`../Identity.md`, `InviteAnonymity.md`); the fetch itself needs no key. On
 the only path there is, the I2P stream is already confidential to `srv`, so
-app-layer sealing is optional. Integrity is always the `fp` anchor.
+nothing is sealed at the application layer (the federation-frame field that
+carries query and card is named `sealed`, but neither is). Integrity is always
+the `fp` anchor.
 
 ## Alias-resolve protocol (`alias` -> descriptor)
 
@@ -269,22 +271,23 @@ Namespace anti-enumeration is out of scope for the resolver (resolve is unauthen
    resolve query/response and signed-record bodies + JSON, and the delegation-cert
    (`record -> delegated -> root`) on the existing hybrid-cert primitives. Unit
    tests round-trip each.
-2. **server-core** - *done.* The card-fetch responder on every serving
-   destination (the home one and every user's own: read the `{fp}` query,
-   answer with the card when the capability matches and refuse identically when it
-   does not; both directions in the clear, for the reason above). The proxy relay
-   that once backed a thin client is gone, along with the route it was served on.
+2. **server-core** - *done.* The card-fetch responder on every user's own
+   serving destination (read the `{fp}` query, answer with the card when the
+   capability matches and refuse identically when it does not; both directions
+   in the clear, for the reason above). The proxy relay that once backed a thin
+   client is gone, along with the route it was served on.
 3. **client** - *done.* Descriptor handling, a fetch transport that dials the
    target directly over a transient I2P destination (a served `CARD_UNKNOWN` /
    `ALIAS_UNKNOWN` is authoritative), address parsing (`fp:b33` vs `<alias>`), `addByAlias`
    routed to the resolver (record chain verified against the hardcoded root, the
    owner's certificate checked beside it, the typed name normalized against the
    core's own `a-z0-9` bounds before anything is asked), and OOB-fingerprint
-   display (the resolved fingerprint is returned to the CLI/GUI). The resolver
-   coordinate is the two values the shipped binary is built with (root fingerprint
-   + dest), overridable in a session for a test resolver. Unit tests drive
-   resolve/card over an injected transport (happy path, unknown name, wrong root,
-   alias mismatch, a certificate over another name or by another identity).
+   display (the resolved fingerprint is returned to whatever asked for the
+   add). The resolver coordinate is the two values the shipped binary is built
+   with (root fingerprint + dest), overridable in a session for a test resolver.
+   Unit tests drive resolve/card over an injected transport (happy path, unknown
+   name, wrong root, alias mismatch, a certificate over another name or by
+   another identity).
 4. **alias-resolver** - *implemented* (its own repository, not specified here):
    registry + lifecycle,
    signed resolve over I2P (live-validated on i2pd), portal/payments (sign-in-with-key,

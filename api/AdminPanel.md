@@ -8,7 +8,7 @@ is bound to that server's card, so the two do not scale independently. Facades d
 several may front one pair, and different facades may front different pairs. The
 central alias service is not managed here; it belongs to the project rather than
 to an operator's deployment. The panel is a co-located operations tool: it reaches
-each service on its private listen address and is never exposed through a facade
+each service on its private operator socket and is never exposed through a facade
 or over I2P.
 
 ## Sign-in-with-key (panel access)
@@ -65,12 +65,12 @@ Every service exposes the same liveness endpoint, built from the shared
 the current and peak resident set (Linux `/proc/self/status` VmRSS / VmHWM). The
 endpoint is operator-signed, so it discloses nothing to an unauthenticated caller.
 
-Every service but one serves it on the same private listener as its API, which is
-already unreachable from the clearnet. The exception is **facade-http**, whose API
-listener *is* the clearnet one: there `/healthz` would answer a caller who does not
-know the secret prefix and would thereby identify the host as a facade, so it is
-served on a separate private operations socket (`opsListen`) and the panel is
-configured with that address, not the published facade URL (`Facade.md`).
+Every service serves it on its private operator socket (`opsListen`), a TLS
+listener separate from its API, and the panel is configured with that address and
+the key the service prints at startup (`pin`). For **facade-http** this is what
+keeps it off the API listener, which is the clearnet one: there `/healthz` would
+answer a caller who does not know the secret prefix and would thereby identify the
+host as a facade (`Facade.md`).
 The panel probes every configured service concurrently and renders status,
 version, uptime, current/peak RAM and round-trip latency.
 
@@ -100,7 +100,7 @@ A sidebar carries the views:
   message its owner is shown in place of the node-wide one), delete it, or ban
   the key. The open account is in the address bar (`#/users/<fingerprint>`), so a
   link points at one account.
-- **Settings** - every setting of the deployment, in five tabs, because one long
+- **Settings** - every setting of the deployment, in seven tabs, because one long
   page of similar-looking blocks is where an operator cannot find the one they
   came for. Each tab saves on its own and is in the address bar
   (`#/settings/<tab>`), so a link points at one subject:
@@ -109,9 +109,9 @@ A sidebar carries the views:
   |---|---|
   | Registration | open or moderated, the message a new client is told and the one a waiting account is shown |
   | Portal | the login consumer (name, address, role) the client shows before a user signs, the portal's public links, and the socket the portal binds |
-  | Network | the facades and reseeds clients reach this server by, the descriptor built from them, the node's own operator API and the messaging server it is bound to, and the log level |
+  | Addresses | the facades and reseeds clients reach this server by, the descriptor built from them, the node's own operator API and the messaging server it is bound to, and the log level |
   | Accounts | the storage a new account gets and how long an idle one is kept, beside the two numbers that show whether that promise can still be kept: what the quotas have allocated and what the disk holds (`GET /v1/messaging/storage`) |
-  | Messaging server | server-core's own file: log level and libi2pd's logging, its I2P privacy and tunnel count, the inbound federation rate limit, how long unacknowledged mail is kept, its private listener and the node it reports to |
+  | Server | server-core's own file: log level and libi2pd's logging, its I2P privacy and tunnel count, the inbound federation rate limit, its private listener and the node it reports to |
   | Facade | the facade's own file, read and written over its ops socket: the secret base path, both listeners, the messaging server it forwards to, and its I2P side |
   | Panel | the panel's own file: who may sign in, the words it signs under, the services it manages, and where it listens - plus what it cannot change (its fingerprint, its config file, its state and web directories, its version) |
 
@@ -128,7 +128,7 @@ A sidebar carries the views:
   never a field that looks editable. And a setting the service reads only at
   start carries a **restart** mark beside the field - shown next to the control,
   because by the time the value has been typed the sentence under it has been
-  read and forgotten. The log level is the exception on the Network tab: it
+  read and forgotten. The log level is the exception on the Addresses tab: it
   applies at once, which is the reason it is there.
 
 The **search is performed on the service node**, not in the browser: the panel
@@ -139,7 +139,7 @@ node with many accounts does not transfer the whole set to locate one.
 |---|---|
 | `GET /api/services` | each service's `/healthz` |
 | `GET /api/users?q&state&limit&offset` | service-node `GET /v1/account/users` |
-| `GET /api/user?user=` | service-node `GET /v1/account/user` |
+| `GET /api/account?user=` | server-core `GET /v1/messaging/account` (mailbox usage and device count) |
 | `POST /api/approve` | service-node `POST /v1/account/approve` |
 | `PUT /api/quota` | service-node `PUT /v1/account/quota` |
 | `POST /api/undelegate`, `POST /api/delete`, `POST /api/ban`, `POST /api/unban` | the matching service-node operator endpoints |
@@ -168,18 +168,31 @@ place in that flow.
 ```json
 {
   "admin": ["<admin hybrid fingerprint, base32>"],
-  "audience": "bazarish-admin-panel",
+  "state": "/var/lib/bazarish/admin-panel",
+  "assets": "/opt/bazarish/bazarish-server/admin-panel/web",
   "listen": {"host": "127.0.0.1", "port": 8460},
-  "services": [
-    {"name": "server-core", "kind": "server-core", "url": "http://127.0.0.1:8420"},
-    {"name": "facade", "kind": "facade", "url": "http://127.0.0.1:8429"}
+  "fleets": [
+    {"name": "home", "services": [
+      {"name": "server-core", "kind": "server-core",
+       "url": "https://127.0.0.1:8428", "pin": "<key server-core prints>"},
+      {"name": "service-node", "kind": "service-node",
+       "url": "https://127.0.0.1:8427", "pin": "<key service-node prints>"},
+      {"name": "facade", "kind": "facade",
+       "url": "https://127.0.0.1:8429", "pin": "<key facade-http prints>"}
+    ]}
   ]
 }
 ```
 
+Each service is reached on its operator socket over TLS and is named by the key
+it prints at startup (`pin`); an `http` URL or a missing pin is refused. An
+optional `consumer` (`name`, `place`, `role`) sets the words the panel signs
+under.
+
 The configuration contains no secrets. The panel prints its own operator
 fingerprint at startup; that fingerprint is added to each service's
-`operators`.
+`operators`, and the socket pin it prints beside it to each service's
+`opsClients`.
 
 Everything above is also editable from the Panel tab, and the panel writes it
 back into this same file one value at a time - the operator's key order, spacing

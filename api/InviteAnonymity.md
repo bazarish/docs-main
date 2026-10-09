@@ -8,10 +8,10 @@ invite/server-card shape; `../Identity.md`, `../Contacts.md`, `Facade.md` and
 > **Note (later supersession).** The destination-routing, per-destination serving
 > sealing keys, and route-by-b33 model below still hold. The **invite artifact**
 > itself - the full ~= 8 KB user-signed contact card carried inline - has since
-> been replaced by a small **descriptor** (`fp:b33` + serving sealing key) plus a
-> live card fetch (`FederatedResolve.md`). Read this document
-> for the destination-routing rationale; read `FederatedResolve.md` for the
-> current first-contact/discovery shape.
+> been replaced by a small **descriptor** (`fp:b33`; the serving sealing key
+> arrives with the card) plus a live card fetch (`FederatedResolve.md`). Read
+> this document for the destination-routing rationale; read `FederatedResolve.md`
+> for the current first-contact/discovery shape.
 
 ## Problem
 
@@ -110,9 +110,8 @@ DeliveryEnvelope:
   payload: <E2E blob>
 ```
 
-The sender's own server still learns only "user U sent something to destination
-D" - which, since D is the recipient's own destination, is as strong as a
-server fingerprint, not stronger.
+The sender's own server learns nothing of the delivery: the envelope does not
+pass through it, the sending client dialling D itself (`Federation.md`).
 
 ### No local delivery (no co-location timing channel)
 
@@ -135,8 +134,8 @@ which server operates it.
 user is served by `dest_U` (their own per-user destination), at which their mail
 arrives and on whose key their server signs for it (`Federation.md`). It initiates
 no connections: outgoing mail is dialled by the sending client, from a destination
-held for that one correspondent. A server-wide "home" address is never used for
-user traffic (it serves first-contact card discovery only); a shared federation
+held for that one correspondent. A server keeps no address of its own - the
+first-contact card fetch is answered on `dest_U` as well - and a shared federation
 source would both expose a common address and, where sender and recipient share a
 server, cause one user's destination to dial another's.
 
@@ -154,9 +153,9 @@ finally **surfaces** the assigned destination into the user-facing card.
 The delivery envelope's routing metadata is sealed to a **serving sealing key
 bound to `dest_U`**, not to one server-wide key:
 
-- A **personal** dest has its own sealing key (effectively per-user).
-  the same k-anonymity set as the dest itself, so it leaks nothing the dest did
-  not already.
+- Every dest is one user's own and has its own serving sealing key, so the key
+  is shared with nobody the dest is not shared with and leaks nothing the dest
+  did not already.
 
 The destination server selects the key by **which destination the connection
 arrived on** (each dest has its own accept loop already), so there is no
@@ -175,8 +174,8 @@ destination carries its own signing keypair, stored bound to the destination
 alongside its serving sealing key - a `(destination, signing key, serving sealing
 key)` group, never reused on another destination:
 
-- A **personal** dest has its own signing key (effectively per-user).
-  same k-anonymity set as the dest and its serving sealing key.
+- Every dest is one user's own and has its own signing key, so the signer is
+  shared with nobody the dest and its serving sealing key are not shared with.
 
 This closes the last server-wide signer. A single server-identity ack key would
 let two users the same server hosts on **different** destinations observe the same
@@ -194,8 +193,8 @@ with one signed object - the node's lifecycle anchor and the peer-facing routing
 statement - and told both which server serves the user. Both halves are gone:
 
 - **The card** above is what a contact fetches. It has no `server`, no
-  `issuedAt`/`notAfter`, and no server signature. Nothing peer-visible names the
-  server.
+  `notAfter` (its `issuedAt` only orders two cards of one person), and no server
+  signature. Nothing peer-visible names the server.
 - **The subscription is gone entirely.** Registration opens an unbounded channel;
   the client authenticates every request by signature in any case, so a signed
   "I subscribe here" told the node nothing it had not already verified. The only
@@ -213,16 +212,15 @@ The card carries no expiry either: routing that has changed is repaired by the
 
 ## How the user learns `dest_U` and the serving sealing key
 
-At subscribe time (grant-gated; see `ServicePortal.md`) the server returns, in
-place of the server card:
+When the client delegates its destination (grant-gated; see `ServicePortal.md`)
+the server returns, in place of the server card:
 
 - the assigned `dest` (brought up from the client's delegated offline
   transient), and
 - the **public** serving sealing key for that dest.
 
-The client folds both into its self-signed contact card and into the cert it
-stores. The server keeps the private serving sealing key and the dest<->mailbox
-mapping.
+The client folds both into its self-signed contact card. The server keeps the
+private serving sealing key and the dest<->mailbox mapping.
 
 ## Flow migration
 
@@ -232,13 +230,10 @@ mapping.
 - **contact-request bootstrap** (`../Contacts.md`) - the bootstrap carries the
   sender's **contact card** (dest + serving sealing key + sealing key) instead of the
   sender's server card, so the peer replies by federating to the sender's dest.
-- **addByAlias / alias resolve** - the resolved trust chain becomes the
-  contact card (not sub-cert + server card). The cross-server sealed `resolve`
-  (`Federation.md`, still pending - the Stage-2 track) keeps a **server-level**
-  resolve key for its entry point: the client cannot seal to a per-dest key for
-  a user whose dest it does not yet know. That server-level resolve key is the
-  one residual server-scoped artifact, used only to bootstrap alias lookups, and
-  is out of scope for the invite revision.
+- **addByAlias / alias resolve** - the central resolver answers with a
+  descriptor (`FederatedResolve.md`), and the client then fetches the contact
+  card as for an invite. The lookup is not sealed and uses no server-level key:
+  the client dials the resolver itself from a transient destination.
 - **Local contact state** - store `contact.dest` + `contact.servingSealingKey`
   in place of `contact.server` + server-card sealing key.
 
@@ -246,20 +241,19 @@ mapping.
 
 - `toServer` -> `toDest`; the sending client dials `toDest` directly.
 - **No local short-circuit**: every message is federated, even between two users
-  the same server hosts - see "No local delivery at all" above. This is the rule,
-  not an optimisation; a fast local path for a co-located recipient is a timing
-  leak.
-- Accept side is unchanged in shape: home / personal destinations each
-  already run an accept loop into the shared `DeliveryEngine`; add per-dest
-  serving-sealing-key selection.
-- The `peers.json` fingerprint->dest resolver is no longer on the client-driven
-  delivery path (the dest travels end to end). It may stay for operator-pinned
-  routes, but the target model routes purely by destination.
-- **Accountability** stays per-connecting-destination (`FederationRateLimiter`,
-  implemented). The server root key **never** signs live federation traffic;
-  destinations are self-standing and the root only certifies offline. Each
-  destination signs its own delivery confirmations with its own per-destination
-  signing key (above), so the signer is never server-wide.
+  the same server hosts - see "No local delivery (no co-location timing
+  channel)" above. This is the rule, not an optimisation; a fast local path for a
+  co-located recipient is a timing leak.
+- Accept side: every personal destination runs its own accept loop into the
+  shared `DeliveryEngine`, with the serving sealing key selected by the
+  destination the connection arrived on.
+- There is no `peers.json` fingerprint->dest resolver: the dest travels end to
+  end, and routing is purely by destination.
+- **Accountability** stays per-connecting-destination (`RateLimiter`, set by
+  `federationRateLimit`; implemented). The server root key **never** signs live
+  federation traffic; destinations are self-standing and the root only certifies
+  offline. Each destination signs its own delivery confirmations with its own
+  per-destination signing key (above), so the signer is never server-wide.
 
 ## Residual disclosure
 
@@ -267,7 +261,6 @@ mapping.
   contact cards can never prove their owners are hosted together.
 - The home server knows dest<->U (operator trust) - unchanged.
 - Global passive I2P traffic-correlation is out of scope.
-- Paid personal dests have no co-location signal.
 
 The strongest cross-user clustering field (the shared server fingerprint and the
 byte-identical root-signed card) is gone, and live federation now carries no
@@ -278,8 +271,8 @@ server-wide signer either (a delivery confirmation is signed per destination).
 1. **common** - the contact-card / extended subscription-cert format: `dest`
    and `servingSealingKey` in the user-signed body (`TestCertificates`). Plus
    `encryptedLeaseSetHost()` and `routingHost()`, so a destination is addressed by
-   the b33 of its encrypted LeaseSet2 - the only form published anywhere in the
-   project - always a `.b32.i2p` host, never the raw destination
+   the b33 of its encrypted LeaseSet2 - the only form the project's own code
+   publishes - always a `.b32.i2p` host, never the raw destination
    (`isB32I2pHost`/`validateB32I2pHost`; `TestI2pAddress`).
 2. **server-core** - per-destination serving sealing keys (generate, persist,
    select by the destination a connection arrived on); `GET /v1/messaging/destination`

@@ -21,7 +21,7 @@ Content is opaque ciphertext; the interface never interprets blob contents.
 
 ## Lifecycle rules
 
-1. A blob is **deleted immediately** once all **registered** client IDs of the user (see `../DeviceSync.md`) have acked it - before any quota or TTL pressure. Retiring a client ID triggers re-evaluation: blobs that were waiting only on the retired client are deleted.
+1. A blob is **deleted immediately** once all **registered** client IDs of the user (see `../DeviceSync.md`) have acked it - before any quota pressure. Retiring a client ID triggers re-evaluation: blobs that were waiting only on the retired client are deleted.
 2. A blob nobody acks is kept: the account's quota is what bounds a mailbox, and admission is refused (rule 4) rather than old content dropped.
 3. When the service node deletes an account (idle, ended by its owner, or removed by an operator), it notifies the messaging server, which discards **everything** held for that fingerprint: pending content, replay markers, delivery passes, the device registry and any quota override. No mailbox may remain in service for an account that no longer exists.
 4. Admission is refused (typed errors, see `../Errors.md`) when a blob exceeds the per-message limit or the user's quota; nothing is partially stored.
@@ -35,12 +35,12 @@ Content is opaque ciphertext; the interface never interprets blob contents.
 
 | Operation | Purpose |
 |---|---|
-| `put(user, blobId, data)` | Store a pending blob; fails atomically on quota/limit violations |
+| `put(user, blobId, data)` | Store a pending blob; fails atomically when it would exceed the quota (the per-message limit is checked before the call) |
 | `list(user, clientId)` | Enumerate blobs not yet acked by this client, oldest arrival first |
 | `get(user, blobId)` | Read blob data |
 | `ack(user, blobId, clientId)` | Record receipt; triggers deletion when the ack set is complete |
 | `purgeUser(user)` | Drop everything for a user (account deleted) |
-| `purgeExpired()` | TTL sweep |
+| `purgeExpired(receivedBefore)` | Drop replay markers (seen delivery ids) and contact-request rate windows older than the cut-off; pending blobs are not touched. The server runs it hourly with a cut-off of `kMaxDelegationDays` (30 days) |
 | `usage(user)` | Current usage in bytes |
 
 ## Open questions

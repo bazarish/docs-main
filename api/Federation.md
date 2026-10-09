@@ -11,17 +11,17 @@ Status: draft skeleton.
   a first-contact `op:card` is answered on those same destinations. The server
   keeps **no destination of its own**: its only published I2P addresses are the
   facade's, for its clients (`Facade.md`). Outbound discovery fetches (a
-  `card`/`resolve` lookup) dial from a
+  `card`/`resolve` lookup) are dialled by the client from a
   **warm pool of single-use transient destinations** (`WarmDestPool`): each lookup
   leaves from a fresh one-time dest that is **never reused** (so successive lookups
   are unlinkable, and none is tied to the server), and the pool
   keeps several destinations pre-built so that a lookup does not incur cold
-  tunnel-build latency. The
-  pool size adapts from demand; it is not configurable, and there is no flag or
-  config key that bounds it. With no warm destination available a fetch builds its
-  own one-time dest and waits for it - slower, never a shared address. Delivery
-  still dials from the sender's own **serving** dest (the recipient acks back to it),
-  never a one-time dest.
+  tunnel-build latency. The pool size is fixed in the client; it is not
+  configurable, and there is no flag or config key that bounds it. With no warm
+  destination available a fetch builds its own one-time dest and waits for it -
+  slower, never a shared address. Delivery dials from a destination the sending
+  client holds for that one correspondent, never from its **serving** dest; the
+  confirmation returns in the reply on the same stream.
 - Every routing/connection target is a full **`.b32.i2p`** address - a
   cryptographic destination address, never an addressbook name (poisonable) and
   never a raw base64 destination. This is enforced in code (`common`
@@ -64,12 +64,12 @@ self-routing.
 
 **A server has no single, shared federation destination** (fundamental rule). Each
 user is served by their own serving destination (never shared with another
-k-anonymity set, or a personal per-user dest - see `InviteAnonymity.md`), and all
-*inbound* federation for that user is served on it. Nothing dials out from it: an
-outgoing message is dialled by the sender's own **client**, from a destination it
-holds for that one correspondent, and discovery (the `card` request below) is
-dialled from a one-time transient. So there is no address anywhere in federation
-that is attributable to a server, and no server that knows whom its users write to.
+user - see `InviteAnonymity.md`), and all *inbound* federation for that user is
+served on it. Nothing dials out from it: an outgoing message is dialled by the
+sender's own **client**, from a destination it holds for that one correspondent,
+and discovery (the `card` request below) is dialled from a one-time transient. So
+there is no address anywhere in federation that is attributable to a server, and
+no server that knows whom its users write to.
 
 **The identity of the dialling party is not part of admission.** Admission is
 determined by the envelope alone: sealed to that destination's serving key, naming
@@ -89,7 +89,7 @@ Built entirely by the sending **client**; servers never see more than their laye
 
 ```
 DeliveryEnvelope:
-  toDest: <recipient I2P destination>       # routing only - all the sender's server sees
+  toDest: <recipient I2P destination>       # routing only - seen by the sending client alone
   sealed:                                   # hybrid seal to the serving sealing
                                             # key of that destination (from the contact card)
     class: content | contact                # delivery class (admission selector), not the
@@ -100,11 +100,11 @@ DeliveryEnvelope:
   payload: <E2E blob>                       # opaque to every server-side component
 ```
 
-- The sender's own server learns only "user U sent something to destination D"
-  (plus size and time) - never the recipient identity. D is always the user's
-  **own** destination: an offline-key master held by their client, delegated to
-  the server as a time-boxed transient. There is no shared address to fall back
-  on, because a shared one would make every user behind it provably co-located.
+- The sender's own server learns nothing of a delivery: the envelope does not
+  pass through it. D is always the recipient's **own** destination: an
+  offline-key master held by their client, delegated to the server as a
+  time-boxed transient. There is no shared address to fall back on, because a
+  shared one would make every user behind it provably co-located.
   A user whose transient has lapsed - or whose account a moderated server has not
   approved - has no destination and is not served; the server never
   silently re-points a live, already-shared address.
@@ -120,11 +120,11 @@ DeliveryEnvelope:
    3. **size/quota checks** - explicit typed errors (`STORAGE_FULL`, `MESSAGE_TOO_LARGE`), revealed only past a valid pass. The order is significant: checked before admission, an over-sized payload with an invalid pass answered differently on the destination that serves the named mailbox and on one that does not, which is the "is this fingerprint served here" answer nothing on this path may give;
    4. **store** as pending content, and add the `deliveryId` to the seen set.
 4. Recipient's server -> sending client: the confirmation is returned **in the reply on the same stream**, signed over the stored `deliveryId` with the signing key of the destination that admitted it. No other path is available, the client having dialled from an address that accepts no inbound connections. The client accepts a `delivered` result only when that signature verifies against the delivery id it sent; an unsigned claim is treated as no answer.
-5. A reply constitutes an answer. A typed refusal (unknown pass, size, quota, contact rate limit) fails the delivery immediately and repetition does not change the outcome. Only the absence of a reply warrants a further attempt; the number of attempts is the sending client's policy, as nothing is spooled anywhere and no server retries on another party's behalf. A repeated delivery carries the same delivery id, so a recipient's server that stored the first copy recognises it, stores no second copy.
+5. A reply constitutes an answer. A typed refusal (unknown pass, size, quota, contact rate limit) fails the delivery immediately and repetition does not change the outcome. Only the absence of a reply warrants a further attempt; the number of attempts is the sending client's policy, as nothing is spooled anywhere and no server retries on another party's behalf. A repeated delivery carries the same delivery id, so a recipient's server that stored the first copy recognises it and stores no second copy.
 
 6. `DELIVERY_REJECTED` is the one refusal that says something about the **capability**: the presented pass is not in the mailbox's registered set. There is nothing else to offer instead - a correspondent holds one pass - so a sender that receives it can no longer deliver, and restoring delivery requires a new contact request. No refusal costs a sender anything: a pass is not spent, so `STORAGE_FULL` and `MESSAGE_TOO_LARGE` leave it exactly as it was, and so does this one.
 
-`contact-request` deliveries skip the pass check, are capped in payload size (`kMaxContactRequestBytes`, a protocol constant measured against the real worst case - see `ClientApi.md`), and are subject to per-origin-server rate limiting and a cap on how many may be waiting at once. There is no quota of their own: a mailbox has one, and every class is stored against it.
+`contact-request` deliveries skip the pass check, are capped in payload size (`kMaxContactRequestBytes`, a protocol constant measured against the real worst case - see `ClientApi.md`), and are rate-limited per receiving destination (on top of the per-connecting-destination limit every delivery is under) with a cap on how many may be waiting at once. There is no quota of their own: a mailbox has one, and every class is stored against it.
 
 ## Requests (draft)
 
@@ -146,8 +146,8 @@ cross-server operation - delivery, contact request, or alias resolution - may
 require a client to connect to, learn, or carry a foreign facade URL. The unit
 of cross-server reachability is the recipient's **serving destination** (its
 b33), carried in the user-signed **contact card** (`../Identity.md`,
-`InviteAnonymity.md`) - distributed inside an invite, never a facade and no
-longer a root-signed server card.
+`InviteAnonymity.md`) and named by the invite's descriptor - never a facade and
+no longer a root-signed server card.
 
 This holds in both directions on first contact: a contact request carries the
 sender's own **routing** (sealing key + destination + serving sealing key) in
@@ -161,12 +161,13 @@ serving sealing key) without leaking to intermediaries and without the client
 contacting a foreign facade. The model is specified in `FederatedResolve.md`; in
 summary:
 
-- A **descriptor** (`fp:b33` plus the serving sealing key, shared as a QR or link)
-  carries the fingerprint and route directly. The client fetches the user-signed
-  contact card for that fingerprint over I2P - the `card` request above, with the
-  fingerprint sealed to the serving sealing key - a direct fetch over a transient
-  I2P destination, and verifies the card against the fingerprint. `fp` anchors
-  integrity; nothing in between learns the fingerprint (sealed) or the result.
+- A **descriptor** (`fp:b33`, shared as a QR or link) carries the fingerprint
+  and route directly. The client fetches the user-signed contact card for that
+  fingerprint over I2P - the `card` request above, with the fingerprint in the
+  clear inside the stream - a direct fetch over a transient I2P destination, and
+  verifies the card against the fingerprint; the serving sealing key arrives in
+  the card. `fp` anchors integrity; nothing in between learns the fingerprint or
+  the result, the I2P stream being encrypted to the destination.
 - An **alias** resolves to a descriptor at the central resolver
   (`FederatedResolve.md`), which returns a signed self-verifying record over its I2P
   endpoint; the client then runs the card fetch above.
@@ -174,16 +175,17 @@ summary:
 **Implementation status.** The facade-locality and `.b32.i2p` address invariants
 are enforced in code. The descriptor / card-fetch and the central-resolver
 `resolve` flows (`FederatedResolve.md`) are **implemented and live-validated over
-real I2P**; only the production resolver deployment (embedding the resolver
-coordinate in the client) remains.
+real I2P**, and the client is built with the production resolver's coordinate
+(`defaultResolverCoordinate`).
 
 ## Authentication
 
 - Federation accountability is **per-connecting-destination**: an inbound peer
-  is rate-limited by the I2P destination it connects from (`FederationRateLimiter`,
-  implemented). The server root key **never** signs live federation traffic -
-  destinations are self-standing and the root only certifies offline; this keeps
-  the connection origin from being a server-identifying signal.
+  is rate-limited by the I2P destination it connects from (`RateLimiter`, set by
+  `federationRateLimit`; implemented). The server root key **never** signs live
+  federation traffic - destinations are self-standing and the root only certifies
+  offline; this keeps the connection origin from being a server-identifying
+  signal.
 - The only key that signs live federation traffic is the **per-destination
   signing key**: every serving destination (each personal
   dest) carries its own signing keypair, persisted **bound to the destination**
@@ -200,4 +202,3 @@ coordinate in the client) remains.
 ## Open questions
 
 - **Per-server rate limiting and spam policy** between federation peers.
-- **Delegated federation keys** vs signing everything with the root key.

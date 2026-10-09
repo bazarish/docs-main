@@ -79,12 +79,14 @@ Per user (`subscriptions/<fp>.json` - the account record - and `grants/<fp>.json
 
 - **account** - created when the client first publishes its card; holds the
   granted quota, the published card and when a destination was last delegated.
-  There is no term: `GET /v1/account/i2p-status` reports what the client needs to
-  see, and the node deletes an account idle for `idleDeleteDays` (180).
+  The account itself has no term - only the delegated transient expires (below):
+  `GET /v1/account/i2p-status` reports what the client needs to see, and the node
+  deletes an account idle for `idleDeleteDays` (180).
 - **approval** - `requestedAt` and `approvedAt`. On an open node an account is
   approved the moment it is created; on a moderated one it stays pending (see
-  below). A renewal never restarts `requestedAt`, so a pending account cannot
-  outlive its deadline by renewing.
+  below). Publishing the card again restarts neither `requestedAt` nor the
+  registration time the sweep counts from, so a pending account cannot postpone
+  its sweep by republishing.
 - **transient** - the validity of the offline I2P transient the client last
   delegated, recorded so any of the user's devices knows when to issue the next
   one without holding the expiry itself.
@@ -102,38 +104,44 @@ The master I2P destination key stays on the **client** (the user's long-term
 routing identity, sealed at rest in the account beside the messaging keys). The
 client either **generates** a fresh master or **loads** one it already owns from
 an unencrypted Ed25519 (signing type 7) `.dat`. The server only ever holds a
-short-lived **offline transient** delegated from that master, so the b32 is the
-user's own and stable as they move between servers, and an operator is locked out
-once its transient expires.
+short-lived **offline transient** delegated from that master, so the address is
+the user's own and stable as they move between servers, and an operator is locked
+out once its transient expires.
 
-Because the server cannot blind a leaseset it has no master key for, a user's
-destination publishes a **standard** LeaseSet (a plain b32, enumerable by
-floodfills) rather than an encrypted one. That is the accepted cost of never
-sharing an address; every other destination in the project stays encrypted.
+The destination publishes an **encrypted** LeaseSet2 at its blinded b33, like
+every other destination in the project, although the server holds no master key:
+the delegation carries, beside the offline transient, one offline signing key per
+UTC day, each authorised by that day's blinded key of the master. The messaging
+server refuses a delegation without a valid key for the current day.
 
 A destination can only be delegated once the account exists, so the client
-publishes its card first, delegates its transient, and immediately re-publishes it
-contact card (`POST /v1/account/card` again, inside the term it already holds,
-which grants nothing and consumes no grant) with the routing folded in. On a moderated
+publishes its card first, delegates its transient, and immediately re-publishes its
+contact card (`POST /v1/account/card` again, which grants nothing and consumes no
+grant) with the routing folded in. On a moderated
 node the delegation is refused until an operator approves the account, so the
 client publishes its routing then instead.
 
-The transient is short (~= 1 week). The client re-issues a fresh one ~= 2 days
-before it lapses, with a few hours of per-device **jitter**, and always **polls
-`GET /v1/account/i2p-status` before issuing** - so when one of the user's devices
-has already renewed, the others do not issue one (the multi-device race).
+The transient is short: 14 days by default, 1 to 30 as the user sets it (the node
+refuses a longer one), kept the same on every device of the account by a
+`device.delegation-term` message. The client re-issues a fresh one
+about 5 days before it lapses, less up to 6 hours of per-device **jitter**, and
+always **polls `GET /v1/account/i2p-status` before issuing** - so when one of the
+user's devices has already renewed, the others do not issue one (the multi-device
+race).
 Keeping the transient fresh is therefore an unconditional background duty of
 the client: if it lapses, the destination goes down and senders cannot deliver.
 
 On install/enable the client also sends the master to its **other devices** as a
 `device.i2p-master` service message - sealed to the account's own sealing key and
-delivered tokenlessly to the account's own destination - so every device adopts
-the same master (preserving the b32) and can re-issue transients.
+written to the account's own mailbox with `POST /v1/messaging/self` - so every
+device adopts the same master (preserving the address) and can re-issue
+transients.
 
 The server provisions/serves the destination on its embedded I2P router
 (`POST /v1/account/i2p-dest` -> the messaging server's operator-internal
 per-user-destination endpoint) and reports its state on
-`GET /v1/messaging/destination` (`none` -> `building` -> `active` -> `expired`).
+`GET /v1/messaging/destination` (empty while nothing is delegated, then
+`building` -> `active` -> `expired`).
 
 > Outside the server: generating the offline transient and the master `.dat`
 > is the client's job (vendored libi2pd); the server consumes and serves the
@@ -207,13 +215,13 @@ operator's instructions. An account's owner can also end it from here.
 
 The portal's **web files are stored on disk**, not in the binary: `portal.assets
 <dir>` (mandatory with `portal.listen`) holds one template per state of the
-flow, the stylesheet, the logo, the fonts and an optional `portal.js`. Every word
-on the page is in those files; the node only fills in the values a template asks
-for by name:
+flow, the text catalog `messages.json`, the stylesheet, the logo, the fonts and
+an optional `portal.js`. Every word on the page is in those files; the node only
+fills in the values a template asks for by name:
 
 | Template | Placeholders |
 |---|---|
-| `page.html` (shell) | `title`, `server` (this node's messaging-server fingerprint), `session`, `content` |
+| `page.html` (shell) | `title`, `strapline` (the line naming this node's messaging-server fingerprint), `session`, `content`, and `lang`, `dir`, `switch` for the page's language |
 | `session.html` | `fingerprint` |
 | `signin.html` | `challenge`, `error` |
 | `registered.html` | `quota`, `descriptor`, `mailbox`, `devices` |
