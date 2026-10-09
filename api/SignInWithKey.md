@@ -22,7 +22,7 @@ Minted by the site, `base64(JSON)`:
   "ts": 1756600000,
   "consumer": {
     "name": "Bazarish admin panel - north fleet",
-    "place": "https://panel.example",
+    "place": ["https://panel.example", "http://panel.b32.i2p"],
     "role": "Administrator"
   },
   "tag": "9ab1..."
@@ -46,20 +46,32 @@ what a verifier compares.
 | Field | What it holds | Limit |
 |---|---|---|
 | `name` | The resource as it calls itself, in the words on its own pages | 96 |
-| `place` | Where it lives, as the user reached it: URL, b32, host:port | 256 |
+| `place` | **A list** of every address it answers at - URL, b32, host:port - in a stable order, because the tag covers the list. At most 4: a list nobody reads is not a check | 256 each |
 | `role` | What is being signed into: `Administrator`, `Account owner`, `Alias owner` | 48 |
 
-All three are required and non-empty. No field may carry control characters: a
-`name` with a newline in it could paint a `place` line of its own in the client's
-window. A challenge that breaks any of these rules is not signed.
+All three are required and non-empty, and `place` holds at least one address. No
+field may carry control characters: a `name` with a newline in it could paint a
+`place` line of its own in the client's window - which is also why `place` is a
+list rather than one field with a separator in it. A challenge that breaks any of
+these rules is not signed.
+
+**Why more than one.** A place is often reachable two ways at once - over
+clearnet and over I2P - and a challenge naming only one of them is refused by the
+very user it is meant to serve: they arrived by the other. The check a person
+performs changes from "does this match where I am" to "is where I am in this
+list", which is still a question they can answer. It stays answerable only while
+the list is short, hence the cap, and the client says **"If the address you came
+to is not in the list, do not sign."** when there is more than one.
 
 What each of ours puts there:
 
 | Verifier | name | place | role |
 |---|---|---|---|
-| Service node portal | `portal.name`, else "Bazarish service node" | `portal.address`, else the first advertised portal link | `portal.role`, else Account owner |
+| Service node portal | `portal.name`, else "Bazarish service node" | `portal.address`, else the advertised portal links | `portal.role`, else Account owner |
 | Alias registry | `portal.name`, else "Bazarish alias registry" | `portal.address` (required) | Alias owner |
 | Admin panel | `consumer.name`, else "Bazarish admin panel" plus the fleet name when one is named | `consumer.place`, else where it listens | Administrator |
+
+Each of those settings is a **list** in the configuration file.
 
 A deployment that cannot say where it lives does not start. An address nobody can
 compare is the same as no address at all.
