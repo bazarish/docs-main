@@ -59,9 +59,10 @@ The facade is the "last mile" between the client and the server infrastructure. 
 - Published under a **secret URI** known only to clients of this server, and that secrecy is **mandatory, not a deployment option**: `bazarish-facade-http` refuses to start without `basePath <secret>`, which it requires on every request and strips before forwarding. The single exception is an explicit `public`, and it means one thing only - a fronting reverse proxy (Caddy, nginx, ...) already publishes this facade under a secret URI of its own. The secret reaches a client solely inside the facade URL of the server descriptor (below); it is never advertised, never derived from the server fingerprint, and never sent anywhere else.
 - The whole clearnet API therefore lives under the secret prefix. Nothing is left outside it: the reseed is no longer part of this API at all (`ClientApi.md`), so a facade answers only requests from a client that already holds the secret.
 - **Two paths exist, and the facade reads neither.** Once the secret prefix is
-  stripped, both are relayed over the **operator private channel**
-  (localhost/unix socket/VPN) to the messaging server, which is the facade's only
-  backend:
+  stripped, both are relayed over the **operator private channel** to the
+  messaging server, which is the facade's only backend. That channel is TLS
+  pinned by the key the messaging server prints, so it need not be a loopback
+  address or a tunnel:
   - `POST /t` - the client tunnel. One opaque body in, one opaque body out; the
     answer is always `200`, because a status code outside the seal would be a
     channel of its own. What is inside - the method, the path, the headers, the
@@ -93,6 +94,13 @@ The facade is the "last mile" between the client and the server infrastructure. 
   start, which is what `POST /restart` is for. **Changing the base path
   invalidates every server descriptor already distributed**, so the new prefix
   has to reach clients (a new descriptor) before the old one stops answering.
+- A third socket, `directListen`, is optional and serves **exactly what the I2P
+  destination serves**, over TLS with the facade's own certificate. It exists
+  for a gateway the same operator runs: given a route to it, that gateway dials
+  this address instead of the destination and the flow does not enter I2P
+  (`bazarish-gateway/PROTOCOL.md`). Left out, the destination is the only way
+  in. It changes nothing a client can observe: the secret prefix, the sealed
+  tunnel and the uniform 404 are the same on both.
 - Nothing streams through the facade: the only large payload there ever was - a file upload - now goes directly between clients (see `FileTransfer.md`).
 - Holds no key of the server or of its users (only its own I2P destinations and a self-signed TLS credential), parses no content (there is nothing left to parse: authentication happens inside the seal, at the backend), stores nothing. An unreachable backend yields a `FACADE_UPSTREAM` 502 - the facade is only a relay.
 - Implemented in `facade-http/` of the `bazarish-server` repository (`Facade`; covered by tests and live-verified relaying to a running server-core).

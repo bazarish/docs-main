@@ -34,7 +34,7 @@ an account call travels in the same tunnel as everything else and the messaging
 server is what forwards it.
 
 - The server has **no public IP interfaces**. Its only public presence is in hidden networks (I2P first).
-- Facade <-> Server / Service node communication goes over an **operator-controlled private channel** (unix socket, localhost, or VPN - deployment choice). Splitting facade and server across hosts is an operator concern.
+- Facade <-> Server / Service node communication goes over an **operator-controlled private channel**: TLS in which each side is named by the hash of the key in its certificate, written in the other's configuration, with no certificate authority and no hostname in the question. Splitting the fleet across hosts therefore needs no tunnel of its own; the operator may still place one there.
 - **The facade carries one sealed tunnel and reads nothing.** A client's requests
   all arrive as opaque frames on a single path; the messaging server opens them
   and runs what was inside through its own routes. Account calls continue from there

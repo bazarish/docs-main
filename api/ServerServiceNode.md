@@ -2,7 +2,7 @@
 
 Status: implemented.
 
-Internal API over the operator private channel. The service node owns per-operator user-management state (accounts: the quota granted and the card published); the server owns content and delivery, and consults the service node to make admission decisions. The global **alias** namespace is **not** here - it is a separate central service (`api/FederatedResolve.md`), not the operator service node.
+Internal API over the operator private channel - mutually pinned TLS, each side holding the hash of the other's key, and every call signed by the identity that makes it. What the node asks of the server rides the server's operator socket; the one call the other way, a card lookup by fingerprint, rides the node's own listener and is authorised to the server's fingerprint alone. The service node owns per-operator user-management state (accounts: the quota granted and the card published); the server owns content and delivery, and consults the service node to make admission decisions. The global **alias** namespace is **not** here - it is a separate central service (`api/FederatedResolve.md`), not the operator service node.
 
 An account has **no term**. Registration opens an unbounded channel; the only clock is the delegated destination, and an account that has none for the node's idle window is deleted (`idleDeleteDays`, 180 by default).
 

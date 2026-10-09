@@ -7,9 +7,11 @@ registration certificate names one messaging server, and the node that issues it
 is bound to that server's card, so the two do not scale independently. Facades do:
 several may front one pair, and different facades may front different pairs. The
 central alias service is not managed here; it belongs to the project rather than
-to an operator's deployment. The panel is a co-located operations tool: it reaches
-each service on its private operator socket and is never exposed through a facade
-or over I2P.
+to an operator's deployment. The panel reaches each service on that service's
+private operator socket, and is never exposed through a facade or over I2P.
+Those sockets are mutually pinned TLS, so they need not be on the panel's own
+host: a deployment may be spread over several machines without a tunnel between
+them.
 
 ## Sign-in-with-key (panel access)
 
@@ -67,10 +69,15 @@ endpoint is operator-signed, so it discloses nothing to an unauthenticated calle
 
 Every service serves it on its private operator socket (`opsListen`), a TLS
 listener separate from its API, and the panel is configured with that address and
-the key the service prints at startup (`pin`). For **facade-http** this is what
-keeps it off the API listener, which is the clearnet one: there `/healthz` would
-answer a caller who does not know the secret prefix and would thereby identify the
-host as a facade (`Facade.md`).
+the key the service prints at startup (`pin`). The pinning runs both ways: the
+socket asks for a client certificate and admits only the keys in its
+`opsClients`, so an unlisted caller is refused at the handshake and never
+reaches the signature check. Neither certificate decides what a caller may do -
+that is still the signature and the `operators` list; TLS binds the two sockets
+to each other. For **facade-http** this is what keeps the endpoint off the API
+listener, which is the clearnet one: there `/healthz` would answer a caller who
+does not know the secret prefix and would thereby identify the host as a facade
+(`Facade.md`).
 The panel probes every configured service concurrently and renders status,
 version, uptime, current/peak RAM and round-trip latency.
 
@@ -178,16 +185,19 @@ place in that flow.
       {"name": "service-node", "kind": "service-node",
        "url": "https://127.0.0.1:8427", "pin": "<key service-node prints>"},
       {"name": "facade", "kind": "facade",
-       "url": "https://127.0.0.1:8429", "pin": "<key facade-http prints>"}
+       "url": "https://127.0.0.1:8429", "pin": "<key facade-http prints>"},
+      {"name": "gateway", "kind": "gateway",
+       "url": "https://127.0.0.1:8439", "pin": "<key the gateway prints>"}
     ]}
   ]
 }
 ```
 
 Each service is reached on its operator socket over TLS and is named by the key
-it prints at startup (`pin`); an `http` URL or a missing pin is refused. An
-optional `consumer` (`name`, `place`, `role`) sets the words the panel signs
-under.
+it prints at startup (`pin`); an `http` URL or a missing pin is refused. A
+private gateway is reached the same way and is read-only here: the panel shows
+its health and changes nothing on it. An optional `consumer` (`name`, `place`,
+`role`) sets the words the panel signs under.
 
 The configuration contains no secrets. The panel prints its own operator
 fingerprint at startup; that fingerprint is added to each service's
