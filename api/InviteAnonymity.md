@@ -37,7 +37,7 @@ server fingerprint. Then the only fields a card carries are the user's own, plus
 a destination - and the destination is the single tunable anonymity knob.
 
 ```
-ContactCard  (CMS-signed by user U - the only artifact a contact fetches):
+ContactCard  (hybrid-signed by user U - the only artifact a contact fetches):
   v
   t:           "contact-card"      # what this document is, checked first
   issuedAt:    <unix seconds>      # what orders two cards of one person
@@ -101,7 +101,7 @@ of the envelope is unchanged:
 ```
 DeliveryEnvelope:
   toDest: <i2p destination>                 # routing only - and only the sending client sees it
-  sealed:                                   # CMS envelope to the destination's serving sealing key
+  sealed:                                   # hybrid seal to the destination's serving sealing key
     class: content | contact
     mailbox: <recipient UID>
     pass: <delivery pass>                   # absent for class "contact"

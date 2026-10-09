@@ -90,7 +90,7 @@ Built entirely by the sending **client**; servers never see more than their laye
 ```
 DeliveryEnvelope:
   toDest: <recipient I2P destination>       # routing only - all the sender's server sees
-  sealed:                                   # CMS envelope, encrypted to the serving sealing
+  sealed:                                   # hybrid seal to the serving sealing
                                             # key of that destination (from the contact card)
     class: content | contact                # delivery class (admission selector), not the
                                             # content type, which is E2E - see ../Messages.md

@@ -20,13 +20,13 @@ Status: draft skeleton. The single client-facing API, reached through a facade (
 Two kinds of frame, and a client's own identity is presented in exactly one of
 them.
 
-- **hello** - opens a tunnel. CMS-sealed to the server's sealing key, which the
-  client takes from `GET /v1/server/card`: that card is public, identical for
-  everyone, and signed by the server root key whose fingerprint the user already
-  had before they saw a facade, so the card can be withheld but not substituted.
-  The frame carries a fresh secret, a one-time key for the answer, and the hybrid
-  signature that says who is opening it. The answer - the tunnel's lifetime - is
-  sealed to that one-time key.
+- **hello** - opens a tunnel. Hybrid-sealed to the server's sealing key, which
+  the client takes from `GET /v1/server/card`: that card is public, identical
+  for everyone, and signed by the server root key whose fingerprint the user
+  already had before they saw a facade, so the card can be withheld but not
+  substituted. The frame carries a fresh secret, a one-time key for the answer,
+  and the hybrid signature that says who is opening it. The answer - the
+  tunnel's lifetime - is sealed to that one-time key.
   The server's sealing key **must be hybrid**: sealing needs the ML-KEM half, and
   a server whose key predates hybrid sealing keys cannot be talked to at all. It
   refuses to start rather than let every client sit at "connecting".
@@ -36,10 +36,10 @@ them.
   addressed by the per-request handle described below. No asymmetric work per
   request, which matters when a client polls every few seconds.
 - **A tunnel cannot open the next tunnel.** That is structural rather than
-  checked: a hello is only ever CMS-sealed and signature-verified, and a carried
-  frame is only ever opened with a tunnel key. Otherwise a leaked secret could
-  renew itself indefinitely and the identity would never be presented again,
-  which is exactly what the lifetime below exists to bound.
+  checked: a hello is only ever hybrid-sealed and signature-verified, and a
+  carried frame is only ever opened with a tunnel key. Otherwise a leaked secret
+  could renew itself indefinitely and the identity would never be presented
+  again, which is exactly what the lifetime below exists to bound.
 - **The answer's status rides inside.** Outside it is always `200`, because a
   code visible to the facade would say what the seal was meant to hide.
 - **Payloads are padded** to a step of a fixed ladder before they are encrypted.
