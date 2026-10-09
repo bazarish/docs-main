@@ -22,7 +22,7 @@ Content is opaque ciphertext; the interface never interprets blob contents.
 ## Lifecycle rules
 
 1. A blob is **deleted immediately** once all **registered** client IDs of the user (see `../DeviceSync.md`) have acked it - before any quota or TTL pressure. Retiring a client ID triggers re-evaluation: blobs that were waiting only on the retired client are deleted.
-2. Maximum retention is the server's **mailbox retention** setting (`mailboxRetentionDays`); blobs older than that are purged.
+2. A blob nobody acks is kept: the account's quota is what bounds a mailbox, and admission is refused (rule 4) rather than old content dropped.
 3. When the service node deletes an account (idle, ended by its owner, or removed by an operator), it notifies the messaging server, which discards **everything** held for that fingerprint: pending content, replay markers, delivery passes, the device registry and any quota override. No mailbox may remain in service for an account that no longer exists.
 4. Admission is refused (typed errors, see `../Errors.md`) when a blob exceeds the per-message limit or the user's quota; nothing is partially stored.
 5. A listing is returned **oldest arrival first**. A mailbox is a queue and has to
