@@ -81,6 +81,8 @@ accepted `n` for the window and refuses it a second time. A legitimate resend
 carries a fresh nonce and passes; a captured request replayed verbatim does not,
 and editing its nonce breaks both signatures. Ed25519 is deterministic, so the
 nonce is the only thing that makes a resend distinct. The client API keeps such a
+cache, and so does every operator endpoint: there the nonce is remembered only
+after the caller is found among the operators, so a stranger cannot fill the
 cache. A login does not need one: its challenge is single-use (section 4).
 
 ## 2. The challenge
@@ -127,11 +129,25 @@ nonces have been consumed.
 | `place` | **A list** of every address it answers at - URL, b32, host:port - in a stable order, because the tag covers the list. At most 4: a list nobody reads is not a check | 256 each |
 | `role` | What is being signed into: `Administrator`, `Account owner`, `Alias owner`, `Operator` | 48 |
 
-All three are required and non-empty, and `place` holds at least one address. No
-field may carry control characters (U+0000-U+001F, U+007F): a `name` with a
-newline in it could render a `place` line of its own in the client's window -
-which is also why `place` is a list rather than one field with a separator in it.
-A challenge that breaks any of these rules is not signed.
+All three are required and non-empty, and `place` holds at least one address.
+Each field is well-formed UTF-8, and none may carry a code point that breaks a
+line or reorders the text around it:
+
+| Code points | What they are |
+|---|---|
+| U+0000-U+001F, U+007F-U+009F | C0 controls, DEL, C1 controls (NEL among them) |
+| U+2028, U+2029 | Line and paragraph separators |
+| U+061C, U+200E, U+200F | Arabic letter mark, left-to-right and right-to-left marks |
+| U+202A-U+202E, U+2066-U+2069 | Bidi embeddings, overrides and isolates |
+
+A `name` with a newline in it could render a `place` line of its own in the
+client's window, and a bidi override could show an address in an order other
+than the one it has - which is also why `place` is a list rather than one field
+with a separator in it. The set is closed and written out here rather than taken
+from a Unicode category, so every implementation refuses exactly the same
+strings. Joiners (U+200C, U+200D) stay allowed: they are part of the spelling in
+Persian, Indic scripts and emoji, and break nothing. A challenge that breaks any
+of these rules is not signed.
 
 **Why more than one.** A place is often reachable two ways at once - over
 clearnet and over I2P - and a challenge naming only one of them is refused by the
