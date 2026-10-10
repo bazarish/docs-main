@@ -4,8 +4,13 @@ The `admin-panel` is a web interface for monitoring and managing Bazarish
 deployments. A deployment is the unit of scaling: **one messaging server, the
 service node bound to it, and the facades placed in front of the pair**. A
 registration certificate names one messaging server, and the node that issues it
-is bound to that server's card, so the two do not scale independently. Facades do:
-several may front one pair, and different facades may front different pairs. The
+is bound to that server's card, so the two do not scale independently: a
+deployment holds **one server-core and one service-node**, and the panel refuses a
+second of either - a second server is a second deployment. Facades do scale:
+several may front one pair, and different facades may front different pairs. A
+deployment may also list private gateways, as many as it has. Every service in a
+deployment has a **name of its own**, because the name is what tells two facades
+or two gateways apart on every page. The
 central alias service is not managed here; it belongs to the project rather than
 to an operator's deployment. The panel reaches each service on that service's
 private operator socket, and is never exposed through a facade or over I2P.
@@ -97,7 +102,9 @@ A sidebar carries the views:
   carrying: requests over the last minute, hour and day, and how many are in
   flight. These are sampled from bucketed counters (one per second for the last
   minute, one per minute for the last day): a current reading rather than a
-  history, so nothing is stored and nothing requires pruning.
+  history, so nothing is stored and nothing requires pruning. A service's name
+  opens its settings: the Server tab, the node's Addresses tab, or the page of
+  that one facade or gateway.
 - **Users** - the accounts on the service node. Search by fingerprint or by the
   address the account is served at, filter by approval state, and scroll: the
   list loads a page at a time. Each row carries whether the account is approved
@@ -108,19 +115,23 @@ A sidebar carries the views:
   message its owner is shown in place of the node-wide one), delete it, or ban
   the key. The open account is in the address bar (`#/users/<fingerprint>`), so a
   link points at one account.
-- **Settings** - every setting of the deployment, in seven tabs, because one long
+- **Settings** - every setting of the deployment, in eight tabs, because one long
   page of similar-looking blocks is where an operator cannot find the one they
   came for. Each tab saves on its own and is in the address bar
-  (`#/settings/<tab>`), so a link points at one subject:
+  (`#/settings/<tab>`, and `#/settings/<tab>/<name>` for one facade or gateway),
+  so a link points at one subject. The singletons have tabs of their own; the
+  services a deployment may hold many of have one tab each that lists them by
+  name, and a name opens that one's page:
 
   | Tab | What it holds |
   |---|---|
   | Registration | open or moderated, the message a new client is told and the one a waiting account is shown |
   | Portal | the login consumer (name, address, role) the client shows before a user signs, the portal's public links, and the socket the portal binds |
-  | Addresses | the facades and reseeds clients reach this server by, the descriptor built from them, the node's own operator API and the messaging server it is bound to, and the log level |
+  | Addresses | the facades' addresses as they report them (read-only: the panel writes them, see below), the reseeds, the descriptor built from both, the node's own operator API and the messaging server it is bound to, and the log level |
   | Accounts | the storage a new account gets and how long an idle one is kept, beside the two numbers that show whether that promise can still be kept: what the quotas have allocated and what the disk holds (`GET /v1/messaging/storage`) |
   | Server | server-core's own file: log level and libi2pd's logging, its I2P privacy and tunnel count, the inbound federation rate limit, its private listener and the node it reports to |
-  | Facade | the facade's own file, read and written over its ops socket: the secret base path, its three listeners (`listen`, `directListen`, `opsListen`), the messaging server it forwards to, and its I2P address's privacy and tunnel count |
+  | Facades | every facade of the deployment with its address and whether the descriptor carries it; a facade's page holds its own file, read and written over its ops socket - its three listeners (`listen`, `directListen`, `opsListen`), the messaging server it forwards to, its I2P address's privacy and tunnel count - its address, read-only, and **New address** |
+  | Gateways | every gateway with its sessions and destinations; a gateway's page holds the tunnels it builds for all its clients (privacy, count), its two warm pools (streams, calls) and its direct routes, read-only |
   | Panel | the panel's own file: who may sign in, the words it signs under, the services it manages, and where it listens - plus what it cannot change (its fingerprint, its config file, its state and web directories, its version) |
 
   Every tab that holds a start-only setting also carries a **restart** control
@@ -154,8 +165,35 @@ node with many accounts does not transfer the whole set to locate one.
 | `GET /api/settings`, `PUT /api/settings` | service-node `/v1/account/settings`, plus server-core `GET /v1/messaging/storage` for the disk figure |
 | `GET /api/panel`, `PUT /api/panel` | nothing - the panel's own configuration file |
 | `POST /api/panel/restart` | nothing - the panel's own process |
-| `GET /api/service-settings?kind=`, `PUT /api/service-settings?kind=` | server-core `/v1/messaging/settings`, service-node `/v1/account/settings`, facade `/settings` (ops socket) |
-| `POST /api/restart?kind=` | server-core `POST /v1/messaging/restart`, service-node `POST /v1/account/restart`, facade `POST /restart` (ops socket) |
+| `GET /api/service-settings`, `PUT /api/service-settings` (`?kind=` for server-core or service-node, `?service=<name>` for anything) | server-core `/v1/messaging/settings`, service-node `/v1/account/settings`, a facade's or a gateway's `/settings` (ops socket) |
+| `POST /api/restart` (same) | server-core `POST /v1/messaging/restart`, service-node `POST /v1/account/restart`, a facade's or a gateway's `POST /restart` (ops socket) |
+| `GET /api/facades` | each facade's `GET /settings` for its address, and the node's `GET /v1/account/settings` for the descriptor |
+| `POST /api/facade/new-address?service=<name>` | that facade's `POST /new-address`, then the node's `PUT /v1/account/settings` and every gateway's `GET`/`PUT /settings` (below) |
+
+### Facade addresses and the descriptor
+
+A facade mints its own address - its I2P destination and its secret path - and
+reports it (`Facade.md`); the operator never types one. The panel is what puts
+them into the server descriptor: it asks every facade of the deployment for its
+URL and writes the list, in the order the facades are listed on the Panel tab,
+into the node's `facades` (`PUT /v1/account/settings`). It does so whenever that
+list is saved and whenever a facade is given a new address. If a facade does not
+answer, the descriptor is left as it was and the panel says which facade it was:
+a descriptor missing a working facade is worse than one that is a step behind.
+A deployment with no facade keeps the addresses it had, and the panel says that
+too. An address that changes behind the panel's back - a facade's `state`
+wiped by hand - shows on the Facades tab as **not in the descriptor** until the
+list is saved again.
+
+**New address** replaces a facade's key and secret path at once and restarts it
+(`POST /new-address`). The panel takes the new URL from that answer rather than
+asking the facade, which is restarting, writes the descriptor, and then rewrites
+the **direct routes** of every gateway it manages: a route naming the old
+destination now names the new one (`PUT /settings` on the gateway, which applies
+routes at once). Otherwise a gateway that reached this facade without I2P would
+keep a route to an address nobody serves, and its clients would quietly fall back
+to I2P. The button says what it costs: a client that knows only the old address
+loses the server until it is given the new descriptor.
 
 The quota is set **on the service node**, which is the component that grants it and
 pushes it to server-core. Setting it directly on server-core, as an earlier
@@ -196,9 +234,11 @@ place in that flow.
 
 Each service is reached on its operator socket over TLS and is named by the key
 it prints at startup (`pin`); an `http` URL or a missing pin is refused. A
-private gateway is reached the same way and is read-only here: the panel shows
-its health and changes nothing on it. An optional `consumer` (`name`, `place`,
-`role`) sets the words the panel signs under.
+private gateway is reached the same way: the panel shows its health and edits its
+tunnels and warm pools. Names are unique within a deployment, and a deployment
+holds one `server-core` and one `service-node` at most; a configuration that
+breaks either is refused at start and on save. An optional `consumer` (`name`,
+`place`, `role`) sets the words the panel signs under.
 
 The configuration contains no secrets. The panel prints its own operator
 fingerprint at startup; that fingerprint is added to each service's
@@ -209,13 +249,15 @@ Everything above is also editable from the Panel tab, and the panel writes it
 back into this same file one value at a time - the operator's key order, spacing
 and comments survive a save.
 
-Between them, the tabs cover every value in all four config files except the
+Between them, the tabs cover every value in the four fleet config files except the
 ones that would let the panel lock itself out or move a service's data: the state
 and asset directories, the operator fingerprint lists, and a server's own
 identity. Those are shown read-only. **Everything else an operator would edit
-over SSH is editable here, and every service but a gateway, which the panel only
-reads, can be restarted from here**, which is the rule this page is built to:
-managing a Bazarish server should not require a shell on it.
+over SSH is editable here, and every service can be restarted from here**, which
+is the rule this page is built to: managing a Bazarish server should not require a
+shell on it. A gateway's file is the exception in the other direction: the panel
+edits its tunnels, pools and direct routes and leaves the rest - the secret path
+and the token above all - to the operator, and never reads them.
 
 ## First run
 

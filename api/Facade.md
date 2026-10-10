@@ -60,7 +60,8 @@ The facade is the "last mile" between the client and the server infrastructure. 
 - This is the **only** I2P address the server side publishes. Federation runs on
   the users' own destinations (`InviteAnonymity.md`), never a shared one, so a
   facade address discloses nothing about which users a server hosts.
-- Published under a **secret URI** known only to clients of this server, and that secrecy is **mandatory, not a deployment option**: `bazarish-facade-http` refuses to start without `basePath <secret>`, which it requires on every request and strips before forwarding. The secret reaches a client solely inside the facade URL of the server descriptor (below); it is never advertised, never derived from the server fingerprint, and never sent anywhere else.
+- Published under a **secret URI** known only to clients of this server, and that secrecy is **mandatory, not a deployment option**: the facade mints its secret path at its first start, together with its destination key, and keeps both in `state`; there is no `basePath` in its configuration to leave empty, and one written there is refused. It requires the path on every request and strips it before forwarding. The secret reaches a client solely inside the facade URL of the server descriptor (below); it is never advertised, never derived from the server fingerprint, and never sent anywhere else.
+- **The facade knows its own address and says it.** The destination and the path together are its URL, which it prints at start and reports in `GET /settings` on its ops socket. The admin panel reads it from there and writes the facades' URLs into the server descriptor itself (`AdminPanel.md`), so an operator never copies an address by hand.
 - The whole API therefore lives under the secret prefix. Nothing is left outside it: the reseed is no longer part of this API at all (`ClientApi.md`), so a facade answers only requests from a client that already holds the secret.
 - **Two paths exist, and the facade reads neither.** Once the secret prefix is
   stripped, both are relayed over the **operator private channel** to the
@@ -90,14 +91,21 @@ The facade is the "last mile" between the client and the server infrastructure. 
   two kinds a request was.
 - Everything outside the secret prefix answers the same bare **404** - the API root, an unknown path, and the operator liveness endpoint alike - so a probe of the host learns nothing. `/healthz` is not on the client-facing socket at all: it is served on a separate private **ops listener** (`opsListen`) that is never published to clients (`AdminPanel.md`).
 - The ops listener also carries the facade's **own configuration**, operator-signed
-  like `/healthz`: `GET /settings` and `PUT /settings` (the secret base path, the
-  backend, the three sockets, the I2P side, the log level) and `POST /restart`.
-  They are on the ops socket for the same reason `/healthz` is - on the public one
-  they would reveal that the host is a facade. Only the log level applies at
-  once; the rest is written into the facade's config file and read at its next
-  start, which is what `POST /restart` is for. **Changing the base path
-  invalidates every server descriptor already distributed**, so the new prefix
-  has to reach clients (a new descriptor) before the old one stops answering.
+  like `/healthz`: `GET /settings` and `PUT /settings` (the backend, the three
+  sockets, the I2P side, the log level; `GET` adds the facade's URL),
+  `POST /new-address` and `POST /restart`. They are on the ops socket for the
+  same reason `/healthz` is - on the public one they would reveal that the host
+  is a facade. Only the log level applies at once; the rest is written into the
+  facade's config file and read at its next start, which is what
+  `POST /restart` is for.
+- **`POST /new-address` replaces the key and the secret path at once**, answers
+  with the new URL and the previous one, and restarts the facade to publish the
+  new destination. Both are replaced together because either alone already
+  changes the URL, and an address that has leaked is replaced whole. **It
+  invalidates every server descriptor that carries the old URL**: a client keeps
+  the facade list it was given and does not learn a new one by itself, so a
+  client that knows only this facade loses the server until it is given the new
+  descriptor. A server with several facades loses only the one.
 - A third socket, `directListen`, is optional and serves **exactly what the I2P
   destination serves**, over TLS with the facade's own certificate. It exists
   for a gateway the same operator runs: given a route to it, that gateway dials
@@ -266,7 +274,7 @@ intermediaries are trusted for availability only (`Identity.md` /
 
 ## Open questions
 
-- Facade registration/rotation flow: how a server **operator** issues and revokes secret URIs. (Clients already learn a server's facades from the configuration link above, and can add/edit the list locally; what remains is the operator-side issuance/revocation and whether updated facades should also propagate via the server card.)
+- ~~Facade registration/rotation flow~~ - the operator side is settled: a facade mints its own address, the admin panel publishes it into the descriptor and replaces it on request (`AdminPanel.md`). Still open: whether an updated facade list should reach existing clients by itself (through the server card), rather than as a new descriptor handed out again.
 - Whether the facade enforces any rate limiting.
 - ~~Streaming/long-poll support imposed by the incoming-delivery mechanism~~ -
   settled: incoming mail is one held-open request (`ClientApi.md`) and there is
