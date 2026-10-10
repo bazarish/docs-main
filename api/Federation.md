@@ -4,8 +4,8 @@ Status: draft skeleton.
 
 ## Transport
 
-- Delivery is **I2P-only**: the messaging server requires `i2p.enabled` (there is no
-  non-I2P transport; the earlier plain-TCP federation was removed). The server has no single
+- Delivery is **I2P-only**: there is no non-I2P transport and no switch for one
+  (the earlier plain-TCP federation was removed). The server has no single
   federation destination - each user's serving destination runs its
   own STREAM accept loop and is persisted so addresses are stable across restarts;
   a first-contact `op:card` is answered on those same destinations. The server

@@ -6,17 +6,20 @@ The facade is the "last mile" between the client and the server infrastructure. 
 
 ## First implementation: HTTP facade (implemented)
 
-- **The facade's own I2P destination is the way in.** With `i2p.enabled` (plus
-  `state` for the keys and `i2p.destinations` for how many) the facade
-  publishes its API on one or more encrypted-LeaseSet destinations, and
-  those are the only facades a client dials (below). The addresses are stable
-  across restarts because they travel in the server descriptor. The I2P front
-  parses no HTTP: an accepted stream is relayed to the facade's plain listener
-  (`listen`, on loopback), which applies the routing and the secret prefix. The
+- **The facade's own I2P destination is the way in, and the only one.** A
+  facade publishes its API on exactly one encrypted-LeaseSet destination, whose
+  key it keeps in `state`; there is no switch that turns it off and no count of
+  them, because a facade without it serves nobody and a client would not dial
+  it (below). Several addresses for one server are several facades. The
+  address is stable across restarts because it travels in the server
+  descriptor. It carries 16 tunnels unless `i2p.tunnelQuantity` says
+  otherwise. The I2P front parses no HTTP: an accepted stream is relayed to the
+  facade's plain listener (`listen`, on loopback), which applies the routing and
+  the secret prefix. The
   stream is torn down only after the client has read the reply (or a bounded
   drain elapses): closing it immediately after the last write truncates the
   reply, and the client then sees an empty stream rather than a response. The log
-  records when each destination's leaseset has published ("i2p facade ready"),
+  records when the destination's leaseset has published ("i2p facade ready"),
   because until then a dial fails for reasons that have nothing to do with the
   facade.
 - **A facade is an I2P address, and the API is spoken over nothing else.** A
@@ -103,7 +106,7 @@ The facade is the "last mile" between the client and the server infrastructure. 
   in. It changes nothing a client can observe: the secret prefix, the sealed
   tunnel and the uniform 404 are the same on both.
 - Nothing streams through the facade: the only large payload there ever was - a file upload - now goes directly between clients (see `FileTransfer.md`).
-- Holds no key of the server or of its users (only its own I2P destinations and a self-signed TLS credential), parses no content (there is nothing left to parse: authentication happens inside the seal, at the backend), stores nothing. An unreachable backend yields a `FACADE_UPSTREAM` 502 - the facade is only a relay.
+- Holds no key of the server or of its users (only its own I2P destination and a self-signed TLS credential), parses no content (there is nothing left to parse: authentication happens inside the seal, at the backend), stores nothing. An unreachable backend yields a `FACADE_UPSTREAM` 502 - the facade is only a relay.
 - Implemented in `facade-http/` of the `bazarish-server` repository (`Facade`; covered by tests and live-verified relaying to a running server-core).
 
 ### What the facade still knows
@@ -133,7 +136,7 @@ A client reaches a facade through a single **facade URL**:
 http://<b33>.b32.i2p/secret-path
 ```
 
-- **`<b33>.b32.i2p`** - one of the facade's own I2P destinations, by the b33 of
+- **`<b33>.b32.i2p`** - the facade's own I2P destination, by the b33 of
   its encrypted LeaseSet2. The client dials it over I2P and speaks plain HTTP on
   the stream: the stream is encrypted to the destination dialled, and the facade
   is the untrusted last mile in any case - all security is end-to-end and
@@ -206,8 +209,8 @@ Consequences for first contact (`Contacts.md`, `Federation.md`):
 
 ### Multiple facades and failover
 
-A server may publish **several** facade URLs (different destinations or secret
-paths). The client holds them as an ordered list and **fails over** across
+A server may publish **several** facade URLs, one per facade: a facade has
+exactly one destination. The client holds them as an ordered list and **fails over** across
 it: it sends to the current facade, and on an *unreachable* facade (transport
 failure) advances to the next, cycling without end across attempts; an
 HTTP error *response* is final (the facade is reachable and the request was

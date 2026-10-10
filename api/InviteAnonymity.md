@@ -278,7 +278,7 @@ server-wide signer either (a delivery confirmation is signed per destination).
    is keyed by `toDest`; the server only accepts on the users' destinations and
    initiates no connections - the client **dials the b33** (not the raw
    destination - an encrypted leaseset is only reachable via the b33). TCP
-   federation removed; `i2p.enabled` mandatory.
+   federation removed; I2P is the only transport.
 3. **client** - `createInvite` / `addByInvite` / contact-request bootstrap /
    `addByAlias` on the contact card and route-by-dest; `deliver`
    targets a destination; `Client::myDestination()` fetches the assigned routing.
