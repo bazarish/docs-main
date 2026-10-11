@@ -28,7 +28,6 @@ HTTP transports map typed errors onto appropriate status codes; the JSON body is
 | Code | Meaning | Source |
 |---|---|---|
 | `STORAGE_FULL` | User's pending-content quota is exhausted | server |
-| `QUOTA_EXCEEDED` | Retired: an exhausted quota is `STORAGE_FULL`. The name is never reused | none |
 | `RECIPIENT_SERVER_UNREACHABLE` | The recipient's server returned no answer: it could not be dialled, the stream failed, or it asserted a delivery without a verifiable signature. Not a refusal; the sending client may repeat the attempt, and on exhausting its attempts reports this as the reason (`Messages.md`) | client |
 | `MESSAGE_TOO_LARGE` | The payload is over `kMaxMessagePayloadBytes`. Past admission, so only a correspondent ever sees it | server |
 | `CONTACT_RATE_LIMITED` | This destination is taking too many contact requests, or has too many waiting. Transient; says nothing about who is served there | server |
@@ -40,7 +39,6 @@ HTTP transports map typed errors onto appropriate status codes; the JSON body is
 | `ALIAS_UNKNOWN` | Alias resolution found no such alias. Aliases are intended to be discoverable, so this is reported explicitly and is not subject to anti-enumeration | alias registry |
 | `CLIENT_UNREGISTERED` | Request carries a client ID that is not registered for this user (see `DeviceSync.md`) | server |
 | `ACCOUNT_PENDING_APPROVAL` | The account exists but is frozen: a moderated server has not approved it yet, so its destination is not brought up. The message carries the operator's instructions for finishing registration | service node |
-| `I2P_UNAVAILABLE` | Retired: I2P is not optional, so there is nothing for it to report. The name is never reused | none |
 
 The registry grows as APIs are specified; codes are append-only and never reused.
 

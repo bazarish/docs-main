@@ -127,13 +127,6 @@ and looks it up; it never derives anything from the payload, whose only visible
 property is its length - and that is padded to a step of the ladder before the
 seal, so what a mailbox's server measures is the step.
 
-The account database that stores it all carries a **schema version** of its own
-(SQLite's `user_version`, stamped when the tables are laid out and checked on
-every open). A database written against another number is refused with both
-numbers rather than read through guesswork. It is **1** and stays 1 until the
-first release: before then a schema change means creating the account again, and
-after it, this is the number a migration steps from.
-
 ### Two identifiers, and which is which
 
 ![How a message is wrapped, what travels on each hop, and where each identifier is created and read](img/identifiers.svg)
