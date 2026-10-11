@@ -48,7 +48,7 @@ response: {"delivered":<bool>,"errorCode":...,"errorMessage":...,
            "deliveryId":<id>,"signerPub":<base64>,"sig":<base64>}\n
 ```
 
-Both ops arrive on the user's serving destination through one accept loop, one per-peer rate limit and one frame dispatcher; `deliver` runs the delivery pipeline (dedup -> admission -> size/quota -> store), `card` answers from the stored card.
+Both ops arrive on the user's serving destination through one accept loop and one frame dispatcher; `deliver` runs the delivery pipeline (dedup -> admission -> size/quota -> store), `card` answers from the stored card.
 
 The confirmation is carried **in that reply**: on storing the envelope the recipient signs the `deliveryId` with the **serving destination's own per-destination signing key** (`signerPub` carries the public half; see *Authentication*), never with the server's root identity. The reply is the only available path, the dialling party being a client on an address that publishes no leaseset and accepts no inbound connections. As `deliveryId` is sealed inside the envelope, only a server that unsealed it can state it, and the signature binds that statement to the destination that answered. The sending client accepts a `delivered` result **only** when the signature verifies against the id it sent; an unsigned or incorrectly signed claim is treated as no answer and the attempt is repeated.
 
@@ -112,19 +112,20 @@ DeliveryEnvelope:
 
 ## Message delivery flow
 
-1. The sending **client** seals the envelope and dials the recipient's serving destination over I2P, **from a destination held for that one correspondent** and never from its own serving destination. The term of that destination and its provenance are implementation matters; the requirement is that a single outbound address never carries traffic to two correspondents. No server of the sender's participates in a delivery, so none of them learns the sender's correspondents.
+1. The sending **client** seals the envelope and dials the recipient's serving destination over I2P, **from a destination held for that one correspondent** and never from its own serving destination. The term of that destination and its provenance are implementation matters; the requirement is that a single outbound address never carries traffic to two correspondents, and that a contact request leaves from an address that has carried nothing before it. No server of the sender's participates in a delivery, so none of them learns the sender's correspondents.
 2. Client -> recipient's server: `deliver` with the envelope and its payload, on that one stream.
 3. Recipient's server unseals and processes in strict order:
    1. **deliveryId dedup** - if the `deliveryId` is still pending in the mailbox, or is in the retained **seen-deliveryId set** (every admitted id, kept independently of the blob until the TTL sweep ages it out), respond success. This makes client retries idempotent and blocks replays of an already-delivered envelope, on both admission paths - and with a reusable pass it is the only thing that does;
    2. **admission** - for `content`, hash the presented pass and look it up in the mailbox's registered set (`../Contacts.md`); no match -> `DELIVERY_REJECTED`, and nothing is consumed. For `contact`, which presents nothing, the size cap below IS the admission;
    3. **size/quota checks** - explicit typed errors (`STORAGE_FULL`, `MESSAGE_TOO_LARGE`), revealed only past a valid pass. The order is significant: checked before admission, an over-sized payload with an invalid pass answered differently on the destination that serves the named mailbox and on one that does not, which is the "is this fingerprint served here" answer nothing on this path may give;
-   4. **store** as pending content, and add the `deliveryId` to the seen set.
+   4. **rate** - `content` is limited per pass, 120 a minute; `contact` per sending I2P destination, one a day (below). Both refuse with `CONTACT_RATE_LIMITED`. They come after dedup, so a retry of an envelope already stored is answered as stored, never refused;
+   5. **store** as pending content, and add the `deliveryId` to the seen set.
 4. Recipient's server -> sending client: the confirmation is returned **in the reply on the same stream**, signed over the stored `deliveryId` with the signing key of the destination that admitted it. No other path is available, the client having dialled from an address that accepts no inbound connections. The client accepts a `delivered` result only when that signature verifies against the delivery id it sent; an unsigned claim is treated as no answer.
 5. A reply constitutes an answer. A typed refusal (unknown pass, size, quota, contact rate limit) fails the delivery immediately and repetition does not change the outcome. Only the absence of a reply warrants a further attempt; the number of attempts is the sending client's policy, as nothing is spooled anywhere and no server retries on another party's behalf. A repeated delivery carries the same delivery id, so a recipient's server that stored the first copy recognises it and stores no second copy.
 
 6. `DELIVERY_REJECTED` is the one refusal that says something about the **capability**: the presented pass is not in the mailbox's registered set. There is nothing else to offer instead - a correspondent holds one pass - so a sender that receives it can no longer deliver, and restoring delivery requires a new contact request. No refusal costs a sender anything: a pass is not spent, so `STORAGE_FULL` and `MESSAGE_TOO_LARGE` leave it exactly as it was, and so does this one.
 
-`contact-request` deliveries skip the pass check, are capped in payload size (`kMaxContactRequestBytes`, a protocol constant measured against the real worst case - see `ClientApi.md`), and are rate-limited per receiving destination (on top of the per-connecting-destination limit every delivery is under) with a cap on how many may be waiting at once. There is no quota of their own: a mailbox has one, and every class is stored against it.
+`contact-request` deliveries skip the pass check, are capped in payload size (`kMaxContactRequestBytes`, a protocol constant measured against the real worst case - see `ClientApi.md`), and are rate-limited per receiving destination with a cap on how many may be waiting at once. They are also admitted **once per sending I2P destination**: the server keeps a hash of the address a request came from for 24 hours and refuses any further request from it. A client sends every request from an address of its own, so a second request from one address is not a client's behaviour, only an attack's. The list is the server's own and is held in memory. There is no quota of their own: a mailbox has one, and every class is stored against it.
 
 ## Requests (draft)
 
@@ -180,9 +181,9 @@ real I2P**, and the client is built with the production resolver's coordinate
 
 ## Authentication
 
-- Federation accountability is **per-connecting-destination**: an inbound peer
-  is rate-limited by the I2P destination it connects from (`RateLimiter`, set by
-  `federationRateLimit`; implemented). The server root key **never** signs live
+- Federation accountability rests on what a delivery presents: mail on its pass
+  (120 a minute each), a contact request on the I2P destination it came from
+  (one a day each; implemented). The server root key **never** signs live
   federation traffic - destinations are self-standing and the root only certifies
   offline; this keeps the connection origin from being a server-identifying
   signal.

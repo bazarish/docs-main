@@ -97,4 +97,4 @@ Unknown pass, unknown mailbox, and a recipient not served here must be externall
 ## Open questions
 
 - **Defaults** - `kMaxPassesPerMailbox` and `kMaxPassesPerRequest` bound what one account may register; whether either belongs in server config rather than the protocol is open.
-- **Fairness** - nothing keeps one correspondent from filling a mailbox to the quota. Whether a per-pass rate limit is worth its state is open, and deliberately not built yet.
+- **Fairness** - a correspondent may deliver at most 120 messages a minute on its pass (a ceiling high enough for a busy bot or group); nothing else keeps one correspondent from filling a mailbox to the quota.

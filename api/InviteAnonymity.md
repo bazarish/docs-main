@@ -247,8 +247,8 @@ private serving sealing key and the dest<->mailbox mapping.
   destination the connection arrived on.
 - There is no `peers.json` fingerprint->dest resolver: the dest travels end to
   end, and routing is purely by destination.
-- **Accountability** stays per-connecting-destination (`RateLimiter`, set by
-  `federationRateLimit`; implemented). The server root key **never** signs live
+- **Accountability** rests on the pass for mail (120 a minute each) and on the
+  connecting destination for a contact request (one a day each; implemented). The server root key **never** signs live
   federation traffic; destinations are self-standing and the root only certifies
   offline. Each destination signs its own delivery confirmations with its own
   per-destination signing key (above), so the signer is never server-wide.
