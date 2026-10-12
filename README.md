@@ -4,7 +4,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol
 blocking and to deanonymization of servers and users. All communication is
 end-to-end encrypted. Any possibility of collecting metadata about a user and
 their contacts is treated as a critical bug requiring architectural rework.
-Supported features: direct (1-1) messages, audio calls and attachments of any
+Supported features: direct (1-1) messages, groups and channels, audio calls and attachments of any
 type. The server-side principle is minimum code, minimum dependencies, simple
 deployment on any server.
 
@@ -18,6 +18,7 @@ component implements.
 - [Contacts](Contacts.md) - contact admission via delivery passes
 - [Messages](Messages.md) - delivery class vs content type; the content-type registry
 - [Bots](Bots.md) - bots as ordinary identities; commands, inline keyboards, callbacks
+- [Groups](Groups.md) - groups and channels as a relaying bot; the `group` block, names, roles, reactions
 - [DeviceSync](DeviceSync.md) - multi-device enrollment and E2E state sync
 - [Errors](Errors.md) - typed error registry
 - API contracts:

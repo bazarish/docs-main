@@ -24,7 +24,8 @@ treatment are open questions left to clients and future iterations - none of the
 require a server change to introduce.
 
 A bot runs as a program of its own against `bazarish-bot`, which holds the
-account and exposes it through a REST API.
+account and exposes it through a REST API. A group is a bot that relays its
+members' posts to each other; it is specified in `Groups.md`.
 
 ## The three content types
 

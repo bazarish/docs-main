@@ -268,6 +268,8 @@ face, with the same retry.
 | `call.decline` | content | Rejects a call: `callId`, `reason`. See `api/Calls.md`. |
 | `call.end` | content | Hangs up / cancels a call: `callId`. See `api/Calls.md`. |
 | `call.ring` | content | A device of the callee's is showing the call: `callId`. What turns the caller's "invitation delivered" into "their device is ringing". See `api/Calls.md`. |
+| `group.state` | content | From a group host only: no body, only the `group` block, sent when the recipient's `write` or `admin` changes and the host has nothing else to send. See `Groups.md`. |
+| `group.reactions` | content | From a group host only: `reactions` = `[{ref, counts: {emoji: n}}]`, the reaction counts of relayed posts, batched, leaving out the recipient's own reaction. See `Groups.md`. |
 | `call.taken` | device | Self-sync: the device that answered or refused an incoming call, so the account's other devices stop ringing - `callId`, `device`. See `api/Calls.md`, `DeviceSync.md`. |
 
 ### Forwarding
@@ -296,6 +298,15 @@ One further field is additive and may be carried by any content message:
   renders a quote of that message and, when it holds the original locally, a
   click jumps to it. A dead reference (the original was never received or was
   deleted) renders as a non-clickable quote. See *Replies*.
+
+A group host (`Groups.md`) adds three more, honoured only from it:
+
+- **`group`** - the block every envelope of a group host carries: `kind`,
+  `members`, `write`, `admin`, `at`.
+- **`author`** - on a relayed post, the author's name in the chat. Ignored on a
+  message without a `group` block.
+- **`contactable`** - on a relayed post, whether its author accepts contact
+  requests.
 
 The registry is **open**: new rows are added here and implemented in clients.
 No server, facade, federation or storage change accompanies a new row.
