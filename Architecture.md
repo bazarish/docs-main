@@ -11,6 +11,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 | **Server** | daemon (C++) | Core messaging: pending content storage, delivery, federation over hidden networks |
 | **Service node** | separate daemon (C++) | User management: accounts, portal, moderation. Isolated from messaging logic |
 | **Facade** | daemon (C++) | "Last mile" between client and server infrastructure. First implementation: HTTP over its own I2P destination at a secret path |
+| **Gateway** | optional daemon (C++) | Runs the I2P router for a client that does not run its own. An optional part of an operator's deployment: nothing else in it depends on a gateway, and a gateway needs nothing else from it |
 | **Client** | separate repositories | Qt6 desktop app (`client-qt`); the same client core behind a REST API for bots (`client-daemon`) |
 | **I2P router** | in-process or external | Transport for the client API, federation and calls. How a component hosts its router is an implementation choice, not part of the protocol |
 | **Storage** | disk | Pending encrypted content |

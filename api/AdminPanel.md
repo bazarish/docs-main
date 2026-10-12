@@ -8,7 +8,8 @@ is bound to that server's card, so the two do not scale independently: a
 deployment holds **one server-core and one service-node**, and the panel refuses a
 second of either - a second server is a second deployment. Facades do scale:
 several may front one pair, and different facades may front different pairs. A
-deployment may also list private gateways, as many as it has. Every service in a
+deployment may also list private gateways, as many as it has or none: a gateway is
+an optional part of a deployment and runs without the panel. Every service in a
 deployment has a **name of its own**, because the name is what tells two facades
 or two gateways apart on every page. The
 central alias service is not managed here; it belongs to the project rather than
