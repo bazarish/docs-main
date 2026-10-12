@@ -110,7 +110,7 @@ The facade is the "last mile" between the client and the server infrastructure. 
   destination serves**, over TLS with the facade's own certificate. It exists
   for a gateway the same operator runs: given a route to it, that gateway dials
   this address instead of the destination and the flow does not enter I2P
-  (`bazarish-gateway/PROTOCOL.md`). Left out, the destination is the only way
+  (`bazarish-server/gateway/PROTOCOL.md`). Left out, the destination is the only way
   in. It changes nothing a client can observe: the secret prefix, the sealed
   tunnel and the uniform 404 are the same on both.
 - Nothing streams through the facade: the only large payload there ever was - a file upload - now goes directly between clients (see `FileTransfer.md`).
