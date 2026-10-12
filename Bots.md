@@ -23,7 +23,7 @@ invite link or by an alias. Discovery, rate-limiting policy and any distinct UI
 treatment are open questions left to clients and future iterations - none of them
 require a server change to introduce.
 
-A bot runs as a program of its own against `client-daemon`, which holds the
+A bot runs as a program of its own against `bazarish-bot`, which holds the
 account and exposes it through a REST API.
 
 ## The three content types

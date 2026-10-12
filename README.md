@@ -44,7 +44,7 @@ One repository per component, developed side by side:
 | Shared C++ library | [common-cpp](https://github.com/bazarish/common-cpp) |
 | Server fleet: messaging server, service node, HTTP facade, admin panel, optional gateway (runs the I2P router for a client that does not run its own) | [bazarish-server](https://github.com/bazarish/bazarish-server) |
 | Client (core, Qt6 GUI) | [client-qt](https://github.com/bazarish/client-qt) |
-| Client daemon (the same core behind a REST API and a web UI, for bots) | [client-daemon](https://github.com/bazarish/client-daemon) |
+| Client daemon (the same core behind a REST API and a web UI, for bots) | [bazarish-bot](https://github.com/bazarish/bazarish-bot) |
 | Alias registry (signed resolve + portal; the one paid component; closed, and documented in its own repository) | [alias-resolver](https://github.com/bazarish/alias-resolver) |
 | Specification | this repository |
 

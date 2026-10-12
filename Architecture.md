@@ -12,7 +12,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 | **Service node** | separate daemon (C++) | User management: accounts, portal, moderation. Isolated from messaging logic |
 | **Facade** | daemon (C++) | "Last mile" between client and server infrastructure. First implementation: HTTP over its own I2P destination at a secret path |
 | **Gateway** | optional daemon (C++) | Runs the I2P router for a client that does not run its own. An optional part of an operator's deployment: nothing else in it depends on a gateway, and a gateway needs nothing else from it |
-| **Client** | separate repositories | Qt6 desktop app (`client-qt`); the same client core behind a REST API for bots (`client-daemon`) |
+| **Client** | separate repositories | Qt6 desktop app (`client-qt`); the same client core behind a REST API for bots (`bazarish-bot`) |
 | **I2P router** | in-process or external | Transport for the client API, federation and calls. How a component hosts its router is an implementation choice, not part of the protocol |
 | **Storage** | disk | Pending encrypted content |
 
@@ -54,7 +54,7 @@ server is what forwards it.
 
 ## Key decisions
 
-1. **Repository scope** - the server fleet lives in one repository, `bazarish-server` (`server-core`, `service-node`, `facade-http`, `admin-panel` and the optional `gateway`, a host that runs the I2P router for a client that will not, sharing one build of `common`); separate from it are `client-qt` (client core + Qt6 GUI), `client-daemon` (the same core with a REST API and a web UI instead of a window), `common-cpp` (the shared C++ library, checked out as each repository's `common` submodule), `alias-resolver` (the alias registry, the only paid component) and `docs-main` (this repository - the canonical protocol specification all components implement). Repositories are developed side by side in a single workspace.
+1. **Repository scope** - the server fleet lives in one repository, `bazarish-server` (`server-core`, `service-node`, `facade-http`, `admin-panel` and the optional `gateway`, a host that runs the I2P router for a client that will not, sharing one build of `common`); separate from it are `client-qt` (client core + Qt6 GUI), `bazarish-bot` (the same core with a REST API and a web UI instead of a window), `common-cpp` (the shared C++ library, checked out as each repository's `common` submodule), `alias-resolver` (the alias registry, the only paid component) and `docs-main` (this repository - the canonical protocol specification all components implement). Repositories are developed side by side in a single workspace.
 2. **Service node is a separate process** with its own API, keeping messaging logic and user management separated.
 3. **Facade <-> server transport** - operator private channel, not a hidden network hop.
 4. **Wire format** - JSON for control messages, raw HTTP bodies for binary content (no base64 overhead). E2E-encrypted payloads are opaque blobs to all server-side components.
@@ -117,7 +117,7 @@ bazarish-server/                 # the server fleet, one build tree:
     admin-panel/                 #   fleet status + management web panel (sign-in-with-key)
     gateway/                     #   optional: runs the I2P router for a client that will not
 client-qt/                       # client core + Qt6 GUI
-client-daemon/                   # the same core with no interface: a REST API for bots and a web UI
+bazarish-bot/                    # the same core with no interface: a REST API for bots and a web UI
 alias-resolver/                  # alias registry: signed resolve over I2P + portal (paid)
 ```
 
