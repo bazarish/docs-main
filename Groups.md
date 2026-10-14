@@ -81,7 +81,9 @@ additive fields:
 - `replyTo` is passed on unchanged.
 - `sentAt` is the moment the host accepted the post. It is the same in every
   copy and in the history a newcomer receives, so history sorts into the past.
-- The author receives no copy: their own outgoing message is the post.
+- The author receives no copy: their own outgoing message is the post. The
+  host confirms every post it took with a `receipt` to its author, which is
+  what marks the post delivered on the author's screen.
 - A client honours `author` only on a message that carries a `group` block.
   On any other message it is ignored, or any contact could put a name over its
   own bubble.
@@ -124,7 +126,8 @@ envelope is.
 
 1. The member adds the host as a contact; the host accepts.
 2. The host asks for a **name in the chat**. The member answers with a plain
-   text message.
+   text message. Only a post is an answer: a receipt or any other service
+   message from the member gets no reply.
 3. The host checks the name (*Names*). A taken or refused name is asked for
    again.
 4. In an **open** group the member is in. In an **approval** group every admin
@@ -152,8 +155,10 @@ the host itself.
 
 - An admin decides requests to join (*Joining*).
 - An admin excludes a member from one of their posts: `bot.command`
-  `exclude <id>`. The excluded member is banned by fingerprint and cannot
-  rejoin. An admin cannot exclude another admin.
+  `exclude <id>`. The member is out and may come back by writing again.
+- An admin blocks a member the same way: `bot.command` `block <id>`. The
+  member is banned by fingerprint and cannot rejoin. An admin cannot exclude or
+  block another admin.
 - An admin deletes any post (*Edits and deletes*).
 - In a channel, admins write.
 
@@ -168,17 +173,24 @@ sends `group.state` - a message with no body, only the block - when `write` or
   to the author, in a message only the author sees. The author decides; the
   author's own descriptor goes nowhere.
 - A member turns this on and off with `bot.command` `contactable on` /
-  `contactable off`, offered as buttons in the host's welcome message. The
-  owner can switch it off for the whole group.
+  `contactable off`. The owner can switch it off for the whole group.
 
 ## Leaving
 
-- `bot.command` `leave`, also offered as a button in the welcome message.
+- `bot.command` `leave`.
 - Deleting the host from one's contacts is leaving too. The host learns it only
   as `DELIVERY_REJECTED` on its next delivery (`Errors.md`), and stops sending.
   A server does not say whether a pass is unknown or a mailbox is someone
   else's, so the refusal is the only signal. A later message from the same
   fingerprint restores the membership, under the same name.
+
+## Settings
+
+The welcome message carries one inline button, **Settings**, and says that
+`/settings` brings it up again. The button turns that message's buttons into
+`leave` and the `contactable` switch. A member who sends `settings` - as a
+`bot.command`, or as the plain text `/settings` - gets a message of their own
+with the same button; the host does not relay it.
 
 ## Descriptors inside text
 
@@ -195,9 +207,11 @@ verified, and a descriptor goes stale when its owner raises a new key.
 | `bot.command` | From | Meaning |
 |---|---|---|
 | `leave` | member | leave the group |
+| `settings` | member | a message with the Settings button |
 | `contactable` `on` / `off` | member | accept or refuse contact requests |
 | `contact <id>` | member | ask the author of post `<id>` for contact |
-| `exclude <id>` | admin | exclude and ban the author of post `<id>` |
+| `exclude <id>` | admin | exclude the author of post `<id>` |
+| `block <id>` | admin | exclude and ban the author of post `<id>` |
 | `delete <id>` | admin | delete post `<id>` for everyone |
 
 Decisions on a request to join are `bot.callback` presses on the card's
