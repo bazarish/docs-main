@@ -139,6 +139,10 @@ envelope is.
 5. A member who is in receives the last N posts (N chosen by the owner, 0
    allowed) and from then on every new one.
 
+A contact request repeated by someone already on the way in or in - naming,
+waiting for an admin, or a member - is answered with the accept alone: the
+host does not ask for the name again, admit again or send the history again.
+
 ## Names
 
 - 1 to 32 code points, without control or format characters, and without a
