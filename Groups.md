@@ -54,8 +54,9 @@ Every `content` envelope a group host sends carries one additive block:
   join or leave: a live count would tell every member the moment somebody
   joined.
 - `write` and `admin` are computed for the recipient. `write` is true while the
-  member is choosing a name, true for every member of a `group` and for an
-  admin of a `channel`, and false while a request to join awaits an admin.
+  member is choosing a name, true for one who left or was excluded (writing is
+  how they join again), true for every member of a `group` and for an admin of
+  a `channel`, and false while a request to join awaits an admin.
 - The client keeps the newest block per contact (by `at`). A message from that
   contact with no block and a `sentAt` newer than the kept `at` drops the group
   state: the account is no longer a group host.
@@ -145,8 +146,11 @@ envelope is.
 - Two names that **look alike** are the same name: names are compared by their
   confusable skeleton (Unicode UTS #39) after case folding and NFKC, so `a` and
   Cyrillic `a` clash, and a name that mixes scripts is refused.
-- A name is never freed. A member who leaves keeps it, and the same
+- A name stays with its member: a member who leaves keeps it, and the same
   fingerprint coming back gets it back.
+- A member changes it with `bot.command` `rename`. The next text they send is
+  the new name, checked as above and not relayed; a refused one is answered and
+  the host waits for another. The old name is freed.
 
 ## Roles
 
@@ -177,20 +181,21 @@ sends `group.state` - a message with no body, only the block - when `write` or
 
 ## Leaving
 
-- `bot.command` `leave`.
-- Deleting the host from one's contacts is leaving too. The host learns it only
-  as `DELIVERY_REJECTED` on its next delivery (`Errors.md`), and stops sending.
-  A server does not say whether a pass is unknown or a mailbox is someone
-  else's, so the refusal is the only signal. A later message from the same
-  fingerprint restores the membership, under the same name.
+A member leaves by deleting the host from their contacts. The host learns it
+only as `DELIVERY_REJECTED` on its next delivery (`Errors.md`): the first such
+refusal makes the member one who left, and the host stops sending. A server does
+not say whether a pass is unknown or a mailbox is someone else's, so the refusal
+is the only signal. A member who left and writes again joins again
+(*Joining*), under the same name.
 
 ## Settings
 
 The welcome message carries one inline button, **Settings**, and says that
-`/settings` brings it up again. The button turns that message's buttons into
-`leave` and the `contactable` switch. A member who sends `settings` - as a
-`bot.command`, or as the plain text `/settings` - gets a message of their own
-with the same button; the host does not relay it.
+`/settings` brings it up again, written as an offer to send it (`!!/settings!!`).
+The button turns that message's buttons into the `contactable` switch and
+**Change name** (`rename`). A member who sends `settings` - as a `bot.command`,
+or as the plain text `/settings` - gets a message of their own with the same
+button; the host does not relay it.
 
 ## Descriptors inside text
 
@@ -206,8 +211,8 @@ verified, and a descriptor goes stale when its owner raises a new key.
 
 | `bot.command` | From | Meaning |
 |---|---|---|
-| `leave` | member | leave the group |
 | `settings` | member | a message with the Settings button |
+| `rename` | member | take the next text as the new name |
 | `contactable` `on` / `off` | member | accept or refuse contact requests |
 | `contact <id>` | member | ask the author of post `<id>` for contact |
 | `exclude <id>` | admin | exclude the author of post `<id>` |
