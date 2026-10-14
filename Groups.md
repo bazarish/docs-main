@@ -112,8 +112,9 @@ envelope is.
 
 - A member reacts as in any chat: a `reaction` to the host. The host keeps one
   reaction per member per post.
-- Members see **counts only**, never who reacted. The host sends them in
-  batches, at most once every 30 seconds per member:
+- Members see **counts only**, never who reacted. The host sends them as they
+  change; changes that come while the previous delivery to a member is on its
+  way reach that member together:
 
 ```
 { "type": "group.reactions",
