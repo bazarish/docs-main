@@ -88,9 +88,13 @@ additive fields:
 - A client honours `author` only on a message that carries a `group` block.
   On any other message it is ignored, or any contact could put a name over its
   own bubble.
-- A message from the host **without** `author` is the host speaking to this
-  member alone - a prompt, a notice, an admin's request card. Clients mark it
-  as visible to the recipient only.
+- A post the host writes itself, not relayed from a member, carries
+  `"fromHost": true` in place of `author` and `contactable`. It goes to every
+  member, admins included. A client honours it only on a message with a `group`
+  block and draws it with no author line: the group itself is speaking.
+- A message from the host with neither `author` nor `fromHost` is the host
+  speaking to this member alone - a prompt, a notice, an admin's request card.
+  Clients mark it as visible to the recipient only.
 
 A post that would exceed the size limit (`Messages.md`, *Size*) once `author`
 and the block are added is refused when it arrives, with a notice to its
