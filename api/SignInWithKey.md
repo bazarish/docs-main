@@ -3,14 +3,14 @@
 Status: implemented.
 
 A Bazarish key is a login. A site issues a **challenge**, the user signs it in
-their client, and pastes the **login blob** back; the site recovers the signer's
-fingerprint and starts a session. The private key never enters the browser and no
+their client, and pastes the **login blob** back, or the client hands it to the
+site over I2P; the site recovers the signer's fingerprint and starts a session. The private key never enters the browser and no
 password exists anywhere.
 
 This document is the whole of authentication by signature: the signed request
 (section 1), the challenge and the blob built on it (sections 2 and 3), how a
-verifier checks a login (section 4) and what a client must do before it signs
-(section 5). Other documents refer here and do not restate it.
+verifier checks a login (section 4), what a client must do before it signs
+(section 5) and how it may hand the blob over itself (section 6). Other documents refer here and do not restate it.
 
 Every verifier in the project speaks this one contract: the service-node portal
 (`ServicePortal.md`), the alias registry and the admin panel
@@ -87,7 +87,10 @@ cache. A login does not need one: its challenge is single-use (section 4).
 
 ## 2. The challenge
 
-Minted by the site, `base64(JSON)`:
+Minted by the site as a link: `bazarish://sign?c=` followed by the base64url
+(RFC 4648 section 5, no padding) of this JSON. The link is the challenge: the site
+shows it as text, a link or a QR code, the client signs it as it stands, and it
+comes back with the blob. Nothing else is a challenge.
 
 ```json
 {
@@ -99,7 +102,8 @@ Minted by the site, `base64(JSON)`:
     "place": ["https://panel.example", "http://panel.b32.i2p"],
     "role": "Administrator"
   },
-  "tag": "9ab1..."
+  "tag": "9ab1...",
+  "callback": "http://panel.b32.i2p/login/callback"
 }
 ```
 
@@ -110,6 +114,7 @@ Minted by the site, `base64(JSON)`:
 | `ts` | When the challenge was minted, seconds, a number. Verified within a freshness window (300 s, either side). |
 | `consumer` | Who consumes the signature. Shown to the user before signing. |
 | `tag` | `hex(HMAC-SHA256(secret, nonce + "\n" + ts + "\n" + canonical(consumer)))` under a portal-local secret, so the portal recognises its own challenge without keeping state, and **the label cannot be changed after minting**. |
+| `callback` | Optional. Where the client may send the blob itself (section 6). |
 
 `canonical(consumer)` is the compact JSON object with keys in lexicographic
 order - `{"name":...,"place":...,"role":...}` - which is what the tag covers and
@@ -192,7 +197,7 @@ Produced by the client, `base64(JSON)`:
 
 It is a signed request (section 1) whose five values travel as the blob's fields
 rather than as headers, over method `BZ-LOGIN`, path `/portal/login` and body =
-the challenge string exactly as issued, still in base64. A login blob names no
+the challenge exactly as issued, the whole link. A login blob names no
 device, so its base string has no device line. The string signed is therefore
 
 ```
@@ -233,8 +238,9 @@ challenge breaks the tag.
 ## 5. What the client must do
 
 Before signing, the client **reads the consumer out of the challenge and shows
-all three fields**, and it **refuses to sign** a challenge that does not decode,
-is of another version, or does not name a complete consumer. Both halves matter:
+all three fields**, and it **refuses to sign** a challenge that is not a
+`bazarish://sign` link, does not decode, is of another version, does not name a
+complete consumer, or names a callback that breaks section 6. Both halves matter:
 a window that shows nothing leaves the user with nothing to compare, and a client
 that signs an unnamed challenge issues a signature for a place it could not
 name.
@@ -244,7 +250,44 @@ challenge says it is for and tells the user to compare that with the site in
 front of them; it does not say "trusted", it does not rank sites, and it does not
 mark anything as safe.
 
-## 6. What this stops, and what it does not
+## 6. Handing the blob over
+
+A challenge may carry a `callback`, and then the client can deliver the blob
+itself instead of the user pasting it.
+
+The callback is `http://` + host + path, at most 256 bytes:
+
+- the host is a `.b32.i2p` address, b32 or b33, and it is the host of one of the
+  consumer's places - a place written `http://host`, `http://host/...` or `host`;
+- no port, no user, no fragment; the path starts with `/` and holds only letters,
+  digits and `-._~!$&'()*+,;=:@/?%`.
+
+The client refuses a challenge whose callback breaks this. The signature can
+therefore go only to a place the verifier itself names, and only over I2P. The
+tag does not cover the callback: it can name nothing but a place the tag does
+cover, so editing it moves the blob at most to another path of that same place.
+
+With a callback the client shows where the signature goes and offers Send beside
+Copy. Send becomes available **5 seconds** after the challenge is shown, and
+only a press sends: not scanning a code, not opening a link.
+
+The client sends from a one-off I2P address, never from the account's own, so
+the site learns nothing it would not learn from a pasted blob:
+
+```
+POST <path> HTTP/1.1
+Host: <host>
+Content-Type: application/json
+
+{"challenge": "bazarish://sign?c=...", "blob": "..."}
+```
+
+A 2xx status means accepted; any other is shown as a refusal with its number.
+The client follows no redirect and shows nothing of the answer's body. What the
+site does next is its own: it verifies (section 4) and lets in the browser that
+showed the challenge, which it finds by the challenge's nonce.
+
+## 7. What this stops, and what it does not
 
 It stops the **quiet** version of the attack. A site cannot mint a challenge for
 somewhere else - the label it carries is the label the verifier will check - so
