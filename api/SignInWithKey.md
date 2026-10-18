@@ -267,8 +267,8 @@ therefore go only to a place the verifier itself names, and only over I2P. The
 tag does not cover the callback: it can name nothing but a place the tag does
 cover, so editing it moves the blob at most to another path of that same place.
 
-With a callback the client shows where the signature goes and offers Send beside
-Copy. Send becomes available **5 seconds** after the challenge is shown, and
+With a callback the client offers Send beside Copy; the host it sends to is
+already on the screen, among the consumer's places. Send becomes available **5 seconds** after the challenge is shown, and
 only a press sends: not scanning a code, not opening a link.
 
 The client sends from a one-off I2P address, never from the account's own, so
