@@ -32,6 +32,17 @@ one-time and unlinked from the user's identity destination, so a short tunnel
 there exposes nothing about who the user is. Variance is off so the path length
 cannot change mid-call.
 
+### Path probes
+
+A media destination may measure the paths its datagrams take and send its audio
+on the fastest. It sends a **probe**: a 9-byte RAW datagram to I2P port 7, byte 0
+`1`, bytes 1-8 an id of its choosing, big-endian. An implementation **should**
+answer a probe at once with an **echo**: the same 9 bytes with byte 0 `2`, to port
+7 of the destination it sends this call's media to (a RAW datagram names no
+sender), on the path that media takes. Media stays on port 0, so a probe never
+reaches the decoder, and a side that does not answer only costs its peer the
+choice of path.
+
 ### Encrypted LeaseSet (b33)
 
 The call's media destination publishes an **encrypted LeaseSet2 (b33)**, like
