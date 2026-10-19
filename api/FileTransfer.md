@@ -28,9 +28,11 @@ party's disk.
 "file": { "name": ..., "size": <plaintext bytes>, "sha256": <plaintext digest>, "mime": ... }
 ```
 
-The digest is over the **plaintext**, so the recipient can check that what it
-finally holds is what was announced, independently of how many transfer attempts
-it took, and independently of the per-transfer encryption below.
+The digest is over the **plaintext**, so the recipient checks that what it finally
+holds is what was announced, independently of how many transfer attempts it took
+and of the per-transfer encryption below. It hashes while decrypting and removes
+the result when the digests differ: a file changed at the sender's path after it
+was announced is refused, not delivered as something else.
 
 ## Threshold: no constant
 
