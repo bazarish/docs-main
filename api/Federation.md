@@ -83,6 +83,11 @@ latency reveals no co-location (`InviteAnonymity.md`). The one write that does n
 federate is a message to the sender's **own other devices**, which their server
 stores directly (`ClientApi.md`) - there is no second party for it to reach.
 
+The one route around I2P is a gateway linked to this server by its operator: the
+gateway carries its users' dials to this server's destinations over TLS
+(`bazarish-server/gateway/PROTOCOL.md`, The server link). The frame and the
+admission are unchanged, and the server still has no shortcut of its own.
+
 ## Delivery envelope
 
 Built entirely by the sending **client**; servers never see more than their layer:

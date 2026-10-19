@@ -126,6 +126,13 @@ destination routing removes. With delivery performed by the client the question
 does not arise: the client holds a destination and dials it, and cannot determine
 which server operates it.
 
+The exception is a gateway its user chose. A gateway linked to the server of the
+same operator carries its users' dials to that server's destinations over TLS
+(`bazarish-server/gateway/PROTOCOL.md`, The server link), so those users can tell
+from the latency which recipients that server hosts. The operator who runs both
+already knows it, and a gateway is a node its users picked. A client on its own
+router, or on a gateway somebody else runs, sees no difference.
+
 ## The destination parameter (`dest_U`)
 
 **Fundamental rule: a server has no single, shared federation destination.** Every

@@ -130,9 +130,9 @@ A sidebar carries the views:
   | Portal | the login consumer (name, address, role) the client shows before a user signs, the portal's public links, and the socket the portal binds |
   | Addresses | the facades' addresses as they report them (read-only: the panel writes them, see below), the reseeds, the descriptor built from both, the node's own operator API and the messaging server it is bound to, and the log level |
   | Accounts | the storage a new account gets and how long an idle one is kept, beside the two numbers that show whether that promise can still be kept: what the quotas have allocated and what the disk holds (`GET /v1/messaging/storage`) |
-  | Server | server-core's own file: log level and libi2pd's logging, its I2P privacy and tunnel count, its private listener and the node it reports to |
+  | Server | server-core's own file: log level and libi2pd's logging, its I2P privacy and tunnel count, its private listener, the listener its gateways reach it on (`gatewayListen`) and the node it reports to |
   | Facades | every facade of the deployment with its address and whether the descriptor carries it; a facade's page holds its own file, read and written over its ops socket - its three listeners (`listen`, `directListen`, `opsListen`), the messaging server it forwards to, its I2P address's privacy and tunnel count - its address, read-only, and **New address** |
-  | Gateways | every gateway with its sessions and destinations; a gateway's page holds the tunnels it builds for all its clients (privacy, count), its two warm pools (streams, calls) and its direct routes, read-only |
+  | Gateways | every gateway with its sessions and destinations; a gateway's page holds the tunnels it builds for all its clients (privacy, count), its two warm pools (streams, calls), and its link to server-core and its routes to the facades, read-only (the panel writes them, see below) |
   | Panel | the panel's own file: who may sign in, the words it signs under, the services it manages, and where it listens - plus what it cannot change (its fingerprint, its config file, its state and web directories, its version) |
 
   Every tab that holds a start-only setting also carries a **restart** control
@@ -188,13 +188,32 @@ list is saved again.
 
 **New address** replaces a facade's key and secret path at once and restarts it
 (`POST /new-address`). The panel takes the new URL from that answer rather than
-asking the facade, which is restarting, writes the descriptor, and then rewrites
-the **direct routes** of every gateway it manages: a route naming the old
-destination now names the new one (`PUT /settings` on the gateway, which applies
-routes at once). Otherwise a gateway that reached this facade without I2P would
+asking the facade, which is restarting, writes the descriptor, and then links
+the deployment's gateways again (below), so the route to this facade names the
+new destination. Otherwise a gateway that reached this facade without I2P would
 keep a route to an address nobody serves, and its clients would quietly fall back
 to I2P. The button says what it costs: a client that knows only the old address
 loses the server until it is given the new descriptor.
+
+### Gateways and the server
+
+The panel links every gateway of a deployment to its server-core and its
+facades; nothing of it is typed by hand. Over the ops sockets it writes:
+
+- into server-core (`PUT /v1/messaging/settings`): `gateways`, the key of every
+  gateway of the deployment, as each is pinned on the Panel tab;
+- into each gateway (`PUT /settings`): `server`, server-core's `gatewayListen`
+  and key, and `direct`, one route for every facade with a `directListen`: the
+  facade's destination, that socket and the facade's key.
+
+A listener bound to every interface is reached at the host the panel reaches
+that service on. The panel writes these whenever the service list, server-core's
+settings or a facade's settings are saved, and when a facade is given a new
+address; a value already in place is not written again. A server-core without a
+`gatewayListen` leaves its gateways linked to the facades only. Traffic goes
+from the gateway to server-core and to the facades directly
+(`bazarish-server/gateway/PROTOCOL.md`, The server link): the panel is not in
+it.
 
 The quota is set **on the service node**, which is the component that grants it and
 pushes it to server-core. Setting it directly on server-core, as an earlier
@@ -257,8 +276,9 @@ identity. Those are shown read-only. **Everything else an operator would edit
 over SSH is editable here, and every service can be restarted from here**, which
 is the rule this page is built to: managing a Bazarish server should not require a
 shell on it. A gateway's file is the exception in the other direction: the panel
-edits its tunnels, pools and direct routes and leaves the rest - the secret path
-and the token above all - to the operator, and never reads them.
+edits its tunnels and pools, writes its link and routes itself, and leaves the
+rest - the secret path and the token above all - to the operator, and never reads
+them.
 
 ## First run
 
