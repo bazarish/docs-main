@@ -16,7 +16,7 @@ party's disk.
               <---------------- file.request {fileId} ------------+
  encrypt to a temp ciphertext (fresh key)
  raise a one-time destination (b33)
-              ----------------- file.offer {host,key,sha256,size} ->
+              -------------- file.offer {host,header,key,sha256,size} ->
                                                             connect, stream, resume
               <================ direct I2P stream ==================
  tear the destination down, drop the temp    ------------>  verify digest, decrypt
@@ -50,7 +50,7 @@ All four are ordinary sealed E2E messages, silent (never a chat bubble):
 | Type | Direction | Payload |
 |---|---|---|
 | `file.request` | recipient -> sender | `fileId` (the announcing message's id), `device` (the requesting client id) |
-| `file.offer` | sender -> recipient | `offer` = `{fileId, host, key, sha256, size}`, `forDevice` (the client id that asked) |
+| `file.offer` | sender -> recipient | `offer` = `{fileId, host, header, key, sha256, size}`, `forDevice` (the client id that asked) |
 | `file.unavailable` | sender -> recipient | `fileId` |
 | `file.cancel` | either direction | `fileId`, `device` (the client id that is pulling the file) |
 
@@ -118,9 +118,15 @@ The sender encrypts the file to a temp ciphertext with a fresh per-transfer key
 only). Encrypting in advance, rather than on the fly, is what makes arbitrary byte
 ranges servable and gives the digest before the first byte is sent.
 
-The key and the **ciphertext** digest travel in the sealed offer. The recipient
-assembles the ciphertext, verifies that digest, and only then decrypts
-file-to-file: a tampered or truncated transfer never yields cleartext.
+The envelope's encrypted content is detached (RFC 5652 lets `encryptedContent`
+be absent): what is served is the bare ciphertext, and the envelope itself - a
+few hundred bytes of recipient info and parameters - travels base64 in the offer
+as `header`. A CMS decoder reads an envelope that carries its content whole into
+memory, so a recipient refuses one that does.
+
+The header, the key and the **ciphertext** digest travel in the sealed offer. The
+recipient assembles the ciphertext, verifies that digest, and only then decrypts:
+a tampered or truncated transfer never yields cleartext.
 
 The whole path is streamed. Neither side ever holds the file whole in memory, so
 a file substantially larger than available memory transfers without difficulty.
