@@ -259,6 +259,7 @@ face, with the same retry.
 | `edit` | content | An in-place edit of a message the sender previously sent: `ref` (the target message's `id`), `text` (new text), `keyboard` (new inline keyboard, `[]` to clear). The recipient replaces its copy. Applied only to a message sent by `from`. See *Editing and deleting messages*. |
 | `delete` | content | A delete-for-everyone of a message the sender previously sent: `ref` (the target message's `id`). The recipient removes its copy with **no tombstone** left behind. Scoped, like `edit`, to a message sent by `from`. See *Editing and deleting messages*. |
 | `chat.clear` | content | Asks the peer to clear the **whole** one-to-one conversation with the sender (no `ref`). The recipient's client wipes its transcript with `from` and leaves a single "cleared the chat" notice. The chat itself remains. The "clear for everyone" choice in the chat-info panel. |
+| `chat.timer` | content | Sets the one-to-one conversation's auto-delete timer for both sides: `seconds` is one of 0 (off), 3600, 86400, 604800 or 2592000, and any other value is ignored. The recipient's client takes the same timer and leaves a "set the auto-delete timer" notice. See *Auto-delete timer*. |
 | `avatar` | content | The sender's avatar pushed to a contact: `avatar` = `{ mime, data }`, `data` being the bytes of a square PNG/JPEG (a CBOR byte string, as in an `image`) compressed client-side to at most **500 KB**. A silent service message - stored as that contact's picture, never shown as a chat bubble. Sent once the dialog is mutually established and re-sent to every contact when the avatar changes. See *Avatars and display names* and `Contacts.md`. |
 | `device.avatar` | device | Self-sync of the user's own avatar to their other devices: the same `avatar` block, sealed to the user's own key and stored through `POST /v1/messaging/self`. See `DeviceSync.md`. |
 | `device.contact-name` | device | Self-sync of a local contact rename to the user's other devices: `peer` (fingerprint), `name`. A purely local label, never sent to the contact. See `DeviceSync.md`. |
@@ -401,6 +402,18 @@ request (the peer's client chooses to honour it), distinct from `delete`, which
 removes a single message. Deleting a **contact** is a separate, local-only,
 irreversible action: it removes the contact and the whole conversation from the
 deleting device (the peer is not told).
+
+### Auto-delete timer
+
+A one-to-one conversation may carry an auto-delete timer. Either side sets it with
+`chat.timer`, the other side takes the same value, and both show a notice of who set
+it. Each device deletes **its own copy only**: nothing is sent when a message goes.
+A message is counted from when it was sent on the sender's devices and from when it
+was read on the recipient's, under the timer in force at that moment, so turning the
+timer on does not touch what was already sent or read. Text, pictures, voice messages
+and files expire; service notices do not. A client checks for expired messages when
+a conversation is opened and from time to time across every conversation. Group
+conversations carry no timer.
 
 ### Avatars and display names
 
