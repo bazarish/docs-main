@@ -19,10 +19,10 @@ that fingerprint; no shared secret is used.
 
 | Request | Purpose |
 |---|---|
-| `PUT /v1/messaging/i2p-dest` | Supply the user's signed offline transient; an empty transient revokes the destination. Answers `{dest, servingKey}` - the address derived from the transient (known before any tunnel is built) and the sealing key that destination serves with, which the client cannot derive. A transient over a **different** address replaces the destination at once: the old one is stopped and dropped inside the same call, so nothing is served on it afterwards and its lease set stops being published. The serving sealing key is kept only while the address is unchanged |
+| `PUT /v1/messaging/i2p-dest` | Supply the user's signed offline transient; an empty transient takes the destination offline. Offline, the address is no longer served but keeps its sealing and signing keys, so the same address published again serves with the same keys and every contact's card stays valid; a delegation that runs out is taken offline the same way. Answers `{dest, servingKey}` - the address derived from the transient (known before any tunnel is built) and the sealing key that destination serves with, which the client cannot derive. A transient over a **different** address replaces the destination at once: the old one is stopped and dropped inside the same call, so nothing is served on it afterwards and its lease set stops being published. The serving sealing key changes only when the address does |
 | `PUT /v1/messaging/quota` | Set the mailbox quota granted by the account, in place of the server's default |
 | `GET /v1/messaging/account?user=` | State held for one account: registered devices, bytes in use, effective quota; displayed by the administration panel |
-| `DELETE /v1/messaging/account?user=` | The account has been deleted: discard the mailbox, the replay markers, the delivery passes, the device registry and the quota override. Issued whenever an account is deleted, by its owner or by an operator. Idempotent: a fingerprint for which the server holds no state is already in the requested condition |
+| `DELETE /v1/messaging/account?user=` | The account has been deleted: discard the mailbox, the replay markers, the delivery passes, the device registry, the quota override and the destination record with its keys. Issued whenever an account is deleted, by its owner or by an operator. Idempotent: a fingerprint for which the server holds no state is already in the requested condition |
 
 ## Client-ID registry
 
