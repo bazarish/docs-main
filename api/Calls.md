@@ -101,17 +101,22 @@ implementation keeps the two from competing - for threads, for a router's
 workers, for anything else it shares - is an implementation matter and belongs in
 its own documentation.
 
-Both sides run their own ring timeout, so an unanswered call terminates without
-user action. The caller's interval starts when the peer's device reported ringing,
-or, if no such report arrived, when the invitation was delivered to the peer's
-server; the callee's starts when the invitation arrived. Neither side requires a
-signal from the other in order to stop ringing.
+An invitation is answered within **60 seconds** of its `sentAt` (the field every
+message carries) or not at all, and both sides count that window from the same
+`sentAt`:
 
-An invitation is valid only while it would still be ringing. A signal carries the
-`sentAt` every message carries, and a callee **must** ignore a `call.invite`
-older than its ring timeout: the mailbox holds what it is given until the device
-fetches it, so an invitation can arrive long after the caller stopped waiting,
-and ringing for it then would ring with no caller on the other end.
+- The caller waits at most 60 seconds after it sent the `call.invite`, delivered
+  or not, ringing or not, then ends the call with `call.end`.
+- A callee **must** drop a `call.invite` that arrives 60 seconds or more after its
+  `sentAt`, or that carries no `sentAt`. Such an invitation is not shown, not
+  answered with any signal and not recorded: the mailbox holds what it is given
+  until the device fetches it, so it can arrive long after the caller stopped
+  waiting.
+- An invitation that arrives in time rings only for what is left of the window.
+  The window is counted from the earlier of `sentAt` and the arrival, so a callee
+  whose clock runs behind the caller's never rings longer than 60 seconds.
+
+Neither side requires a signal from the other in order to stop ringing.
 
 The end of a call and its beginning are two mailbox items, and the mailbox does
 not guarantee the order in which they are delivered. A callee that has seen
