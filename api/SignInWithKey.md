@@ -90,7 +90,8 @@ cache. A login does not need one: its challenge is single-use (section 4).
 Minted by the site as a link: `bazarish://sign?c=` followed by the base64url
 (RFC 4648 section 5, no padding) of this JSON. The link is the challenge: the site
 shows it as text, a link or a QR code, the client signs it as it stands, and it
-comes back with the blob. Nothing else is a challenge.
+comes back with the blob. Nothing else is a challenge; a site may also show a link
+that leads to one (below).
 
 ```json
 {
@@ -133,15 +134,19 @@ reliably, so a site may show a link to its challenge instead:
 
 ```
 bazarish://sign?at=<host><path>
+bazarish://sign?at=panel.b32.i2p/login/c/5f3c...
 ```
 
 The host and path follow the callback's rules (section 6): a `.b32.i2p` host, no
 port, a path that starts with `/`, at most 256 bytes with `http://` in front. The
 client fetches it from a one-off I2P address with `GET <path>`. A `200` answer's
 body is the challenge and nothing else, at most 4096 bytes; any other status is
-shown as a refusal with its number. The client then handles the challenge as if
-it had been given it, and also refuses it unless its callback goes back to the
-host the link named: a link cannot pass on another place's challenge.
+shown as a refusal with its number.
+
+The challenge behind a link must carry a callback on the host the link named.
+The client refuses one without a callback or with a callback elsewhere: a link
+cannot pass on another place's challenge. Past that check the client handles the
+challenge as if it had been given it.
 
 ### The consumer
 
@@ -257,7 +262,9 @@ challenge breaks the tag.
 Before signing, the client **reads the consumer out of the challenge and shows
 all three fields**, and it **refuses to sign** a challenge that is not a
 `bazarish://sign` link, does not decode, is of another version, does not name a
-complete consumer, or names a callback that breaks section 6. Both halves matter:
+complete consumer, or names a callback that breaks section 6. A challenge fetched
+by a link is also refused when its callback does not go back to the link's host
+(section 2). Both halves matter:
 a window that shows nothing leaves the user with nothing to compare, and a client
 that signs an unnamed challenge issues a signature for a place it could not
 name.
