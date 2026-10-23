@@ -475,8 +475,11 @@ stamped by the sending client from its own clock at send time. It sits inside th
 sealed body, under the authorship signature, and it is the single source of truth
 for both the message's displayed time and its position in the conversation.
 
-A recipient orders a conversation by `sentAt` and by nothing else. In particular
-it does not order by when the message reached it, and it has nothing from a
+A recipient orders a conversation by `sentAt`, with one bound: a message from the
+other side never goes above a message the recipient had already written in that
+conversation when it arrived. The order key of such a message is the later of its
+`sentAt` and one millisecond after the recipient's newest own message, while the
+time it shows stays its `sentAt`. Apart from that bound there is nothing from a
 server to order by: a mailbox is told the delivery class and the size of an
 envelope and never its contents, so no server is in a position to say when a
 message was written - and none is asked. The local arrival clock stands in only
@@ -493,19 +496,22 @@ where it happens:
   them (`api/ClientApi.md`), so a burst is fetched in the order it arrived rather
   than in whatever order the server's storage happens to enumerate.
 
-Concretely each message gets a stable **order key**, which is its `sentAt`. The
-conversation is kept sorted by it, so a message written long ago and delivered
-only now appears where it was written, in history, rather than at the bottom.
-Such a message can therefore appear above the visible part of the conversation,
-and noticing it is not left to the reader: the unread mark is kept as a
-high-water over *stored* rows, in the order they were received, so a late arrival
-is unread whatever its timestamp says.
+Concretely each message gets a stable **order key**: its `sentAt`, raised to the
+bound above when it came from the other side. The conversation is kept sorted by
+it, so a message written long ago and delivered only now appears where it was
+written among the other side's messages, but below anything the recipient wrote
+before it arrived. Such a message can therefore appear above the visible part of
+the conversation, and noticing it is not left to the reader: the unread mark is
+kept as a high-water over *stored* rows, in the order they were received, so a
+late arrival is unread whatever its timestamp says.
 
-The cost of ordering by a clock the recipient does not control is stated plainly:
-a correspondent whose clock is wrong (or who lies about it) places their own
-messages wrongly in the conversation, and nothing but their own signature backs
-the time. This is accepted deliberately - the alternative is to let the party
-that is meant to know nothing about a message decide where it goes.
+The bound exists because two clocks are compared. A reply written a second after
+a question, by a clock a second and a half behind the asker's, would otherwise
+land above the question it answers. The other costs of ordering by a clock the recipient does not
+control remain: a correspondent whose clock is wrong (or who lies about it)
+places their own messages wrongly among themselves, and nothing but their own
+signature backs the time. This is accepted deliberately - the alternative is to
+let the party that is meant to know nothing about a message decide where it goes.
 
 ## Delivery status
 
