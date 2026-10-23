@@ -256,6 +256,7 @@ face, with the same retry.
 | `reaction` | content | A reaction to a message: `ref` (the target message's `id`), `text` (**at most 4 characters and 20 bytes** - enough for an emoji with a modifier or a joined pair; **empty removes** the reactor's reaction). Both limits are checked when sending and again on receipt: a peer's client is not the receiver's to trust, and an oversized one is dropped rather than rendered on someone's message. One reaction per user per message - a new one overwrites the old at every recipient. A single sealed delivery to the peer. Never a chat bubble - clients render it as a chip on the target message. See *Reactions*. |
 | `bot.command` | content | A command invocation aimed at a bot: `command` (name, no leading slash), `args` (raw argument string). See *Bots & interactive messages*. |
 | `bot.callback` | content | An inline-keyboard button press: `data` (the button's payload), `ref` (the `id` of the keyboard message). See *Bots & interactive messages*. |
+| `bot.menu` | content | The commands a bot offers a contact: `menuId` (a random unsigned 32-bit integer) and `items` of `{ title, command }`. A client names the menu it holds in the `menuId` of what it sends back. A silent service message. See `Bots.md`. |
 | `edit` | content | An in-place edit of a message the sender previously sent: `ref` (the target message's `id`), `text` (new text), `keyboard` (new inline keyboard, `[]` to clear). The recipient replaces its copy. Applied only to a message sent by `from`. See *Editing and deleting messages*. |
 | `delete` | content | A delete-for-everyone of a message the sender previously sent: `ref` (the target message's `id`). The recipient removes its copy with **no tombstone** left behind. Scoped, like `edit`, to a message sent by `from`. See *Editing and deleting messages*. |
 | `chat.clear` | content | Asks the peer to clear the **whole** one-to-one conversation with the sender (no `ref`). The recipient's client wipes its transcript with `from` and leaves a single "cleared the chat" notice. The chat itself remains. The "clear for everyone" choice in the chat-info panel. |
@@ -316,7 +317,7 @@ No server, facade, federation or storage change accompanies a new row.
 
 A bot is not a server concept either: it is an **ordinary identity** that
 registers on a server like any client, accepts contacts and exchanges the same
-`content`/`contact` envelopes. "Botness" lives entirely in Layer 2 - three
+`content`/`contact` envelopes. "Botness" lives entirely in Layer 2 - four
 client-only pieces, all forward-compatible:
 
 **Inline keyboard.** Any content message (typically `text`) may carry an
@@ -345,7 +346,11 @@ without parsing free text (though a bot may do either).
 **Callbacks.** A `bot.callback` reports a button press back to the bot, which
 acts on the `data` and may reply (e.g. with a new message or a fresh keyboard).
 
-Because all three are `content`-class deliveries, the server, facades,
+**Menu.** A `bot.menu` lists the commands a bot offers, shown beside the
+conversation, and every message a client answers it with names the menu it
+holds.
+
+Because all four are `content`-class deliveries, the server, facades,
 federation and storage are unchanged and never learn that a conversation
 involved a bot. The full model is in `Bots.md`.
 

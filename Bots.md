@@ -27,9 +27,9 @@ A bot runs as a program of its own against `bazarish-bot`, which holds the
 account and exposes it through a REST API. A group is a bot that relays its
 members' posts to each other; it is specified in `Groups.md`.
 
-## The three content types
+## The four content types
 
-All three are `content`-class deliveries (pass-gated, established-contact),
+All four are `content`-class deliveries (pass-gated, established-contact),
 sealed end-to-end like any message.
 
 ### `bot.command` - a command invocation
@@ -101,16 +101,64 @@ the behaviour in which a message changes in response to a button press. The same
 bot-only feature. A bot edits only messages it sent; a client enforces that on
 receipt.
 
+### `bot.menu` - the commands a bot offers
+
+```
+{ "v": 1, "type": "bot.menu", "id": <id>, "from": <fp>, "sentAt": <unix ms>,
+  "menuId": 3303132829,   // chosen at random by the bot
+  "items": [ { "title": "Balance", "command": "balance" },
+             { "title": "Help", "command": "help" } ]
+}
+```
+
+A bot tells a contact which commands it takes. A client keeps the newest menu
+each contact sent and offers its items beside that conversation; pressing one
+sends `/command` to that contact as an ordinary text message. A menu replaces
+the one before it as a whole, and an empty `items` takes the menu away. Menus are
+ordered by `sentAt`: one sent before the menu a client holds is dropped, because
+I2P does not keep order.
+
+The sender checks the limits before sending and the receiver checks them on
+arrival; a menu outside them is dropped whole.
+
+| Field | Limit |
+|---|---|
+| `menuId` | an integer from 0 to 2^32 - 1 |
+| `items` | at most 32 |
+| `title` | 1 to 32 characters of UTF-8, none of them C0, DEL, C1, a line or paragraph separator or a bidi control (the set `SignInWithKey.md` forbids a consumer) |
+| `command` | 1 to 32 of `a-z`, `0-9` and `_`: no slash, no arguments |
+
+A title is shown as plain text: no markup and no links.
+
+**The menu a client holds travels back.** Every `text`, `image`, `audio`,
+`file`, `bot.command` and `bot.callback` a client sends to a contact whose menu
+it holds carries that menu's id; a client that holds none sends no `menuId`. A
+message whose `menuId` is not such an integer is dropped.
+
+```
+{ "v": 1, "type": "text", ..., "text": "hello", "menuId": 3303132829 }
+```
+
+When a message names no menu or another one than the bot's current menu, the bot
+sends `bot.menu` again at once, as a message of its own, without waiting for its
+answer. That covers a device added to the account later, a menu lost or
+overtaken on the way, and a menu the bot changed: the next message the person
+writes brings the current one.
+
+A `bot.menu` is control content: it is not shown as a message and raises no
+notification.
+
 ### Read receipts
 
 A bot sends a `receipt` for the user-visible content it receives (text, files
 and media), so the sender's message advances to the *read* ("green") state - a
 bot is a normal recipient in this respect. Receipts are not sent for the control
-types (`bot.command`, `bot.callback`, `edit`).
+types (`bot.command`, `bot.callback`, `bot.menu`, `edit`).
 
 ## Forward compatibility
 
-`bot.command` and `bot.callback` are ordinary registry rows: a client that does
-not know them keeps, acks and surfaces them as "unsupported" rather than
-dropping them (`Messages.md`). The `keyboard` field degrades to a plain message.
+`bot.command`, `bot.callback` and `bot.menu` are ordinary registry rows: a client
+that does not know them keeps, acks and surfaces them as "unsupported" rather
+than dropping them (`Messages.md`). The `keyboard` field degrades to a plain
+message, and a `menuId` is ignored by anyone that does not know it.
 Nothing here is a breaking change to the envelope, so `v` stays at 1.
