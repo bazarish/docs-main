@@ -126,6 +126,23 @@ The site gives the challenge to the user and receives it back together with the
 blob. Because of the tag it does not have to remember what it issued, only which
 nonces have been consumed.
 
+### A link to a challenge
+
+Three places and a callback make a QR code too dense for a phone camera to read
+reliably, so a site may show a link to its challenge instead:
+
+```
+bazarish://sign?at=<host><path>
+```
+
+The host and path follow the callback's rules (section 6): a `.b32.i2p` host, no
+port, a path that starts with `/`, at most 256 bytes with `http://` in front. The
+client fetches it from a one-off I2P address with `GET <path>`. A `200` answer's
+body is the challenge and nothing else, at most 4096 bytes; any other status is
+shown as a refusal with its number. The client then handles the challenge as if
+it had been given it, and also refuses it unless its callback goes back to the
+host the link named: a link cannot pass on another place's challenge.
+
 ### The consumer
 
 | Field | What it holds | Limit, UTF-8 bytes |
