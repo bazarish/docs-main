@@ -10,7 +10,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 |---|---|---|
 | **Server** | daemon (C++) | Core messaging: pending content storage, delivery, federation over hidden networks |
 | **Service node** | separate daemon (C++) | User management: accounts, portal, moderation. Isolated from messaging logic |
-| **Facade** | daemon (C++) | "Last mile" between client and server infrastructure. First implementation: HTTP over its own I2P destination at a secret path |
+| **Facade** | daemon (C++) | "Last mile" between client and server infrastructure. First implementation: HTTP over its own I2P destination (b33), answered at `/` |
 | **Gateway** | optional daemon (C++) | Runs the I2P router for a client that does not run its own. An optional part of an operator's deployment: nothing else in it depends on a gateway, and a gateway needs nothing else from it |
 | **Client** | separate repositories | Qt6 desktop app (`client-qt`); the same client core behind a REST API for bots (`bazarish-bot`) |
 | **I2P router** | in-process or external | Transport for the client API, federation and calls. How a component hosts its router is an implementation choice, not part of the protocol |
@@ -59,7 +59,7 @@ server is what forwards it.
 3. **Facade <-> server transport** - operator private channel, not a hidden network hop.
 4. **Wire format** - JSON for control messages, raw HTTP bodies for binary content (no base64 overhead). E2E-encrypted payloads are opaque blobs to all server-side components.
 5. **Destination routing** - delivery routes by the recipient's I2P **destination** (its b33), carried in the user-signed contact card, not by server fingerprint; the sender dials it directly (no resolver, no `peers.json`). A server has **no single federation address**: every user is served by their own destination, which admits what arrives and initiates no connections. The sending **client** performs the dialling, from a destination held for that one correspondent; a server that initiates no connections cannot derive a correspondence graph from the addresses it contacted. A contact is shared as a **descriptor** (`fp:b33`); an **alias** resolves at the central resolver. Every routing target is a `.b32.i2p` host. See `Identity.md`, `api/Federation.md`, `api/InviteAnonymity.md`, `api/FederatedResolve.md`.
-6. **Single facade entry point** - the client uses one secret URI, and behind it one path: the tunnel. The facade fans out to nothing, because there is one backend; the messaging server is what reaches the service node.
+6. **Single facade entry point** - the client uses one facade address, and behind it one path: the tunnel. The facade fans out to nothing, because there is one backend; the messaging server is what reaches the service node.
 6a. **Routing travels with every message** - a message carries its sender's current destination and serving sealing key (`routing`), and a receiver adopts the pair whenever it differs. Regenerating an I2P key changes the address, and a contact who learned the old one at introduction would dial it forever; one message from the moved side repairs the return path, in either direction and of any type. There is no second recovery path: a request for someone's new address could only go to their old one. The rule is that a party which changes its address sends first. See `Messages.md`.
 6b. **Tunnel length is a user setting** - three levels: minimal (1 hop each way, no variance), middle (1 hop, variance 1: I2P adds between zero and one hop and never subtracts), maximum (3 hops, no variance, the depth I2P itself defaults to). The client defaults to minimal and states what one hop does and does not conceal; call media remains minimal at every setting, three hops in each direction introducing audible delay in a live call. Server components accept `i2p.privacy` and default to maximum.
 7. **Docs language** - English (code comments are English per codestyle).
@@ -113,7 +113,7 @@ common-cpp/ (dir: common/)      # shared C++ library: protocol types, OpenSSL wr
 bazarish-server/                 # the server fleet, one build tree:
     server-core/                 #   messaging server daemon (I2P federation, destination-routed)
     service-node/                #   service node daemon (accounts, portal, moderation)
-    facade-http/                 #   HTTP facade daemon (secret-path last mile)
+    facade-http/                 #   HTTP facade daemon (I2P last mile)
     admin-panel/                 #   fleet status + management web panel (sign-in-with-key)
     gateway/                     #   optional: runs the I2P router for a client that will not
 client-qt/                       # client core + Qt6 GUI

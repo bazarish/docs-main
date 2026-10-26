@@ -4,7 +4,7 @@ Status: draft skeleton. The single client-facing API, reached through a facade (
 
 ## Conventions
 
-- Base: one secret URI per facade; everything below is relative to it.
+- Base: a facade's address, answered at `/`; everything below is relative to it.
 - Control messages: JSON. Binary content (attachments, encrypted blobs): raw HTTP bodies, no base64.
 - **Everything below travels inside one sealed tunnel.** The paths named in this
   document are what the *server* sees after it opens a frame; on the wire there

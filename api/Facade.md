@@ -14,8 +14,7 @@ The facade is the "last mile" between the client and the server infrastructure. 
   address is stable across restarts because it travels in the server
   descriptor. It carries 16 tunnels unless `i2p.tunnelQuantity` says
   otherwise. The I2P front parses no HTTP: an accepted stream is relayed to the
-  facade's plain listener (`listen`, on loopback), which applies the routing and
-  the secret prefix. The
+  facade's plain listener (`listen`, on loopback), which applies the routing. The
   stream is torn down only after the client has read the reply (or a bounded
   drain elapses): closing it immediately after the last write truncates the
   reply, and the client then sees an empty stream rather than a response. The log
@@ -60,11 +59,18 @@ The facade is the "last mile" between the client and the server infrastructure. 
 - This is the **only** I2P address the server side publishes. Federation runs on
   the users' own destinations (`InviteAnonymity.md`), never a shared one, so a
   facade address discloses nothing about which users a server hosts.
-- Published under a **secret URI** known only to clients of this server, and that secrecy is **mandatory, not a deployment option**: the facade mints its secret path at its first start, together with its destination key, and keeps both in `state`; there is no `basePath` in its configuration to leave empty, and one written there is refused. It requires the path on every request and strips it before forwarding. The secret reaches a client solely inside the facade URL of the server descriptor (below); it is never advertised, never derived from the server fingerprint, and never sent anywhere else.
-- **The facade knows its own address and says it.** The destination and the path together are its URL, which it prints at start and reports in `GET /settings` on its ops socket. The admin panel reads it from there and writes the facades' URLs into the server descriptor itself (`AdminPanel.md`), so an operator never copies an address by hand.
-- The whole API therefore lives under the secret prefix. Nothing is left outside it: the reseed is no longer part of this API at all (`ClientApi.md`), so a facade answers only requests from a client that already holds the secret.
-- **Two paths exist, and the facade reads neither.** Once the secret prefix is
-  stripped, both are relayed over the **operator private channel** to the
+- **The address is the secret.** The destination is published as an encrypted
+  LeaseSet (b33): the network database keeps it under a blinded key that changes
+  daily, so the address is learned only from someone who holds it. It reaches a
+  client solely inside the server descriptor (below); it is never advertised,
+  never derived from the server fingerprint, and never sent anywhere else. The
+  facade answers at `/`, with no path prefix of its own.
+- **The facade knows its own address and says it.** It prints the address at
+  start and reports it in `GET /settings` on its ops socket. The admin panel reads
+  it from there and writes the facades' addresses into the server descriptor
+  itself (`AdminPanel.md`), so an operator never copies an address by hand.
+- **Two paths exist, and the facade reads neither.** Both are relayed over the
+  **operator private channel** to the
   messaging server, which is the facade's only backend. That channel is TLS
   pinned by the key the messaging server prints, so it need not be a loopback
   address or a tunnel:
@@ -89,20 +95,18 @@ The facade is the "last mile" between the client and the server infrastructure. 
   the facade at all (`Architecture.md`). That is what leaves one path where there
   used to be two prefixes, and with it goes the one bit that said which of the
   two kinds a request was.
-- Everything outside the secret prefix answers the same bare **404** - the API root, an unknown path, and the operator liveness endpoint alike - so a probe of the host learns nothing. `/healthz` is not on the client-facing socket at all: it is served on a separate private **ops listener** (`opsListen`) that is never published to clients (`AdminPanel.md`).
+- Everything else answers the same bare **404** - an unknown path and the operator liveness endpoint alike. `/healthz` is not on the client-facing socket at all: it is served on a separate private **ops listener** (`opsListen`) that is never published to clients (`AdminPanel.md`).
 - The ops listener also carries the facade's **own configuration**, operator-signed
   like `/healthz`: `GET /settings` and `PUT /settings` (the backend, the three
-  sockets, the I2P side, the log level; `GET` adds the facade's URL),
-  `POST /new-address` and `POST /restart`. They are on the ops socket for the
-  same reason `/healthz` is - on the public one they would reveal that the host
-  is a facade. Only the log level applies at once; the rest is written into the
+  sockets, the I2P side, the log level; `GET` adds the facade's address),
+  `POST /new-address` and `POST /restart`. They are on the ops socket with
+  `/healthz`: every client of the server holds the public address, and none of
+  them needs the operator's endpoints. Only the log level applies at once; the rest is written into the
   facade's config file and read at its next start, which is what
   `POST /restart` is for.
-- **`POST /new-address` replaces the key and the secret path at once**, answers
-  with the new URL and the previous one, and restarts the facade to publish the
-  new destination. Both are replaced together because either alone already
-  changes the URL, and an address that has leaked is replaced whole. **It
-  invalidates every server descriptor that carries the old URL**: a client keeps
+- **`POST /new-address` replaces the key**, answers with the new address and the
+  previous one, and restarts the facade to publish the new destination. **It
+  invalidates every server descriptor that carries the old address**: a client keeps
   the facade list it was given and does not learn a new one by itself, so a
   client that knows only this facade loses the server until it is given the new
   descriptor. A server with several facades loses only the one.
@@ -111,8 +115,8 @@ The facade is the "last mile" between the client and the server infrastructure. 
   for a gateway the same operator runs: given a route to it, that gateway dials
   this address instead of the destination and the flow does not enter I2P
   (`bazarish-server/gateway/PROTOCOL.md`). Left out, the destination is the only way
-  in. It changes nothing a client can observe: the secret prefix, the sealed
-  tunnel and the uniform 404 are the same on both.
+  in. It changes nothing a client can observe: the paths, the sealed tunnel and
+  the uniform 404 are the same on both.
 - Nothing streams through the facade: the only large payload there ever was - a file upload - now goes directly between clients (see `FileTransfer.md`).
 - Holds no key of the server or of its users (only its own I2P destination and a self-signed TLS credential), parses no content (there is nothing left to parse: authentication happens inside the seal, at the backend), stores nothing. An unreachable backend yields a `FACADE_UPSTREAM` 502 - the facade is only a relay.
 - Implemented in `facade-http/` of the `bazarish-server` repository (`Facade`; covered by tests and live-verified relaying to a running server-core).
@@ -138,27 +142,23 @@ should be read as claiming it.
 
 ## Client addressing
 
-A client reaches a facade through a single **facade URL**:
+A client reaches a facade through its **facade address** - the I2P host, with
+no scheme and no path:
 
 ```
-http://<b33>.b32.i2p/secret-path
+<b33>.b32.i2p
 ```
 
-- **`<b33>.b32.i2p`** - the facade's own I2P destination, by the b33 of
-  its encrypted LeaseSet2. The client dials it over I2P and speaks plain HTTP on
-  the stream: the stream is encrypted to the destination dialled, and the facade
-  is the untrusted last mile in any case - all security is end-to-end and
-  anchored in the server fingerprint.
-- **/secret-path** - the secret URI prefix, e.g. `/h9fd/kshdcy/secretdkg`. The
-  client prepends it to **every** request path it sends a facade (a reseed is
-  fetched from its own address, above, and carries none); the facade strips it
-  before forwarding. It is excluded from the signed canonical path, so the
-  backend verifies the stripped, query-less path, and one signature is valid
-  across all of a server's facades.
+It is the facade's own I2P destination, by the b33 of its encrypted LeaseSet2.
+The client dials it over I2P and speaks plain HTTP on the stream, with paths
+from `/`: the stream is encrypted to the destination dialled, and the facade is
+the untrusted last mile in any case - all security is end-to-end and anchored in
+the server fingerprint. A descriptor whose facade carries a scheme or a path is
+refused.
 
-A clearnet facade URL (`http[s]://host[:port]/secret-path`) exists only for a
-client started with `--allow-facade-without-i2p-for-dev-purposes` (above);
-without it, a descriptor that names one is refused. A client that hosts its own
+A clearnet facade address (`host:port`, plain HTTP) exists only for a client
+started with `--allow-facade-without-i2p-for-dev-purposes` (above); without it,
+a descriptor that names one is refused. A client that hosts its own
 server reaches that server's facade on its own loopback, which leaves the
 machine for nothing.
 
@@ -183,18 +183,18 @@ are replayable for exactly this reason.
 
 ### Facade locality (invariant)
 
-A facade URL belongs to **exactly one** server and is known **only** to that
+A facade address belongs to **exactly one** server and is known **only** to that
 server's own clients. This is a hard invariant, not a convention:
 
 - A client only ever connects to **its own** server's facade. It never reaches
   another server's facade, and it does not store, learn, or carry a foreign
-  facade URL at all.
-- A facade URL therefore never appears in any artifact that crosses a server
+  facade address at all.
+- A facade address therefore never appears in any artifact that crosses a server
   boundary - not in an invite, not in a contact request, not in an alias
   resolution. The unit of cross-server reachability is the recipient's serving
   **destination** (its b33), carried in the user-signed **contact card**
   (`Identity.md`, `InviteAnonymity.md`) - and **no facade**.
-- A facade may be secret (a private secret-path, an unlisted host). The design
+- A facade's address is known only to its own clients. The design
   must never force revealing one in order to reach a user on that server, so a
   server operator can keep its last mile confidential to its own clientele.
 
@@ -217,7 +217,7 @@ Consequences for first contact (`Contacts.md`, `Federation.md`):
 
 ### Multiple facades and failover
 
-A server may publish **several** facade URLs, one per facade: a facade has
+A server may publish **several** facade addresses, one per facade: a facade has
 exactly one destination. The client holds them as an ordered list and **fails over** across
 it: it sends to the current facade, and on an *unreachable* facade (transport
 failure) advances to the next, cycling without end across attempts; an
@@ -232,18 +232,18 @@ So that a user can add a server with no manual entry, its whole configuration is
 carried in one link (also rendered as a QR):
 
 ```
-bazarish://server?v=1&fp=<server fingerprint>&facade=<facade URL>[&facade=<facade URL>...][&reseed=<reseed address>...]
+bazarish://server?v=1&fp=<server fingerprint>&facade=<facade address>[&facade=<facade address>...][&reseed=<reseed address>...]
 ```
 
 Every field is human-readable (no base64): the fingerprint is the trust anchor
 (everything the server signs is verified against it as usual), each `facade`
-parameter is one facade URL, in client failover order, and each `reseed` one
+parameter is one facade address, in client failover order, and each `reseed` one
 reseed address (above). The service node renders this exact string in the user's
 cabinet after sign-in, so a client reads back precisely what the server
-published. Facade URLs and reseed addresses are carried verbatim, so they must
-not contain `&`.
+published. Facade and reseed addresses are carried verbatim, so they must not
+contain `&`.
 
-This is the **only** artifact that carries facade URLs, and it has a single
+This is the **only** artifact that carries facade addresses, and it has a single
 purpose: configuring the client's **own** server. Its audience is the prospective
 clients of *that* server (an operator publishes it, for example on the server's
 site), and it is consumed solely to populate the local facade list. It is never
@@ -253,10 +253,10 @@ distinct:
 
 | Artifact | Carries | Audience | Facade? |
 |---|---|---|---|
-| `bazarish://server?...` | server fingerprint + facade URLs + reseed addresses | prospective clients of **this** server | **yes** - own server only |
+| `bazarish://server?...` | server fingerprint + facade addresses + reseed addresses | prospective clients of **this** server | **yes** - own server only |
 | `bazarish://invite?...` (descriptor) | fingerprint + own destination (`fp:b33`) | anyone, to add the holder as a contact | no |
 
-The descriptor carries no facade URL; the contact card it points at is fetched
+The descriptor carries no facade address; the contact card it points at is fetched
 over I2P and is user-signed, so it is verified against the fingerprint and
 intermediaries are trusted for availability only (`Identity.md` /
 `FederatedResolve.md` / `Federation.md`).
@@ -265,7 +265,7 @@ intermediaries are trusted for availability only (`Identity.md` /
 
 - **Compromise containment**: a compromised facade must yield nothing beyond the private-channel backend addresses and in-flight traffic (which is E2E-encrypted at the content level). It must never learn server root keys or storage contents.
 - **No logging** of client-identifying data; access logs are disabled by design.
-- Multiple facades per server are supported; each gets its own secret URI. Rotation/revocation of a secret URI must not require touching the server.
+- Multiple facades per server are supported; each has its own address. Replacing one must not require touching the server.
 
 ## Future facades
 

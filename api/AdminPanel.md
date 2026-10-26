@@ -82,9 +82,8 @@ socket asks for a client certificate and admits only the keys in its
 reaches the signature check. Neither certificate decides what a caller may do -
 that is still the signature and the `operators` list; TLS binds the two sockets
 to each other. For **facade-http** this is what keeps the endpoint off the
-sockets its clients reach: there `/healthz` would answer a caller who does not
-know the secret prefix and would thereby identify the address as a facade
-(`Facade.md`).
+sockets its clients reach: every client of the server holds that address, and
+none of them needs the operator's endpoints (`Facade.md`).
 The panel probes every configured service concurrently and renders status,
 version, uptime, current/peak RAM and round-trip latency.
 
@@ -173,10 +172,10 @@ node with many accounts does not transfer the whole set to locate one.
 
 ### Facade addresses and the descriptor
 
-A facade mints its own address - its I2P destination and its secret path - and
-reports it (`Facade.md`); the operator never types one. The panel is what puts
-them into the server descriptor: it asks every facade of the deployment for its
-URL and writes the list, in the order the facades are listed on the Panel tab,
+A facade mints its own address - its I2P destination - and reports it
+(`Facade.md`); the operator never types one. The panel is what puts them into
+the server descriptor: it asks every facade of the deployment for its address
+and writes the list, in the order the facades are listed on the Panel tab,
 into the node's `facades` (`PUT /v1/account/settings`). It does so whenever that
 list is saved and whenever a facade is given a new address. If a facade does not
 answer, the descriptor is left as it was and the panel says which facade it was:
@@ -186,8 +185,8 @@ too. An address that changes behind the panel's back - a facade's `state`
 wiped by hand - shows on the Facades tab as **not in the descriptor** until the
 list is saved again.
 
-**New address** replaces a facade's key and secret path at once and restarts it
-(`POST /new-address`). The panel takes the new URL from that answer rather than
+**New address** replaces a facade's key and restarts it (`POST /new-address`).
+The panel takes the new address from that answer rather than
 asking the facade, which is restarting, writes the descriptor, and then links
 the deployment's gateways again (below), so the route to this facade names the
 new destination. Otherwise a gateway that reached this facade without I2P would

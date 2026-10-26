@@ -149,7 +149,7 @@ A facade is the client<->own-server last mile and **never** crosses a server
 boundary (see `Facade.md`). A client reaches another server only on its users'
 serving destinations over I2P, and a facade only of its own server. So no
 cross-server operation - delivery, contact request, or alias resolution - may
-require a client to connect to, learn, or carry a foreign facade URL. The unit
+require a client to connect to, learn, or carry a foreign facade address. The unit
 of cross-server reachability is the recipient's **serving destination** (its
 b33), carried in the user-signed **contact card** (`../Identity.md`,
 `InviteAnonymity.md`) and named by the invite's descriptor - never a facade and
