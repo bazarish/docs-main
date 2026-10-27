@@ -1,7 +1,5 @@
 # Sign-in-with-key (login blob)
 
-Status: implemented.
-
 A Bazarish key is a login. A site issues a **challenge**, the user signs it in
 their client, and pastes the **login blob** back, or the client hands it to the
 site over I2P; the site recovers the signer's fingerprint and starts a session. The private key never enters the browser and no

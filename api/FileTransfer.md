@@ -1,7 +1,5 @@
 # File transfer
 
-Status: implemented (transport + protocol; the sender must be online).
-
 A file is **announced**, not uploaded. The message carries the file's name, size
 and digest; the bytes stay on the sender's disk until the recipient asks for
 them, at which point the sender creates a one-time I2P destination and serves that
@@ -34,16 +32,11 @@ and of the per-transfer encryption below. It hashes while decrypting and removes
 the result when the digests differ: a file changed at the sender's path after it
 was announced is refused, not delivered as something else.
 
-## Threshold: no constant
+## Files and pictures
 
-There is no client-side size threshold. A client sends normally and falls back to
-a direct transfer when the server answers with its typed per-message limit error.
-The threshold is therefore the server's own advertised limit, and it adapts per
-server with nothing to keep in sync.
-
-Operators should size that limit against the mailbox quota rather than against
-the smallest value that works: too small a limit pushes ordinary attachments into
-a transfer that needs both sides online.
+A file is always announced and fetched directly; a picture travels inside its
+message. A message the recipient's server refuses as too large is reported as
+refused and is not turned into a transfer.
 
 ## Service messages
 
@@ -51,24 +44,26 @@ All four are ordinary sealed E2E messages, silent (never a chat bubble):
 
 | Type | Direction | Payload |
 |---|---|---|
-| `file.request` | recipient -> sender | `fileId` (the announcing message's id), `device` (the requesting client id) |
-| `file.offer` | sender -> recipient | `offer` = `{fileId, host, header, key, sha256, size}`, `forDevice` (the client id that asked) |
+| `file.request` | recipient -> sender | `fileId` (the announcing message's id), `ask` (a fresh random id for this request) |
+| `file.offer` | sender -> recipient | `offer` = `{fileId, host, header, key, sha256, size}`, `forAsk` (the ask it answers) |
 | `file.unavailable` | sender -> recipient | `fileId` |
-| `file.cancel` | either direction | `fileId`, `device` (the client id that is pulling the file) |
+| `file.cancel` | either direction | `fileId`, `ask` (the transfer it stops) |
 
 **Devices.** A user's devices share one mailbox, so every one of them sees these
-messages. A request names the device that made it; the offer names the same
-device, and the others ignore it - the one-time destination in it was created for
-that device alone. A second device requiring the file issues its own request, and
+messages. A request carries a fresh random `ask`, and the offer names the ask it
+answers; a device ignores an offer for an ask it did not issue - the one-time
+destination in it was created for that request alone. A second device requiring the file issues its own request, and
 the sender serves it over a separate destination: several transfers proceed
 concurrently,
 each with its own address, its own progress and its own cancel. On the sending
 side only the device that announced the file (and still holds the bytes) answers
 at all; the others stay silent rather than reporting it unavailable.
 
-`file.unavailable` is returned when the sender no longer holds the file -
-it was unsent, or the user moved it. Without it the recipient would wait on a
-transfer that can never start.
+`file.unavailable` is returned when the file is no longer at the path it was
+announced from, or when the sender could not serve it. A request for a file the
+sender has unsent gets no answer. A sender serves a request only if it reads it
+within five minutes of its `sentAt`; an older request is dropped without an
+answer.
 
 ## Stopping
 
@@ -79,11 +74,10 @@ tunnels, so a stop that ended only the half on which it was issued would leave
 the other half serving no one until its window expired - which is up to half an
 hour of tunnels for a file no one is receiving.
 
-`device` names the client that is pulling the file, in both directions, because
-that is what identifies the half: one contact may be pulling the same file onto
-two devices at once, each over its own one-time address. A stop that names one of
-them leaves the other transfer running, and a `file.cancel` naming a device that
-is not the recipient's own changes nothing there.
+`ask` names the transfer, in both directions, because that is what identifies the
+half: one contact may be pulling the same file onto two devices at once, each over
+its own one-time address and with its own ask. A stop that names one of them
+leaves the other transfer running.
 
 A stop is reported as an ended transfer with its reason, not as a failure of the
 transport, and the side that issued it and the side that was notified are
@@ -149,5 +143,5 @@ storage service, and a client must report it rather than imply delivery:
 | Component | Role |
 |---|---|
 | `client-qt` | everything: announce, request, serve (one-time dest + temp ciphertext), fetch with resume, verify, decrypt, and report progress |
-| `server-core` | untouched - it carries only the small announcement and the four service messages |
-| `facade-http` | untouched - nothing streams through the facade any more |
+| `server-core` | carries only the small announcement and the four service messages |
+| `facade-http` | nothing - no file streams through a facade |

@@ -1,41 +1,27 @@
 # Invite Anonymity: destination-routed contact cards
 
-Status: **implemented and live-validated** over real I2P (single-server and
-cross-server, 2026-06-17). Supersedes the old
-invite/server-card shape; `../Identity.md`, `../Contacts.md`, `Facade.md` and
-`Federation.md` have been updated to match.
-
-> **Note (later supersession).** The destination-routing, per-destination serving
-> sealing keys, and route-by-b33 model below still hold. The **invite artifact**
-> itself - the full ~= 8 KB user-signed contact card carried inline - has since
-> been replaced by a small **descriptor** (`fp:b33`; the serving sealing key
-> arrives with the card) plus a live card fetch (`FederatedResolve.md`). Read
-> this document for the destination-routing rationale; read `FederatedResolve.md`
-> for the current first-contact/discovery shape.
+This document covers how a contact is routed: by the user's own destination,
+with per-destination serving keys, and with nothing server-wide in what a contact
+receives. An invite is a small **descriptor** (`fp:b33`), and the contact card it
+points to is fetched live (`FederatedResolve.md`).
 
 ## Problem
 
-An invite today carries two artifacts: the user's **subscription certificate**
-(user-signed: `user`, `server`, sealing key) and the serving server's **server card**
-(root-signed: `server`, transport endpoints, sealing key). A third party who
-collects invites from several users of one server can **cluster** them: the
-server card is a byte-identical, root-signed blob shared by every user of that
-server, and even setting the blob aside, the `server` fingerprint, the endpoints
-and the server sealing key are identical field *values* across those users. So
-the invite leaks co-location.
+Anything server-wide in what a contact receives lets a third party who collects
+invites from several users of one server **cluster** them: a root-signed server
+card, a `server` fingerprint, transport endpoints or a server sealing key would be
+identical across every user of that server, and would leak co-location.
 
-The clustering is structural, not cosmetic: routing is **by server
-fingerprint** (`DeliveryEnvelope.toServer`; the sender's own server resolves the
-fingerprint to an I2P destination), and the envelope is sealed to **one shared
-server sealing key**. Both are server-wide, so both are shared.
+The clustering would be structural, not cosmetic: routing **by server
+fingerprint** and sealing to **one shared server sealing key** are both
+server-wide, so both would be shared.
 
 ## Key idea
 
-The subscription certificate is **user-signed**. Fold the routing into it and
-drop the root-signed server card entirely. Route **by destination**, not by
-server fingerprint. Then the only fields a card carries are the user's own, plus
-a destination - and the destination is the single tunable anonymity
-parameter.
+The contact card is **user-signed** and carries the routing itself; there is no
+root-signed server card. Routing is **by destination**, not by server
+fingerprint. The only fields a card carries are the user's own, plus a
+destination - and the destination is the single tunable anonymity parameter.
 
 ```
 ContactCard  (hybrid-signed by user U - the only artifact a contact fetches):
@@ -164,12 +150,11 @@ bound to `dest_U`**, not to one server-wide key:
 
 The destination server selects the key by **which destination the connection
 arrived on** (each dest has its own accept loop already), so there is no
-trial-decryption. After unsealing, the server reads `mailbox` and delivers
-locally exactly as today. The server holds the private halves of its
+trial-decryption. After unsealing, the server reads `mailbox` and stores
+the delivery in it. The server holds the private halves of its
 destinations' serving sealing keys.
 
-This replaces the single server sealing key carried in the server card; the
-value is no longer shared server-wide.
+No serving sealing key is shared server-wide.
 
 ## Per-destination signing key
 
@@ -191,16 +176,15 @@ k-anonymity set), so it leaks nothing new. The server **root identity** signs on
 outside federation (the server card / `bazarish://server` link, `Facade.md`),
 never a federated message.
 
-## Done: there is no subscription certificate
+## No subscription certificate
 
-Implemented 2026-08-23. The old subscription certificate served two audiences
-with one signed object - the node's lifecycle anchor and the peer-facing routing
-statement - and told both which server serves the user. Both halves are gone:
+One signed object serving both the node (a lifecycle anchor) and peers (a
+routing statement) would tell both which server serves the user. Neither exists:
 
 - **The card** above is what a contact fetches. It has no `server`, no
   `notAfter` (its `issuedAt` only orders two cards of one person), and no server
   signature. Nothing peer-visible names the server.
-- **The subscription is gone entirely.** Registration opens an unbounded channel;
+- **There is no subscription.** Registration opens an unbounded channel;
   the client authenticates every request by signature in any case, so a signed
   "I subscribe here" told the node nothing it had not already verified. The only
   clock is the **delegation** of the destination, which the I2P network itself
@@ -218,7 +202,7 @@ The card carries no expiry either: routing that has changed is repaired by the
 ## How the user learns `dest_U` and the serving sealing key
 
 When the client delegates its destination (grant-gated; see `ServicePortal.md`)
-the server returns, in place of the server card:
+the server returns:
 
 - the assigned `dest` (brought up from the client's delegated offline
   transient), and
@@ -227,24 +211,24 @@ the server returns, in place of the server card:
 The client folds both into its self-signed contact card. The server keeps the
 private serving sealing key and the dest<->mailbox mapping.
 
-## Flow migration
+## Flows
 
-- **createInvite** - emit the single user-signed contact card; no server card.
-- **addByInvite** - verify the card; deliver to `card.dest`, seal the envelope
-  to `card.servingSealingKey`. No server card, no fingerprint resolve.
+- **createInvite** - emit the descriptor of the single user-signed contact card.
+- **addByInvite** - fetch and verify the card; deliver to `card.dest`, seal the
+  envelope to `card.servingSealingKey`. There is no fingerprint resolve.
 - **contact-request bootstrap** (`../Contacts.md`) - the bootstrap carries the
-  sender's **contact card** (dest + serving sealing key + sealing key) instead of the
-  sender's server card, so the peer replies by federating to the sender's dest.
+  sender's **contact card** (dest + serving sealing key + sealing key), so the
+  peer replies by federating to the sender's dest.
 - **addByAlias / alias resolve** - the central resolver answers with a
   descriptor (`FederatedResolve.md`), and the client then fetches the contact
   card as for an invite. The lookup is not sealed and uses no server-level key:
   the client dials the resolver itself from a transient destination.
-- **Local contact state** - store `contact.dest` + `contact.servingSealingKey`
-  in place of `contact.server` + server-card sealing key.
+- **Local contact state** - `contact.dest` + `contact.servingSealingKey`.
 
-## Federation impact
+## Federation
 
-- `toServer` -> `toDest`; the sending client dials `toDest` directly.
+- The delivery envelope is addressed `toDest`, and the sending client dials
+  `toDest` directly.
 - **No local short-circuit**: every message is federated, even between two users
   the same server hosts - see "No local delivery (no co-location timing
   channel)" above. This is the rule, not an optimisation; a fast local path for a
@@ -267,38 +251,6 @@ private serving sealing key and the dest<->mailbox mapping.
 - The home server knows dest<->U (operator trust) - unchanged.
 - Global passive I2P traffic-correlation is out of scope.
 
-The strongest cross-user clustering field (the shared server fingerprint and the
-byte-identical root-signed card) is gone, and live federation now carries no
-server-wide signer either (a delivery confirmation is signed per destination).
-
-## Implementation (all phases done)
-
-1. **common** - the contact-card / extended subscription-cert format: `dest`
-   and `servingSealingKey` in the user-signed body (`TestCertificates`). Plus
-   `encryptedLeaseSetHost()` and `routingHost()`, so a destination is addressed by
-   the b33 of its encrypted LeaseSet2 - the only form the project's own code
-   publishes - always a `.b32.i2p` host, never the raw destination
-   (`isB32I2pHost`/`validateB32I2pHost`; `TestI2pAddress`).
-2. **server-core** - per-destination serving sealing keys (generate, persist,
-   select by the destination a connection arrived on); `GET /v1/messaging/destination`
-   returns the assigned dest + public serving sealing key; the delivery envelope
-   is keyed by `toDest`; the server only accepts on the users' destinations and
-   initiates no connections - the client **dials the b33** (not the raw
-   destination - an encrypted leaseset is only reachable via the b33). TCP
-   federation removed; I2P is the only transport.
-3. **client** - `createInvite` / `addByInvite` / contact-request bootstrap /
-   `addByAlias` on the contact card and route-by-dest; `deliver`
-   targets a destination; `Client::myDestination()` fetches the assigned routing.
-4. **docs** - folded into `../Identity.md`, `../Contacts.md`, `Facade.md`,
-   `Federation.md`, `Architecture.md`, `Messages.md`, `DeviceSync.md`,
-   `ClientApi.md`; the server card is retired from the invite/contact path.
-
-Live-validated end-to-end over real I2P (2026-06-17, against i2pd 2.60.0): full
-single-server dialog and full cross-server Alice<->Bob conversation via invite,
-with no `peers.json`, dialling each other's b33.
-
-## Compatibility
-
-Fresh alpha - **no** backward-compatibility shims. Old invites, server cards and
-stored contacts are dropped; accounts re-subscribe to obtain a destination-routed
-card. The legacy fingerprint routing path is removed, not gated.
+Nothing a contact receives is shared across users of one server - no server
+fingerprint, no root-signed card - and live federation carries no server-wide
+signer either (a delivery confirmation is signed per destination).

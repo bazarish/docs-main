@@ -1,7 +1,5 @@
 # Bots & Interactive Messages
 
-Status: design draft (decided direction).
-
 ## Principle: a bot is an ordinary identity
 
 A bot has no special status anywhere in the infrastructure. It is a normal
@@ -18,10 +16,10 @@ This is a direct consequence of the two-layer model:
 > client protocol and the content-type registry.
 
 There is deliberately **no** server-side bot registry, bot flag, or bot
-discovery in this iteration. A bot is reached exactly like any contact: by its
-invite link or by an alias. Discovery, rate-limiting policy and any distinct UI
-treatment are open questions left to clients and future iterations - none of them
-require a server change to introduce.
+directory. A bot is reached exactly like any contact: by its invite link or by an
+alias, and its correspondents are limited like any others, 120 messages a minute
+on a pass. A client shows a bot's keyboards under its messages and its menu beside
+the conversation, and marks a bot in no other way.
 
 A bot runs as a program of its own against `bazarish-bot`, which holds the
 account and exposes it through a REST API. A group is a bot that relays its
@@ -150,8 +148,9 @@ notification.
 
 ### Read receipts
 
-A bot sends a `receipt` for the user-visible content it receives (text, files
-and media), so the sender's message advances to the *read* ("green") state - a
+A bot program sends a `receipt` through its host (`POST /v1/receipts`) for the
+user-visible content it has read (text, files and media), and a group host sends
+one for every post it takes in, so the sender's message advances to the *read* ("green") state - a
 bot is a normal recipient in this respect. Receipts are not sent for the control
 types (`bot.command`, `bot.callback`, `bot.menu`, `edit`).
 

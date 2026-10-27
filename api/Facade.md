@@ -1,10 +1,8 @@
 # Facade Contract
 
-Status: draft skeleton.
+The facade is the "last mile" between the client and the server infrastructure. It is deliberately a thin, replaceable layer: the client side is HTTP over the facade's own I2P destination, while the backend side speaks the standard internal API. Any transport that can carry the request/response exchange to the backend API would satisfy the same contract.
 
-The facade is the "last mile" between the client and the server infrastructure. It is deliberately a thin, replaceable layer: the client side of it may be anything (HTTP today, DNS later, exotic transports in principle), while the backend side speaks the standard internal API.
-
-## First implementation: HTTP facade (implemented)
+## HTTP facade
 
 - **The facade's own I2P destination is the way in, and the only one.** A
   facade publishes its API on exactly one encrypted-LeaseSet destination, whose
@@ -87,14 +85,12 @@ The facade is the "last mile" between the client and the server infrastructure. 
   - anything else -> 404 (never forwarded). The reseed archive is not among
     them: the messaging server passes it to the portal over its private channel
     (`/internal/i2pseeds.su3`) and the portal serves it publicly
-    (`ClientApi.md`), and the path the facade once whitelisted for it is gone
-    from the list as well as from the answer.
-- **Account management is not a separate route any more.** Client calls to the
+    (`ClientApi.md`); the facade has no path for it.
+- **Account management has no route of its own.** Client calls to the
   service node arrive inside the same tunnel and are forwarded to the node by the
-  messaging server under its own signature; the node is no longer reachable from
-  the facade at all (`Architecture.md`). That is what leaves one path where there
-  used to be two prefixes, and with it goes the one bit that said which of the
-  two kinds a request was.
+  messaging server under its own signature; the node is not reachable from
+  the facade at all (`Architecture.md`). One path carries both kinds of request,
+  so nothing outside the seal says which of the two a request is.
 - Everything else answers the same bare **404** - an unknown path and the operator liveness endpoint alike. `/healthz` is not on the client-facing socket at all: it is served on a separate private **ops listener** (`opsListen`) that is never published to clients (`AdminPanel.md`).
 - The ops listener also carries the facade's **own configuration**, operator-signed
   like `/healthz`: `GET /settings` and `PUT /settings` (the backend, the three
@@ -219,12 +215,11 @@ Consequences for first contact (`Contacts.md`, `Federation.md`):
 
 A server may publish **several** facade addresses, one per facade: a facade has
 exactly one destination. The client holds them as an ordered list and **fails over** across
-it: it sends to the current facade, and on an *unreachable* facade (transport
-failure) advances to the next, cycling without end across attempts; an
-HTTP error *response* is final (the facade is reachable and the request was
-failed) and does not trigger failover. The client remembers the last facade that
-worked and starts there next time, so a healthy facade is preferred. Facades can
-be added or edited at any time without touching the server.
+it: every request tries the facades in list order and moves to the next only
+when one is *unreachable* (a transport failure); an HTTP error *response* is final
+(the facade is reachable and the request was failed) and does not trigger
+failover. When none answers, the request fails, and a retry starts again from the
+first. Facades can be added or edited at any time without touching the server.
 
 ### Configuration links
 
@@ -267,18 +262,21 @@ intermediaries are trusted for availability only (`Identity.md` /
 - **No logging** of client-identifying data; access logs are disabled by design.
 - Multiple facades per server are supported; each has its own address. Replacing one must not require touching the server.
 
-## Future facades
+## Facade list, request rate and held requests
 
-- **DNS facade** - low-bandwidth transport over the DNS protocol for aggressive network environments.
-- The contract stays the same: any transport that can carry the request/response exchange to the backend API qualifies.
-
-## Open questions
-
-- ~~Facade registration/rotation flow~~ - the operator side is settled: a facade mints its own address, the admin panel publishes it into the descriptor and replaces it on request (`AdminPanel.md`). Still open: whether an updated facade list should reach existing clients by itself (through the server card), rather than as a new descriptor handed out again.
-- Whether the facade enforces any rate limiting.
-- ~~Streaming/long-poll support imposed by the incoming-delivery mechanism~~ -
-  settled: incoming mail is one held-open request (`ClientApi.md`) and there is
-  no second mechanism behind it, so a facade **must** carry a request answered
-  late - up to 30 seconds - and its own upstream timeouts must outlast that. A
-  facade that closes a client's parked request is not slow, it is broken:
-  the client has no other way to hear that mail arrived.
+- **The facade list.** A facade mints its own address, and the admin panel
+  publishes it into the server descriptor and replaces it on request
+  (`AdminPanel.md`). A client learns its facade list only from a
+  `bazarish://server` link: the server card names no facade, and nothing the
+  server sends replaces the list a client holds. A changed list reaches an
+  existing client when its user enters the new link in the client's
+  server-connection settings; the portal shows the current link after sign-in.
+- **No request-rate limit.** The tunnel is sealed, so the facade cannot tell one
+  user's requests from another's. Its I2P front relays at most 256 streams at
+  once and closes any further stream unanswered.
+- **Held requests.** Incoming mail is one held-open request (`ClientApi.md`),
+  which the server holds for at most 30 seconds, and there is no second mechanism
+  behind it. The facade waits 60 seconds for its backend and keeps a client's
+  connection for 90, so it never cuts a parked request short. A facade that
+  closes a client's parked request is not slow, it is broken: the client has no
+  other way to hear that mail arrived.

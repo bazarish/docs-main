@@ -1,7 +1,5 @@
 # Messages & Content Types
 
-Status: design draft (decided direction).
-
 ## Types
 
 A message declares its type, and the type determines the recipient's handling of
@@ -99,7 +97,7 @@ never appear here:
 |---|---|---|
 | `contact` | nothing | Bootstrap. Size-capped (`kMaxContactRequestBytes`), rate-limited per serving destination. The only path into a mailbox that presents nothing. |
 | `content` | the recipient's delivery pass (required) | Looked up, not consumed (see `Contacts.md`). The path for every established-contact message, whatever its content type. |
-| `device` | the account's own signature | An account writing to its own other devices, through `POST /v1/messaging/self` rather than through federation. Outside the budget a stranger's request is counted against, and stored only when the account has more than one device. |
+| `device` | an authenticated request from one of the account's registered devices | An account writing to its own other devices, through `POST /v1/messaging/self` rather than through federation. Outside the budget a stranger's request is counted against, and stored only when the account has more than one device. |
 
 There is no separate quota for any of them: a mailbox has one, and every class is
 stored against it.

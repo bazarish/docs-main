@@ -1,11 +1,9 @@
 # Federation API (Client -> Serving Destination)
 
-Status: draft skeleton.
-
 ## Transport
 
-- Delivery is **I2P-only**: there is no non-I2P transport and no switch for one
-  (the earlier plain-TCP federation was removed). The server has no single
+- Delivery is **I2P-only**: there is no non-I2P transport and no switch for one.
+  The server has no single
   federation destination - each user's serving destination runs its
   own STREAM accept loop and is persisted so addresses are stable across restarts;
   a first-contact `op:card` is answered on those same destinations. The server
@@ -38,21 +36,21 @@ Status: draft skeleton.
   transport assumes I2P specifics.
 - Wire format matches the rest of the system: JSON control messages + raw binary bodies.
 
-### Delivery framing (implemented)
+### Delivery framing
 
 Over the connected stream, one delivery is:
 
 ```
 request:  {"op":"deliver","sealed":<base64>,"len":<N>}\n   then N raw payload bytes
-response: {"delivered":<bool>,"errorCode":...,"errorMessage":...,
-           "deliveryId":<id>,"signerPub":<base64>,"sig":<base64>}\n
+stored:   {"delivered":true,"deliveryId":<id>,"signerPub":<base64>,"sig":<base64>}\n
+refused:  {"delivered":false,"errorCode":<code>,"errorMessage":<text>}\n
 ```
 
-Both ops arrive on the user's serving destination through one accept loop and one frame dispatcher; `deliver` runs the delivery pipeline (dedup -> admission -> size/quota -> store), `card` answers from the stored card.
+Both ops arrive on the user's serving destination, served by three accept workers and one frame dispatcher; `deliver` runs the delivery pipeline (dedup -> admission -> size/quota -> store), `card` answers from the stored card. A stream carries one frame: its header line is at most 64 KiB, and the stream is closed 45 seconds after it opens. An unreadable frame, an unknown op or a payload claiming more than 2 MiB is answered `DELIVERY_REJECTED`.
 
 The confirmation is carried **in that reply**: on storing the envelope the recipient signs the `deliveryId` with the **serving destination's own per-destination signing key** (`signerPub` carries the public half; see *Authentication*), never with the server's root identity. The reply is the only available path, the dialling party being a client on an address that publishes no leaseset and accepts no inbound connections. As `deliveryId` is sealed inside the envelope, only a server that unsealed it can state it, and the signature binds that statement to the destination that answered. The sending client accepts a `delivered` result **only** when the signature verifies against the id it sent; an unsigned or incorrectly signed claim is treated as no answer and the attempt is repeated.
 
-Operational note: a freshly created destination must publish its leaseset before peers can reach it; the first connect after startup may return `CANT_REACH_PEER` ("LeaseSet not found") and should be retried with backoff. Verified end to end against a live i2pd.
+A freshly created destination must publish its leaseset before peers can reach it; the first connect after startup may find no leaseset and get no stream, and is retried with backoff.
 
 ## Destination routing
 
@@ -132,12 +130,27 @@ DeliveryEnvelope:
 
 `contact-request` deliveries skip the pass check, are capped in payload size (`kMaxContactRequestBytes`, a protocol constant measured against the real worst case - see `ClientApi.md`), and are rate-limited per receiving destination with a cap on how many may be waiting at once. They are also admitted **once per sending I2P destination**: the server keeps a hash of the address a request came from for 24 hours and refuses any further request from it. A client sends every request from an address of its own, so a second request from one address is not a client's behaviour, only an attack's. The list is the server's own and is held in memory. There is no quota of their own: a mailbox has one, and every class is stored against it.
 
-## Requests (draft)
+## Requests
+
+A serving destination answers two requests, one per stream, and refuses any
+other with `DELIVERY_REJECTED`.
 
 | Request | Purpose |
 |---|---|
 | `deliver` | Deliver an envelope (message or contact request) for a local mailbox |
 | `card` | Return **this destination's own user's** contact card for a fingerprint query - the first-contact card fetch (`FederatedResolve.md`). A destination answers for the one user it belongs to and for nobody else: answering node-wide made every published address an oracle for "is this fingerprint served here", and two invites proved their owners co-located |
+
+The `card` request and its answer:
+
+```
+request:  {"op":"card","sealed":<base64 of {"v":1,"fp":<fingerprint>}>}\n
+answer:   {"ok":true,"sealed":<base64 card frame>}\n
+refused:  {"ok":false,"errorCode":"CARD_UNKNOWN"}\n
+```
+
+`CARD_UNKNOWN` is the same answer for a fingerprint that is not this destination's
+user and for a user with no card, so the refusal says nothing about who else is
+served.
 
 Alias resolution (`alias` -> descriptor) is **not** a request of this API; it
 is served by the separate central resolver over its own I2P endpoint
@@ -153,7 +166,7 @@ require a client to connect to, learn, or carry a foreign facade address. The un
 of cross-server reachability is the recipient's **serving destination** (its
 b33), carried in the user-signed **contact card** (`../Identity.md`,
 `InviteAnonymity.md`) and named by the invite's descriptor - never a facade and
-no longer a root-signed server card.
+never a server card.
 
 This holds in both directions on first contact: a contact request carries the
 sender's own **routing** (sealing key + destination + serving sealing key) in
@@ -205,6 +218,12 @@ real I2P**, and the client is built with the production resolver's coordinate
   server-wide signer to cluster them as co-located. Since no two users ever share
   a destination, no two users ever share a signer either.
 
-## Open questions
+## Limits
 
-- **Per-server rate limiting and spam policy** between federation peers.
+Federation has no server-to-server peers to limit: a client dials every delivery
+from an address of its own. A serving destination admits mail at 120 a minute per
+delivery pass, and contact requests at 3 a minute and at most 30 waiting, and one a
+day per sending I2P destination; every rate limit refuses with
+`CONTACT_RATE_LIMITED`. A contact request is at most 17590 bytes
+(`CONTACT_REQUEST_TOO_LARGE`) and a message at most 512 KiB (`MESSAGE_TOO_LARGE`).
+Revoking a pass (`../Contacts.md`) stops an established contact.

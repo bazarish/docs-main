@@ -1,7 +1,6 @@
 # Federated resolution & contact discovery
 
-Status: **implemented** (supersedes the earlier draft of this document). Specifies how
-a client discovers a contact it knows only by a small scannable identifier or by
+Specifies how a client discovers a contact it knows only by a small scannable identifier or by
 name, over I2P, with the home server learning nothing about it - it is not on the
 path - and nothing between the two ends able to forge the result: on the
 descriptor path the fingerprint anchors it outright, and on the name path the
@@ -30,8 +29,7 @@ is not here: it is documented in its own repository
   did would tell every contact who hosts its owner, and let two cards be compared
   for co-location.
 
-The old full-card-in-invite (offline, multi-QR) is **removed**: the descriptor +
-a live fetch replaces it. Cost: the user's
+An invite carries the descriptor, not the card: the card is fetched live. Cost: the user's
 server must be reachable at add-time. Benefit: one QR, always-fresh card, and the
 home server never sees who is being added (below).
 
@@ -90,8 +88,7 @@ reachability (`Facade.md`).
 **No proxy fallback exists.** Relaying a lookup through the requester's own server
 would disclose to it the identity being added, which this design withholds; a
 client without a working I2P router is therefore informed of that condition rather
-than downgraded silently. The route that formerly provided the relay
-(`POST /v1/messaging/fetch`) has been removed.
+than downgraded silently.
 
 ## Card-fetch protocol (`fp` -> contact card)
 

@@ -1,7 +1,5 @@
 # Multi-Device Synchronization
 
-Status: design draft (decided direction).
-
 A user runs several clients (devices); each has a unique random **client ID**. Contact bookkeeping, delivery passes, and message history must converge across them without giving servers anything new to read.
 
 ## Model
@@ -9,29 +7,25 @@ A user runs several clients (devices); each has a unique random **client ID**. C
 - **Shared identity keys.** All clients of a user hold the same hybrid identity keypair set (see `Identity.md`); a new device receives it during enrollment. Senders never need to know how many devices a user has.
 - **Explicit client registry.** Client IDs are registered and retired via the API (see `api/ClientApi.md`). The "delete when all clients received" rule operates on this definite set; implicit discovery would admit races and leave retired identifiers holding quota.
 - **Sync channel = own mailbox.** Sync data travels as ordinary E2E deliveries to the user's own mailbox, written through `POST /v1/messaging/self` and read back through the standard pending/ack path. The server sees a delivery class and nothing else about it, and the "all clients acked -> delete immediately" rule performs the cleanup.
-- With a **single registered client**, no sync traffic is produced at all.
+- With a **single registered client**, the server stores no sync traffic: it answers a self-message with `stored: false`.
 
 ## What is synchronized
 
 There is no event journal, no per-device sequence and no CRDT: the mechanism is
 the flat list of `device.*` self-messages below, and the address-book transfer
-(`device.contacts-request` / `device.contacts`) is the full-state handover. An
-earlier draft of this file specified a journal with `message-echo`, `snapshot`
-and gap detection; none of it was built, and it has been removed from this
-document rather than left as a design someone might implement against.
+(`device.contacts-request` / `device.contacts`) is the full-state handover.
 
 Sync data travels as ordinary E2E deliveries to the user's own mailbox, but not
 through the same entry point as mail: `POST /v1/messaging/self` is its own
 endpoint, with its own delivery class (`device`), and it is deliberately outside
 the budget a stranger's contact request is counted against. An account with only
-one registered device stores nothing at all - the answer says so in `stored`,
-which every answer carries, so a client always knows which of the two happened.
+one registered device stores nothing at all - the answer says so in `stored`.
 
 ## Enrollment (adding a device)
 
 1. An existing device publishes a one-shot blinded destination and shows two things: a link naming it, `bazarish://pair?v=1&dest=<b33>[&reseed=<https url>]`, and a four-digit code. The link is a QR code and a string; the code is only on the screen. The destination is blinded so a floodfill cannot disclose it to anyone who did not receive the link.
-2. The new device dials that destination and sends `GET /hello`, carrying the code in `X-Bazarish-Pair`. The existing device compares the code in constant time and only then builds the account bundle, sealed with that same code, and streams it in the response body. A request with a wrong code is refused with `403` and counted; after ten wrong codes the destination is taken down. A request with no code header is refused with `400` and not counted, so a port scan cannot spend the budget. Nothing leaves the device without the code, so the link may travel over any channel.
-3. The bundle is the account backup: identity private keys (classical + post-quantum), the account's sealing key, the destination key, the server endpoint, the address book and the block list. It is never written to disk on either device. Message history is not in it.
+2. The new device dials that destination and sends `GET /hello`, carrying the code in `X-Bazarish-Pair`. The existing device seals the account bundle with that code when pairing starts and holds it in memory; it compares the code in constant time and streams the bundle in the response body only when the code matches. A request with a wrong code is refused with `403` and counted; after ten wrong codes the destination is taken down. A request with no code header is refused with `400` and not counted, so a port scan cannot spend the budget. Nothing leaves the device without the code, so the link may travel over any channel.
+3. The bundle is the account backup: identity private keys (classical + post-quantum), the account's sealing key, the destination key, the delivery secret, the server endpoint, the account's name, settings and avatar, the address book with avatars, and the block list. It is never written to disk on either device. Message history is not in it.
 4. A reseed address in the link is what a new device uses to start its own router when it has no network database yet. It is the only coordinate a device can be given before it has an account, so it is an `https` URL and nothing else.
 5. The new device authenticates as the user and **registers its client ID**.
 6. It asks for the address book (`device.contacts-request`); every other device that has contacts answers.
@@ -40,7 +34,7 @@ which every answer carries, so a client always knows which of the two happened.
 ## Retirement (removing a device)
 
 - Any device can retire a client ID (lost/stolen device included). The server immediately **re-evaluates ack-completeness** of pending content: blobs that were waiting only on the retired client are deleted.
-- **Limitation:** with a shared identity key, a stolen device retains the identity indefinitely. Retirement stops deliveries to it but does not revoke the key. A correspondent can revoke the pass the account holds, which stops the stolen device writing to that one mailbox; the identity itself is unrecoverable. Per-device keys with cross-signing are the known evolution path if this risk proves unacceptable in practice.
+- **Limitation:** with a shared identity key, a stolen device retains the identity indefinitely. Retirement stops deliveries to it but does not revoke the key. A correspondent can revoke the pass the account holds, which stops the stolen device writing to that one mailbox; the identity itself is unrecoverable.
 
 ## Account sync (avatar & contact names)
 
@@ -78,7 +72,7 @@ Account state propagates to the user's other devices as dedicated **self-message
 - `device.account-prefs` - `acceptCalls` and `sendReceipts`: the account's own answers, which must be the same wherever it is reached from. A notice carries what it knows about; a field it omits is left as it was.
 - `device.alias-status` - `status` and `delegation`: the registry's signed answer about the names this account holds, passed on as fetched. A receiver checks it against the built-in resolver root and adopts it only when it is about this account and not older than the answer it holds (`api/FederatedResolve.md`).
 - `call.taken` - the device that answered or refused an incoming call, stopping the others ringing (`api/Calls.md`).
-- `device.contacts-request` - `device`: the asking device wants the address book. Sent once, automatically, on a device's first sync that reaches the server, and manually from the account window. A device ignores its own request; with no other device the mailbox holds it.
+- `device.contacts-request` - `device`: the asking device wants the address book. Sent once, automatically, on a device's first sync that reaches the server, and manually from the account window. A device ignores its own request; an account with no other device stores nothing.
 - `device.contacts` - `forDevice`, `contacts`: the book, or a part of it. Every other device that has contacts answers, so several answers may arrive; each is taken in turn.
 
 ### The address book
@@ -87,15 +81,15 @@ A device that has just joined cannot learn a contact from the network: a corresp
 
 One entry carries what a contact **is**: their fingerprint, their identity keys (what every message of theirs is checked against, `Messages.md`), their sealing key, destination and serving key, the local display name, the per-contact switches, whether this account has issued a delivery pass to them, whether they are blocked, and their avatar.
 
-It carries the contact's **delivery pass** along with everything else about them, and this is the one thing it deliberately did not carry before: a one-time token could not be in two places, so a device that learned a contact this way had to obtain its own before it could write. A pass is not spent, so every device holds the same one and a device that learns a contact can write to them at once. It still carries nothing that belongs to one device or to one exchange in flight.
+It carries the contact's **delivery pass** along with everything else about them: a pass is not spent, so every device holds the same one and a device that learns a contact can write to them at once. It still carries nothing that belongs to one device or to one exchange in flight.
 
-Answers are **chunked**: one contact is never split across two messages, and an entry whose avatar would not fit is sent without it (the correspondent sends their avatar again the next time they write; the address they are reached at is what cannot be re-derived). The chunks carry no sequence number and no end marker: the merge is per message and fills gaps, so the order they arrive in does not matter and there is nothing for the asker to wait for. An empty chunk is not sent.
+Answers are **chunked**: one contact is never split across two messages, and an entry whose avatar would not fit is sent without it (the correspondent sends their avatar again the next time they write; the address they are reached at is what cannot be re-derived). The chunks carry no sequence number and no end marker: the merge is per message and fills gaps, so the order they arrive in does not matter and there is nothing for the asker to wait for. An empty chunk is not sent. A chunk is at most 128 KiB, and the book has no bound of its own: it is stored against the account's one quota like any other self-message, and a chunk refused for quota ends that answer - the asking device keeps what arrived and can ask again from the account window.
 
-Merging **fills gaps only**. A contact this device already has is not overwritten: routing learned from the correspondent themselves is fresher than a copy of it, and a second answer from another device must not undo a rename or a move. Missing fields - keys, avatar, name, switches - are taken from the book.
+Merging **fills gaps only**. A contact this device already has is not overwritten: routing learned from the correspondent themselves is fresher than a copy of it, and a second answer from another device must not undo a rename or a move. For a contact it already has, a device fills only what is empty - keys, routing, name and avatar; the switches, the pass and the block state come only with a contact new to it.
 
-`device.message` is sent **after** the recipient's server has signed for the delivery it echoes, not when the message is written. An echo that goes out first puts on every other device a message that may never arrive - and one copy per retry, all of them shown as still sending - which is an unrecoverable desynchronization. What every device shows is therefore what at least one server holds. `device.message` carries what this device did in a conversation, so every device shows the same one: a message sent, a picture, a voice message, an edit, a deletion, a reaction, a request to a correspondent to clear the chat, and a conversation's auto-delete timer. What a device does *not* echo is its own service messages - read receipts, call signalling and the file-transfer handshake - which are between it and the correspondent. The read state is not among them: it is the account's, not the device's, and it travels as `device.read` above. Which device a message was read on is not disclosed, but *that* it has been read is the same fact on every device the account is open on - a second device that offered everything again as new was reporting something that is not true.
+`device.message` is sent **after** the recipient's server has signed for the delivery it echoes, not when the message is written. An echo that goes out first puts on every other device a message that may never arrive - and one copy per retry, all of them shown as still sending - which is an unrecoverable desynchronization. What every device shows is therefore what at least one server holds. `device.message` carries what this device did in a conversation, so every device shows the same one: a message sent, a picture, a voice message, an edit, a deletion, a reaction, a request to a correspondent to clear the chat, and a conversation's auto-delete timer. What a device does *not* echo is its own service messages - read receipts, call signalling and the file-transfer handshake - which are between it and the correspondent. The read state is not among them: it is the account's, not the device's, and it travels as `device.read` above. `device.message` carries the message whole: a picture or a voice message is echoed with its bytes, and no echo is partial. A file announcement is not echoed, because its bytes stay on the device that sent it. Which device a message was read on is not disclosed, but *that* it has been read is the same fact on every device the account is open on - a second device that offered everything again as new was reporting something that is not true.
 
-All are local-only facts that must never reach a contact, so they travel the self-channel exclusively. The routing-key sibling `device.i2p-master` (preserving the user's I2P address across devices, see `Identity.md`) uses the same mechanism. Wire shapes are in `Messages.md`.
+All are local-only facts that must never reach a contact, so they travel the self-channel exclusively. The routing-key sibling `device.i2p-master` (preserving the user's I2P address across devices, see `Identity.md`) uses the same mechanism. The fields of each type are listed above; `device.message` carries `peer`, `device` and `message`.
 
 **`device.i2p-master-request` (`{device, host}`)** is the other half of that pair. An account has **one** address, and it is the address every contact holds; a device that finds its server serving an address it has no keys for asks for them here, naming the address it needs (`host`) and itself (`device`). A device answers with `device.i2p-master` only when it holds the address that was named (an unnamed `host` asks for whatever the answerer has), and the asker takes the one whose address matches what the server serves. A device never answers its own request, and a device that already holds the served address has nothing to ask.
 
@@ -109,10 +103,4 @@ A self-message is named by a **delivery id of its own**, unrelated to the one th
 
 ## Quota interplay
 
-`device.message` with attachments doubles outgoing traffic and temporarily occupies the user's own quota: echo blobs are retained only until every registered client has fetched them, so for devices that are normally online the occupancy is brief. An offline device accumulates echoes for the retention period; substantial attachment traffic on the default quota (50 MB unless the operator sets another) will exhaust it. This is an accepted trade-off, to be reviewed against operational experience.
-
-## Open questions
-
-- **Address-book size vs quota** - a long-lived account's book is sent in as many messages as required, one contact never spanning two; whether that needs an explicit bound is open.
-- Client-side policy for `device.message` (for example, omitting attachments above a threshold). The protocol permits a partial echo carrying an attachment stub; defaults to be determined in client design.
-- Per-device keys as a future identity model (see Retirement).
+An echoed picture or voice message is stored again in the account's own mailbox until every registered device has fetched it, so for devices that are normally online the occupancy is brief. A device that stays offline keeps its echoes there, and enough of them fill the quota (50 MB unless the operator sets another).

@@ -67,7 +67,7 @@ reveals nothing. Keys are PEM and DER, the composite frame is CBOR, and the
 password envelope is CMS. Every primitive is OpenSSL's; no custom cryptographic
 algorithms.
 
-## Status
+## Implementation
 
 The protocol is implemented across all components, with unit tests passing and the
 core flows live-validated over real I2P: E2EE first contact, destination-routed
@@ -90,7 +90,3 @@ the caller signs the request with its identity and the service authorises that
 fingerprint - so there is no shared operator secret. Panel sign-in is
 sign-in-with-key, verified locally against the configured admin identity with no
 backend online (`api/AdminPanel.md`).
-
-Out of scope for v1 (tracked as future concepts): per-device identity keys
-(`DeviceSync.md`), and a
-standalone threat-model document.

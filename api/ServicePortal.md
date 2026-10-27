@@ -1,7 +1,5 @@
 # Service Portal (account onboarding)
 
-Status: implemented.
-
 The **service node** owns user accounts. It exposes a **web portal** (the
 "Service site") through which a user registers and proves ownership of their key.
 The **messaging server (server-core)** stays a pure delivery layer: it never
@@ -26,8 +24,8 @@ own I2P destination - is included.
                   +------------------+
        grants registration | quota
                   +--------v---------+
-                  |   server-core    |  delivery only; points unregistered
-                  +------------------+  senders at the portal
+                  |   server-core    |  delivery only; relays the node's
+                  +------------------+  answers unchanged
 ```
 
 ## 1. Identity & login (sign-in-with-key)
@@ -70,8 +68,10 @@ receives.
 (The global `alias` namespace is a separate product sold by the central
 alias-resolver, not the service node, and is not specified here.)
 
-server-core, when it rejects an unregistered sender, returns an error that points
-at the same portal.
+server-core points nowhere itself: it relays the service node's refusal unchanged,
+and the refusal carries no links. A refused client registers itself
+(`POST /v1/account/registration`); when connecting still fails, it reads
+`GET /v1/account/portal` and shows the message and links found there.
 
 ## 3. Account model
 
@@ -258,18 +258,15 @@ in that directory, of a type the portal publishes, are served.
 | Client | `POST /v1/account/i2p-dest` | key | upload a signed offline transient (refused while the account is unapproved) |
 | Client | `GET /v1/account/i2p-status` | key | approval state and the recorded transient validity |
 
-## 7. Removed
+## 7. What the service node does not do
 
-- `POST`/`DELETE /v1/account/alias`, `GET /v1/account/resolve`, and the on-node
-  alias registry: the global `alias` namespace moved out to the central
-  **alias-resolver**, whose own repository documents it. The service node no longer sells,
-  stores, or resolves names - and since the payment layer moved to the resolver
-  too, it now sells nothing at all: a destination and a mailbox quota come with
-  the account. Nothing of a payment layer is left here, not even an abstraction.
-- The captcha, and with it `GET /portal/captcha`, `POST /register` and
-  `register.html`. A puzzle a person can read is a puzzle a solver can read, so
-  it provided no benefit and required an extra page; what is left is the two
-  modes above.
+- **Names.** The global `alias` namespace belongs to the central
+  **alias-resolver**, whose own repository documents it. The service node neither
+  sells, stores nor resolves names, and it sells nothing at all: a destination
+  and a mailbox quota come with the account. There is no payment layer here, not
+  even an abstraction.
+- **Captcha.** A puzzle a person can read is a puzzle a solver can read, so there
+  is none; registration has the two modes above.
 
 ## 8. Security notes
 
@@ -278,8 +275,3 @@ in that directory, of a type the portal publishes, are served.
 - Sessions are short-lived signed cookies.
 - Approval and deletion are operator-signed actions on the private channel; the
   portal itself can neither approve an account nor see who is waiting.
-
-## 9. Open questions
-
-- Whether server-core embeds portal links in its rejection error or only
-  references the service node's `/v1/account/portal`.

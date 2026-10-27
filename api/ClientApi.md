@@ -1,6 +1,6 @@
 # Client API
 
-Status: draft skeleton. The single client-facing API, reached through a facade (see `Facade.md`).
+The single client-facing API, reached through a facade (see `Facade.md`).
 
 ## Conventions
 
@@ -62,10 +62,12 @@ them.
 | `POST /v1/account/card` | Publish the user-signed **contact card** (`{card}`): the sealing key plus the serving **destination** + **serving sealing key** the client received from `POST /v1/account/i2p-dest` or reads back from `GET /v1/messaging/destination` (see `../Identity.md`, `InviteAnonymity.md`). The card names no server and carries no validity window. This call is also what turns a portal registration into an account - the first one redeems the grant (`ServicePortal.md`) - and it is repeated whenever the routing changes; a repeat grants nothing. The destination can only be delegated once the account exists, so the first card carries no routing: the client delegates its transient and publishes again immediately afterwards. Responds `{quotaBytes, serverCard, approval, registrationMessage}` |
 | `DELETE /v1/account/registration` | Terminate the account. The destination is revoked, the node discards the account record and the grants, and the messaging server is instructed to discard the mailbox and all other state held for that fingerprint (`DELETE /v1/messaging/account`, operator-signed). The request is signed with the account's own identity key, the only credential that can authorise it; a client therefore performs this call before removing its local profile and removes it only on success. **Idempotent**: a key for which the node holds nothing receives the same response as a deletion, with nothing revoked or discarded, so that a client whose account an operator has already removed can still complete the operation locally. A client treats any 4xx response likewise: no state for the account remains on the server, and it removes its local copy. Only the absence of a response (or a 5xx) leaves both sides unchanged, with the reason reported to the user |
 | `POST /v1/account/i2p-dest` | Upload a signed offline **transient** (`{transient, expiresUnix}`; empty takes the address offline and keeps its keys). Every account owns a destination - it is the base protocol, not a purchase - so the only gates are that the account exists here and, on a moderated node, that it is approved (`ACCOUNT_PENDING_APPROVAL` until then). The node passes the transient to the messaging server, which operates the destination, and records its validity. Responds `{dest, servingKey}`: the address this delegation gives and the base64 SPKI of the key that destination seals deliveries with. The client needs both to issue its card, and the serving key is the half it cannot derive itself - so the card is published from this answer rather than from a second request. A transient over a new address also means the old destination is dropped at once (`ServerServiceNode.md`), which is what makes the fan-out that follows obligatory (`../Messages.md`) |
-| `GET /v1/account/i2p-status` | `{approval, registrationMessage, transientExpires, transientUpdatedAt, ...}` - the client polls this to drive transient re-issue and to see whether a moderated account is still awaiting approval |
+| `GET /v1/account/i2p-status` | `{approval, registrationMessage, transientExpires, transientUpdatedAt}`, where `approval` is `none`, `pending` or `approved` - the client polls this to drive transient re-issue and to see whether a moderated account is still awaiting approval |
+| `POST /v1/account/registration` | Register with no portal page to visit (`ServicePortal.md`): answers `{ok, quotaBytes, requiresApproval, message}` |
+| `GET /v1/account/portal` | The node's onboarding text and registration terms: `{message, links, registration: {requiresApproval, message}, quotaBytes}` |
 | `GET /v1/account/card?user=X` | The contact card behind a descriptor: returns `{user, card}`. Reached from the messaging server, which serves a peer's query **on the user's own destination** - that destination is the capability, and it answers for its own user alone, so this cannot be used to ask whether a server hosts some other fingerprint. There is no lookup by fingerprint through a facade. The `alias` namespace lives on the central resolver (`api/FederatedResolve.md`) |
 
-Implemented in the `service-node` repository (`SubscriptionStore`, `AccountApi`; covered by tests). The service node is bound to its messaging server by that server's card (passed at startup). Nothing a contact can fetch names that server.
+The service node is bound to its messaging server by that server's card (passed at startup). Nothing a contact can fetch names that server.
 
 ## Messaging (server)
 
@@ -75,8 +77,9 @@ Implemented in the `service-node` repository (`SubscriptionStore`, `AccountApi`;
 dials the recipient's serving destination over I2P and performs the federation
 exchange with it (`Federation.md`), from a destination held for that one
 correspondent. The account's own server is never asked to dial a correspondent and
-therefore does not learn who its users write to; this is the reason the endpoint
-was removed rather than left unused.
+therefore does not learn who its users write to. There are no send attempts to
+keep: the account's server holds no outgoing state, and a client holds a delivery
+in memory only until its outcome is reported.
 
 The server performs no part of a delivery. Its remaining functions are receipt -
 it operates the destination a correspondent dials, admits the envelope and holds
@@ -111,13 +114,13 @@ than at the recipient's server.
   Declining a request transmits nothing.
 - A repeated delivery is the same delivery: the delivery id is derived from the
   message and the recipient mailbox (`../Messages.md`), so the recipient's server
-  recognises the repetition and stores no second copy.
+  recognises the repetition and stores no second copy. It remembers a delivery id for 30 days after storing it, so a repetition within that time is answered as delivered.
 
 ### Own destination
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /v1/messaging/destination` | Returns the caller's assigned `{dest, servingKey, state}` - the destination this server operates for the user (the blinded b33 of its encrypted LeaseSet2, a `.b32.i2p` host equal to the b33 of the master the client holds), the public serving sealing key for it, and `state` (empty when the user delegated none, else `building` -> `active` -> `expired`). `dest` is empty only while nothing is delegated - the server derives it from the delegation at once, before the destination publishes - and a client refreshing its card then fills in its own master's b33, the same address either way. The client includes dest+key in the contact card it signs |
+| `GET /v1/messaging/destination` | Returns the caller's assigned `{dest, servingKey, state}` - the destination this server operates for the user (the blinded b33 of its encrypted LeaseSet2, a `.b32.i2p` host equal to the b33 of the master the client holds), the public serving sealing key for it, and `state` (`none` when the user delegated none, else `building` -> `active` -> `expired`). `dest` is empty only while nothing is delegated - the server derives it from the delegation at once, before the destination publishes - and a client refreshing its card then fills in its own master's b33, the same address either way. The client includes dest+key in the contact card it signs |
 | `GET /v1/messaging/storage-usage` | The authenticated caller's own mailbox storage: `{usedBytes, quotaBytes}` - bytes of pending content currently held, and the effective quota (the user's override, else the server default). Read-only; the client shows it as used/free/total in per-account settings. |
 
 ### Receiving
@@ -125,9 +128,9 @@ than at the recipient's server.
 | Endpoint | Purpose |
 |---|---|
 | `GET /v1/messaging/events` | Hold the request open until something is pending for this client (or `wait` seconds pass, capped at 30), then answer in the same shape as `pending`. How a server holds it open is an implementation matter; what the protocol requires is that a delivery ends the wait, at once. This is the **only** way a client learns that mail has arrived: there is no second, slower mechanism to fall back to, and a wait that ends in an error is repeated rather than delegated to one |
-| `GET /v1/messaging/pending` | List pending entries for this client ID: `{pending: [{id, class}]}` where `class` is the delivery class `content` or `contact` (the admission selector, not the content type - see `../Messages.md`). **Oldest arrival first**, and `events` answers in the same order: a burst is fetched in the order the mailbox took it, not in whatever order the server's storage enumerates. The order is arrival only - the position of each message in the conversation is decided by the `sentAt` inside the sealed envelope, which no server sees |
+| `GET /v1/messaging/pending` | List pending entries for this client ID: `{pending: [{id, class}]}` where `class` is the delivery class `content`, `contact` or `device` (the admission selector, not the content type - see `../Messages.md`). **Oldest arrival first**, and `events` answers in the same order: a burst is fetched in the order the mailbox took it, not in whatever order the server's storage enumerates. The order is arrival only - the position of each message in the conversation is decided by the `sentAt` inside the sealed envelope, which no server sees. The list is not paged: one answer lists every entry this client has not acknowledged, and the mailbox quota bounds its length. A client takes in as many entries per pass as it chooses and acknowledges them; while any remain unacknowledged, `events` answers at once |
 | `GET /v1/messaging/pending/{blobId}` | Fetch the raw E2E payload bytes |
-| `POST /v1/messaging/ack` | Confirm receipt for this client ID; when all registered client IDs of the user have acked, the server deletes the content immediately |
+| `POST /v1/messaging/ack` | Confirm receipt of `{blobId}` for this client ID; when all registered client IDs of the user have acked, the server deletes the content immediately |
 
 ### Files (see `FileTransfer.md`)
 
@@ -169,21 +172,16 @@ the network the user chose.
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /v1/messaging/passes` | Register the hashes of the passes this user's mailbox admits. Hashes, not the passes themselves: a sender presents the pass, so what is on the node's disk recognises a delivery and cannot produce one. Registering one already held is how a block is lifted |
-| `POST /v1/messaging/passes/revoke` | Drop exactly these passes and answer how many were there. Exact and immediate - the account names what it issued, so there is nothing to sweep for (`../Contacts.md`) |
+| `POST /v1/messaging/passes` | `{passes: [<hash>, ...]}` -> `{ok, held}`. Register the hashes of the passes this user's mailbox admits. Hashes, not the passes themselves: a sender presents the pass, so what is on the node's disk recognises a delivery and cannot produce one. Registering one already held is how a block is lifted |
+| `POST /v1/messaging/passes/revoke` | `{passes}` -> `{revoked}`. Drop exactly these passes and answer how many were there. Exact and immediate - the account names what it issued, so there is nothing to sweep for (`../Contacts.md`) |
 
 ### Client registry (see `../DeviceSync.md`)
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /v1/messaging/clients` | Register this client ID (device enrollment) |
+| `POST /v1/messaging/clients` | Register this client ID, `{clientId}` (device enrollment) |
+| `GET /v1/messaging/clients` | The registered client IDs: `{clients: [{clientId, current, queue}]}` - `current` marks the caller, `queue` counts the entries waiting for that client |
 | `DELETE /v1/messaging/clients/{clientId}` | Retire a client ID - own or another (lost) device's. The server re-evaluates ack-completeness of pending content |
+| `POST /v1/messaging/self` | Store `{deliveryId, payload}` (payload base64) in the account's own mailbox for its other devices: answers `{ok, stored}`, and `stored` is false while the account has one registered client (`../DeviceSync.md`) |
 
-Every request carries the client's unique random **client ID**; the "delete when all clients received" rule operates on the registered set. Requests from an unregistered client ID (other than registration itself) fail with `CLIENT_UNREGISTERED`.
-
-## Open questions
-
-- **Incoming delivery mechanism** - settled: one held-open request (`events`), no periodic polling and no fallback. A facade carrying it learns when an event happened and nothing else - the request travels inside the tunnel, so the client, the path and the answer are opaque to it.
-- **Pagination / batching** for `/pending` with many messages.
-- Retention period of completed send attempts before they are dropped.
-- Endpoint naming and request/response schemas - to be specified per endpoint once flows are agreed.
+Every request carries the client's unique random **client ID**; the "delete when all clients received" rule operates on the registered set. Requests to `events`, `pending`, `ack`, `passes` and `self` from an unregistered client ID fail with `CLIENT_UNREGISTERED`. A successful write that has nothing to report answers `{ok: true}`.

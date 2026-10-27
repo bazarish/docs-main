@@ -1,6 +1,6 @@
 # Groups & Channels
 
-Status: v1 (decided). Host: `bazarish-bot`; member: `client-qt`.
+Host: `bazarish-bot`; member: `client-qt`.
 
 ## Principle: a group is a bot that relays
 
@@ -98,14 +98,15 @@ additive fields:
 
 A post that would exceed the size limit (`Messages.md`, *Size*) once `author`
 and the block are added is refused when it arrives, with a notice to its
-author. Files are not relayed in v1; a picture or a voice note that fits one
-envelope is.
+author. Files are not relayed: a file message from a member is dropped without a
+notice. A picture or a voice note that fits one envelope is relayed.
 
 ## Edits and deletes
 
 - The author edits or deletes their post as any message: `edit` / `delete` to
   the host. The host checks that the post is theirs and relays the same
-  `edit` / `delete` to everyone else.
+  `edit` / `delete` to everyone else. Only a text post is edited; an edit to a
+  picture or a voice note is ignored.
 - An admin deletes another member's post with `bot.command` `delete <id>`. The
   host relays the `delete` to everyone except the author. The author's own copy
   stays: it is their outgoing message, and a `delete` applies only to messages
@@ -186,7 +187,8 @@ sends `group.state` - a message with no body, only the block - when `write` or
 - A post marked `contactable` offers "request contact". The member sends
   `bot.command` `contact <id>`, and the host passes the requester's descriptor
   to the author, in a message only the author sees. The author decides; the
-  author's own descriptor goes nowhere.
+  author's own descriptor goes nowhere. A member asks a given author once; a repeated ask is
+  not passed on.
 - A member turns this on and off with `bot.command` `contactable on` /
   `contactable off`. The owner can switch it off for the whole group.
 

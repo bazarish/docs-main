@@ -1,7 +1,5 @@
 # Contact Admission: Delivery Passes
 
-Status: implemented.
-
 ## Problem
 
 A server stores incoming content only if the sender is an approved contact of the recipient. Holding that approval as a list of identities on the server would constitute a readable social graph, which the threat model does not permit. The server must therefore be able to *enforce* contact admission without being able to *read* the relationship.
@@ -19,13 +17,13 @@ A **delivery pass** is a 256-bit value the recipient's client derives for one co
 Properties:
 
 - **No social graph at rest.** The server holds a flat set of opaque hashes per mailbox; nothing maps a hash to a contact.
-- **One record per correspondent.** A mailbox holds as many passes as the account has contacts, and that number does not grow with traffic. The one-time scheme this replaced grew by a fresh batch on every refill and revoked the previous one only on removal; a single test account had accumulated sixty-one thousand.
-- **Replay protection.** A pass is reusable, so what stops an envelope being offered twice is the server's retained **seen-deliveryId set**: every admitted `deliveryId` is remembered for 30 days after its arrival (`kMaxDelegationDays`), independently of the stored blob's lifecycle, so within that time an already-delivered envelope cannot be re-admitted even after it has been fetched, acked and swept from the mailbox (see `api/Federation.md`). This is what guarded the tokenless path before, and it now guards both.
-- **What is deliberately not bounded.** A pass does not limit how much a correspondent may write within it. The ceiling on a mailbox is its storage quota, which is where it always was in practice: the one-time scheme refilled itself automatically, so an active conversation was in effect never counted either. The cost is that one correspondent can fill a mailbox to the quota and leave nothing for the others; the remedy is blocking them, which is now exact and immediate.
+- **One record per correspondent.** A mailbox holds as many passes as the account has contacts, and that number does not grow with traffic.
+- **Replay protection.** A pass is reusable, so what stops an envelope being offered twice is the server's retained **seen-deliveryId set**: every admitted `deliveryId` is remembered for 30 days after its arrival (`kMaxDelegationDays`), independently of the stored blob's lifecycle, so within that time an already-delivered envelope cannot be re-admitted even after it has been fetched, acked and swept from the mailbox (see `api/Federation.md`). Contact requests, which carry no pass, are guarded by the same set.
+- **What is deliberately not bounded.** A pass does not limit how much a correspondent may write within it. The ceiling on a mailbox is its storage quota. A correspondent may deliver at most 120 messages a minute on its pass (`kMailPerPassPerMinute`); the server counts them per pass in a one-minute window and refuses the excess with `CONTACT_RATE_LIMITED`. Nothing divides the quota between correspondents: one of them can fill a mailbox to the quota and leave nothing for the others, and the remedy is blocking them, which is exact and immediate.
 
 ## Pass lifecycle
 
-1. **Issuance** - the recipient's client derives the pass for a contact, registers its hash with its own server (`POST /v1/messaging/passes`, see `api/ClientApi.md`) and delivers the pass inside an E2E message, in the same `bootstrap` block that carries routing. Registration must precede or accompany delivery. Registering one already held is not an error - see *Revocation*.
+1. **Issuance** - the recipient's client derives the pass for a contact, registers its hash with its own server (`POST /v1/messaging/passes`, see `api/ClientApi.md`) and delivers the pass inside an E2E message, in the same `bootstrap` block that carries routing. Registration must precede or accompany delivery. Registering one already held is not an error - see *Revocation*. A mailbox holds at most 4096 passes (`kMaxPassesPerMailbox`) and one registration carries at most 256 (`kMaxPassesPerRequest`); both are protocol constants, not operator settings, and a request over either is refused with `400`.
 2. **Presentation** - the sender puts the pass in the envelope (`pass`); the recipient's server hashes it and looks it up. The pass does not depend on size: a line of text and the largest payload the protocol allows are admitted alike, and what bounds the large one is `kMaxMessagePayloadBytes` and the mailbox quota. Processing order on the recipient's server: deliveryId dedup first (a retried message must succeed idempotently, checked against both the pending blob and the retained seen-deliveryId set), then the pass, then size, then the store.
 3. **Revocation** - per correspondent, and asked for by the account that issued the pass. Its client sends the hash (`POST /v1/messaging/passes/revoke`); the server drops exactly that record and answers how many were there. Nothing is swept for and nothing else is touched, so there is no walk to queue and no accidental match. Removing or blocking a contact revokes what they hold; deleting the account discards all of them.
 
@@ -71,7 +69,7 @@ Before A can send the contact request above it must learn B's routing (`{ sealin
 - **Invite / alias** - A holds a self-verifying descriptor (fingerprint + serving destination + serving key) and fetches B's user-signed card **over I2P federation**, dialing B's serving destination directly. The card is verified against the fingerprint, so no server is trusted (see `api/FederatedResolve.md`).
 
 
-**Co-location rule (mandatory).** Two clients of the same server always have *different* I2P destinations - every account owns one - so first-contact discovery goes over I2P and there is no by-fingerprint lookup through a facade at all: one existed in an earlier draft, and a lookup that told a shared server "client A is asking for client B" would have disclosed that A and B are **co-located on it**.
+**Co-location rule (mandatory).** Two clients of the same server always have *different* I2P destinations - every account owns one - so first-contact discovery goes over I2P and there is no by-fingerprint lookup through a facade at all: a lookup that told a shared server "client A is asking for client B" would have disclosed that A and B are **co-located on it**.
 
 The same rule binds the answering end, which is the harder half. A card fetch arrives on a destination, and that destination answers for **its own user only**. Answering for any fingerprint the node happens to serve turned every published address into an oracle: dial A's destination, ask for B, and a returned card proves the two are served by the same server. The attack requires only a fingerprint and a destination, and every contact holds both.
 
@@ -79,8 +77,8 @@ For the same reason the contact request **delivery** is routed by destination ov
 
 ## Residual disclosure to the server
 
-- **Set size** is the number of contacts, which is the degree of the contact graph rather than an estimate of it. Mitigation: clients may pad the set with unused hashes. The one-time scheme hid this behind a stash size but leaked the same grouping nonetheless, since two of its tokens for one correspondent XORed to a value ending in four zero bytes.
-- **Registration timing**: a pass registered immediately after an outgoing contact request indicates that it belongs to that pending contact. Mitigation: randomised delay and pre-registration padding. Recorded in the threat model; not a release blocker.
+- **Set size** is the number of contacts, which is the degree of the contact graph rather than an estimate of it. Mitigation: clients may pad the set with unused hashes.
+- **Registration timing**: a pass registered immediately after an outgoing contact request indicates that it belongs to that pending contact. Mitigation: randomised delay and pre-registration padding.
 - **Traffic volume per mailbox** is inherent to any store-and-forward server.
 
 ## Anti-enumeration
@@ -92,9 +90,4 @@ destination serves. Such a request does not enter the seen-set, so it cannot be
 used to suppress the genuine delivery of the same id. A pass-bearing delivery for another mailbox is
 refused like any other bad admission.
 
-Unknown pass, unknown mailbox, and a recipient not served here must be externally indistinguishable (single `DELIVERY_REJECTED` error). Two refusals the one-time scheme had no longer exist: nothing can be "already spent", and no envelope can present the wrong number of them. Detailed typed errors (`STORAGE_FULL` and `MESSAGE_TOO_LARGE`, which the sender must see explicitly) are returned only after a valid pass has been presented - so only actual contacts can learn mailbox state. The order that makes this true is in `api/Federation.md`, and it is essential rather than incidental.
-
-## Open questions
-
-- **Defaults** - `kMaxPassesPerMailbox` and `kMaxPassesPerRequest` bound what one account may register; whether either belongs in server config rather than the protocol is open.
-- **Fairness** - a correspondent may deliver at most 120 messages a minute on its pass (a ceiling high enough for a busy bot or group); nothing else keeps one correspondent from filling a mailbox to the quota.
+Unknown pass, unknown mailbox, and a recipient not served here must be externally indistinguishable (single `DELIVERY_REJECTED` error). A pass is not spent, so no refusal says a pass was already used. Detailed typed errors (`STORAGE_FULL` and `MESSAGE_TOO_LARGE`, which the sender must see explicitly) are returned only after a valid pass has been presented - so only actual contacts can learn mailbox state. The order that makes this true is in `api/Federation.md`, and it is essential rather than incidental.

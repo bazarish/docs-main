@@ -1,10 +1,8 @@
 # Identity & Cryptography
 
-Status: draft skeleton.
-
 ## Principles
 
-- OpenSSL only; standardized algorithms and containers (PEM, DER, X.509, CMS). No custom cryptographic constructions (codestyle requirement).
+- OpenSSL only; standardized algorithms and containers: keys in PEM and DER, certificates as one composite CBOR frame, CMS for the password envelope alone. No custom cryptographic constructions (codestyle requirement).
 - Every long-lived identity is a **hybrid keypair set** (classical + post-quantum, see Algorithms below); human-readable names are optional, revocable mappings on top.
 
 ## User identity
@@ -27,9 +25,8 @@ Status: draft skeleton.
   bound to it), and it is also what a **client** fetches in the open before it can
   speak in private: the tunnel is sealed to the sealing key in it, and the card is
   trusted because it is signed by the fingerprint the user already had
-  (`api/ClientApi.md`). That sealing key **must be hybrid** - sealing needs the
-  ML-KEM half, and a server whose key predates hybrid sealing keys can serve no
-  client at all, so it refuses to start rather than fail one connection at a time.
+  (`api/ClientApi.md`). That sealing key is hybrid (X25519 + ML-KEM-768), as every
+  sealing key in the project is.
   It is **not** the peer-facing routing artifact and is **not**
   carried in invites: delivery routing and sealing are per-destination and travel
   in the user's contact card (below); a contact fetches that card from the
@@ -51,10 +48,9 @@ Status: draft skeleton.
   **root identity** signs only **outside** federation - the server card above
   (the `bazarish://server` configuration link carries no signature, only the
   fingerprint that card is verified against, `api/Facade.md`) and the
-  service-node binding - so two users one server hosts on different destinations
-  share no signer and cannot be clustered by a common server fingerprint; users
-  sharing a destination share its signing key, which is the same k-anonymity set
-  that already shares the destination (`InviteAnonymity.md`).
+  service-node binding - so two users one server hosts share no signer and cannot be
+  clustered by a common server fingerprint: no two users share a destination, so
+  none share its signing key (`InviteAnonymity.md`).
 
 ## Certificates
 
@@ -185,9 +181,8 @@ display name the recipient adopts at add time (static thereafter; see `Messages.
 It fits a single QR. The recipient
 fetches the user-signed **contact card** for that fingerprint from the destination
 and verifies it against the fingerprint, so the binding is cryptographic and
-intermediaries are trusted for availability only. This replaces the earlier
-full-card invite (the whole ~= 7-8 KB user-signed card inline, spanning several QR
-symbols): smaller and always-fresh, at the cost of a live fetch at add-time
+intermediaries are trusted for availability only. The descriptor is small and the
+card always fresh, at the cost of a live fetch at add-time
 (`api/FederatedResolve.md`).
 
 Trust ladder for adding a contact, strongest first:

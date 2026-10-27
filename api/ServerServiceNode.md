@@ -1,7 +1,5 @@
 # Server <-> Service Node API
 
-Status: implemented.
-
 Internal API over the operator private channel - mutually pinned TLS, each side holding the hash of the other's key, and every call signed by the identity that makes it. What the node asks of the server rides the server's operator socket; the one call the other way, a card lookup by fingerprint, rides the node's own listener and is authorised to the server's fingerprint alone. The service node owns per-operator user-management state (accounts: the quota granted and the card published); the server owns content and delivery, and consults the service node to make admission decisions. The global **alias** namespace is **not** here - it is a separate central service (`api/FederatedResolve.md`), not the operator service node.
 
 An account has **no term**. Registration opens an unbounded channel; the only clock is the delegated destination, and an account that has none for the node's idle window is deleted (`idleDeleteDays`, 180 by default).
@@ -12,7 +10,7 @@ An account has **no term**. Registration opens an unbounded channel; the only cl
 |---|---|
 | `get-card` | fingerprint -> the user's **contact card** (sealing key + destination + serving sealing key). Backs the federation `card` request - the first-contact card fetch (`api/FederatedResolve.md`). The query arrives on that user's own destination and is answered for that user alone, so it cannot be used to ask a server whether it hosts some other fingerprint |
 
-## Service node -> Server (implemented)
+## Service node -> Server
 
 Requests are signed with the node's own identity and authorised by the server on
 that fingerprint; no shared secret is used.
