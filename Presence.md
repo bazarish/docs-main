@@ -161,13 +161,24 @@ typing only while it also sees online.
 
 ## Through a gateway
 
-A client on an external gateway hands it the presence destination's keys, the
-reader list and, for a watching address, the account's presence secret, because
-the router that builds and reads those lease sets is the gateway's. The
-operator then holds a lasting ability to see when the account's contacts who list
-it are online, and to keep the account's presence address silent. It cannot
-read a watch or forge a state. The wire and the full cost are in the gateway's
-`PROTOCOL.md` (`bazarish-server/gateway`).
+A client on an external gateway cannot keep the presence address to itself: the
+router that builds it and reads the lease sets of contacts is the gateway's. It
+hands over the least that works:
+
+- **The presence address as a delegation, never its master key.** The gateway
+  gets an offline transient that ends with the UTC day. Before it ends the
+  gateway asks for the next one and the client sends a delegation to the end of
+  the following day; with none, the gateway takes the address down a minute
+  before the end. The client keeps no clock for it. An operator can keep the
+  address silent while a delegation runs, and cannot raise it after.
+- **The reader list,** which names the presence keys of up to 99 contacts.
+- **The account's presence secret,** to read the lease sets that list the
+  account. A secret that decrypts cannot be delegated, so this is the lasting
+  part: the operator can see when those contacts are online for as long as the
+  secret stands, and a new secret means a new card.
+
+It can neither read a watch nor forge one, since the keys for both never leave
+the device. The wire is in the gateway's `PROTOCOL.md` (`bazarish-server/gateway`).
 
 ## What anyone learns
 
