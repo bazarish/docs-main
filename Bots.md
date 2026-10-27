@@ -18,8 +18,10 @@ This is a direct consequence of the two-layer model:
 There is deliberately **no** server-side bot registry, bot flag, or bot
 directory. A bot is reached exactly like any contact: by its invite link or by an
 alias, and its correspondents are limited like any others, 120 messages a minute
-on a pass. A client shows a bot's keyboards under its messages and its menu beside
-the conversation, and marks a bot in no other way.
+on a pass. Its own contact card says `kind: "bot"` (`Identity.md`), a statement
+the bot makes about itself; a client shows a bot's keyboards under its messages
+and its menu beside the conversation, names it a bot under its name, and shows no
+presence for it.
 
 A bot runs as a program of its own against `bazarish-bot`, which holds the
 account and exposes it through a REST API. A group is a bot that relays its

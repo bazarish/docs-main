@@ -20,6 +20,7 @@ component implements.
 - [Bots](Bots.md) - bots as ordinary identities; commands, inline keyboards, callbacks
 - [Groups](Groups.md) - groups and channels as a relaying bot; the `group` block, names, roles, reactions
 - [DeviceSync](DeviceSync.md) - multi-device enrollment and E2E state sync
+- [Presence](Presence.md) - online and typing, directly between devices over I2P
 - [Errors](Errors.md) - typed error registry
 - API contracts:
   - [ClientApi](api/ClientApi.md) - client <-> facade <-> {server, service node}

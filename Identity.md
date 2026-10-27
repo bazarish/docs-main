@@ -62,7 +62,8 @@ Issued **by the user** and signed with their identity key: the cryptographic
 answer to "where and how do I deliver to U?". Signed by U, so it stays
 trustworthy through any untrusted intermediary.
 
-Body: `{ v, t: "contact-card", issuedAt, dest, sealingKey, servingKey }`.
+Body: `{ v, t: "contact-card", issuedAt, kind, dest, sealingKey, servingKey,
+presenceKey, presenceDest }`.
 
 - `t` - what this document is. Checked before any of the body is believed, so
   that one signed document cannot be read as another: with optional fields and no
@@ -74,6 +75,10 @@ Body: `{ v, t: "contact-card", issuedAt, dest, sealingKey, servingKey }`.
   published last, so a second device holding an old copy could republish it and
   silently revert the account's routing - valid signature, correct owner, but
   stale.
+- `kind` - `user`, `bot` or `chat` (a group or channel host, `Groups.md`): what
+  kind of account signed the card. It is fixed when the account is made, every
+  card carries it, and a card without it is refused. A client draws a contact by
+  it; it is the owner's own statement, so it decides rendering and never trust.
 - `sealingKey` - the user's E2E sealing key (SPKI DER, base64): what a contact
   encrypts to. The very first contact request is sealed to it before any pass
   exchange, and so is **every message afterwards** - the card is where a stranger
@@ -90,6 +95,11 @@ Body: `{ v, t: "contact-card", issuedAt, dest, sealingKey, servingKey }`.
   by the user's server, which is what lets the server route without being able to
   read: the message itself is sealed to `sealingKey`, whose private half never
   leaves the user's device.
+- `presenceKey` - the account's X25519 presence key (SPKI DER, base64, a bare
+  X25519 key and not a sealing pair), and `presenceDest` - the b33 of its
+  presence destination (`Presence.md`). A `user` card carries both and a card of
+  another kind carries neither; any other combination is refused. Both are made
+  with the account and never change.
 
 **The owner is not a field.** A card is a statement its signer makes about
 themselves, so the subject is taken from the keys that signed it. A name written
@@ -100,7 +110,8 @@ because only the reader knows whose card they asked for.
 
 What is deliberately **absent**: any server fingerprint or server card (routing
 is by destination, and naming the server would let cards be grouped by who hosts
-them); and anything about the owner's devices.
+them); and anything about the owner's devices - the presence destination is one
+per account, whichever device holds it.
 
 **Forward secrecy: there is none, and the card is where that shows.**
 `sealingKey` is long-lived and never rotated, so whoever obtains its private half
@@ -198,7 +209,7 @@ Trust ladder for adding a contact, strongest first:
 
 ## Algorithms (decided empirically against OpenSSL 3.5)
 
-- **Identity is a post-quantum hybrid: Ed25519 + ML-DSA-65 (FIPS 204).** Every identity-level statement (contact card, alias certificate, server card) carries **both** signatures and is valid only when both verify - forging requires breaking both schemes. This is mandatory, not optional.
+- **Identity is a post-quantum hybrid: Ed25519 + ML-DSA-65 (FIPS 204).** Every identity-level statement (contact card, alias certificate, server card) carries **both** signatures and is valid only when both verify - forging requires breaking both schemes. This is mandatory, not optional. The one exception is a presence watch, a request checked once on arrival and dropped after 120 seconds, which carries the Ed25519 signature alone under its own domain string (`Presence.md`).
 - **One composite frame, no CMS.** OpenSSL CMS carries neither signer type: measured against 3.5.7, `CMS_add1_signer` refuses Ed25519 with `no default digest`, and an X25519 recipient is refused with `operation not supported for this keytype`. So a statement is one CBOR frame built from standard primitives: `{v, body, c: {alg, pub, sig}, q: {alg, pub, sig}}`, with `body` the exact signed bytes. Both halves sign the **same** message: the domain-separation string, then SHA-256 over `Ed25519 SPKI DER || ML-DSA SPKI DER`, then the body bytes. Naming both keys in the signed message is what stops either half being copied into a frame that names a different key. Verification checks both signatures **and both key types** (a classical key in the pq slot is a downgrade and fails).
 - **Identity fingerprint**: lowercase unpadded base32 (RFC 4648) of SHA-256 over the concatenation `Ed25519 SPKI DER || ML-DSA SPKI DER` - 52 characters, covering both keys; substituting either key changes the identity. Display shortening is a client UX concern.
 - **Sealing keys: X25519 + ML-KEM-768 (FIPS 203), one composite KEM.** A sealing key is distinct from the identity keys by design, and it is a pair: its public form is the CBOR `{t, c, q}` carrying both public halves (1268 bytes, measured).
@@ -206,4 +217,4 @@ Trust ladder for adding a contact, strongest first:
   - **CMS stays for the password envelope only** (RFC 3211 PWRI, AES-256-CBC): the account backup and the file-transfer payload are keyed by a password, involve no asymmetric key, and stream, so the standard container remains in use there.
 - **Alias syntax**: `a-z` and `0-9` only, case-insensitive (normalized to lowercase), 1-16 characters (`api/FederatedResolve.md`). The length cap keeps an alias distinct from the 52-character fingerprint form.
 
-Implementation: the `common` repository (`Crypto`, `Hybrid`, `Certificates` modules; `Cms` is the password envelope alone). Tests cover tamper, downgrade and half-splicing cases. Notable sizes, measured: ML-DSA-65 signature 3309 bytes and public key 1974 bytes against Ed25519's 64 and 44, so an alias certificate is 5593 bytes and a contact card, which carries two sealing pairs, is 8994.
+Implementation: the `common` repository (`Crypto`, `Hybrid`, `Certificates` modules; `Cms` is the password envelope alone). Tests cover tamper, downgrade and half-splicing cases. Notable sizes, measured: ML-DSA-65 signature 3309 bytes and public key 1974 bytes against Ed25519's 64 and 44, so an alias certificate is 5593 bytes and a `user` contact card, which carries two sealing pairs and the presence fields, is 9172 (a `bot` card, without them, is 9012).

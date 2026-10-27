@@ -90,6 +90,7 @@ docs-main/                       # this repository - canonical protocol specific
 |-- Identity.md                  # keys, UIDs, certificates, contact card
 |-- Contacts.md                  # contact admission via delivery passes
 |-- DeviceSync.md                # multi-device enrollment and E2E state sync
+|-- Presence.md                  # online and typing over client-authorised I2P destinations
 |-- Messages.md                  # two-layer message typing, content-type registry
 |-- Bots.md                      # bots & interactive messages
 |-- Groups.md                    # groups and channels as a relaying bot

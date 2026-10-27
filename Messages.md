@@ -245,7 +245,7 @@ face, with the same retry.
 | `text` | content | `text` - a plain text line. |
 | `contact.routing` | content | A routing change pushed to an established contact: the `routing` block, on a message with nothing else in it. The only message that carries one. |
 | `device.chat-pin` | device | One conversation pinned or unpinned, on every device of the account. |
-| `contact.request` | contact | Carries a `bootstrap` block (`sealing` - the same account sealing key the card publishes -, `dest`, `servingKey`, `pass`) plus `text`. The first message; see `Contacts.md`. |
+| `contact.request` | contact | Carries a `bootstrap` block (`kind`, `sealing` - the same account sealing key the card publishes -, `dest`, `servingKey`, `pass`, and for a `user` `presenceKey` and `presenceDest`) plus `text`. The first message; see `Contacts.md`. |
 | `contact.accept` | content | Agreeing to a received `contact.request`: an empty-bodied message whose first-reply `bootstrap` delivers our descriptor + our pass to the requester, making the pair mutual contacts. The requester's client completes adding the contact automatically and surfaces a note. See `Contacts.md`. |
 | `file` | content | An announcement: `name`, `size`, `sha256` and `mime`. The bytes stay on the sender's disk until the recipient asks for them. See `api/FileTransfer.md`. |
 | `image` | content | A picture, carried inline: the bytes travel in the envelope rather than being fetched. Its body block is named `image`. |

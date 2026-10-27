@@ -38,7 +38,7 @@ Which pass an account holds for each correspondent is private client state, carr
 A is not B's contact and B is not A's - the first exchange must bootstrap both directions:
 
 1. A's client derives its pass *for B* and registers its hash on A's own server.
-2. A sends a **contact request** to B: a delivery admitted by nothing, flagged as a request, payload capped (17590 bytes, slightly above the measured worst case; a protocol constant, not an operator setting). The cap is on the delivered, sealed bytes and must not fall below a real contact request: the E2E payload carries A's identity, the introduction message, A's self-chosen **display name** (`dn`, so B can seed a named friend - see "Display names" below), **the pass B will write back with**, plus A's routing **bootstrap** - `{ sealing key, dest, servingKey }` (see `../Identity.md`) - without which B would not know where to send the acceptance, so a sealed request is 17558 bytes in the worst case (the longest display name and
+2. A sends a **contact request** to B: a delivery admitted by nothing, flagged as a request, payload capped (17590 bytes, slightly above the measured worst case; a protocol constant, not an operator setting). The cap is on the delivered, sealed bytes and must not fall below a real contact request: the E2E payload carries A's identity, the introduction message, A's self-chosen **display name** (`dn`, so B can seed a named friend - see "Display names" below), **the pass B will write back with**, plus A's routing **bootstrap** - `{ kind, sealing key, dest, servingKey }`, and for a `user` also `presenceKey` and `presenceDest` (see `Identity.md`) - without which B would not know where to send the acceptance, so a sealed request is 17558 bytes in the worst case (the longest display name and
 the longest greeting), the authorship block that introduces the sender's keys
 (`Messages.md`) being 5417 of them. The cap is that number plus a margin that a
 test holds under 64 bytes, and no more: room above the worst case is room for a
@@ -64,7 +64,7 @@ A user's **avatar** (square, compressed client-side to <= 500 KB) is exchanged o
 
 ## First-contact discovery and co-location
 
-Before A can send the contact request above it must learn B's routing (`{ sealing key, dest, servingKey }`). One discovery path exists:
+Before A can send the contact request above it must learn B's routing (`{ kind, sealing key, dest, servingKey }`, plus the presence fields of a `user`). One discovery path exists:
 
 - **Invite / alias** - A holds a self-verifying descriptor (fingerprint + serving destination + serving key) and fetches B's user-signed card **over I2P federation**, dialing B's serving destination directly. The card is verified against the fingerprint, so no server is trusted (see `api/FederatedResolve.md`).
 

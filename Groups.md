@@ -5,7 +5,8 @@ Host: `bazarish-bot`; member: `client-qt`.
 ## Principle: a group is a bot that relays
 
 A group is an ordinary identity (`Identity.md`) run as a **group host**: a
-`bazarish-bot` account of kind `group`. A member adds it like any contact, by
+`bazarish-bot` account of kind `group`, whose contact card says
+`kind: "chat"`. A member adds it like any contact, by
 invite or alias, and the host relays each member's post to every other member,
 from itself, under the author's name in the chat. Everything that makes the
 conversation a group lives in **Layer 2** (`Messages.md`): to the servers,
