@@ -83,14 +83,20 @@ device moves all of its watches to a new one when:
 - an answered watch has had no state for `subscriptionLife`;
 - a watch to a contact heard from within `leaseSetLife` has gone unanswered for
   `subscriptionLife`;
-- a watch from a contact arrives while the device's own watch to that contact
-  has gone unanswered for `watchRetry`: the contact's address is up now. A watch
-  unanswered for less is only resent at once.
+- a watch from a contact arrived, which says the contact's address is up, and
+  the device's own watch to that contact is still unanswered `watchRetry` after
+  it. The own watch is resent at once when such a watch arrives;
+- its own presence address has just come up.
 
 A contact shown online before the move stays online, without typing, until it
-answers or for `subscriptionLife`. A device about to hold sends its watches only
-once its own presence address is up, so that a contact it wakes looks that
-address up after it has been published.
+answers or for `subscriptionLife`.
+
+Watches go out as soon as the device is in focus, without waiting for its own
+presence address: a contact on the same gateway is met inside it (the gateway's
+`PROTOCOL.md`) and answers at once. A contact woken by such an early watch may
+look the address up before it is published and find the one before; the move
+that follows the address coming up sends every watch again from a new watching
+address, which wakes that contact once more.
 
 ### Frames
 
