@@ -74,6 +74,7 @@ Account state propagates to the user's other devices as dedicated **self-message
 - `call.taken` - the device that answered or refused an incoming call, stopping the others ringing (`api/Calls.md`).
 - `device.contacts-request` - `device`: the asking device wants the address book. Sent once, automatically, on a device's first sync that reaches the server, and manually from the account window. A device ignores its own request; an account with no other device stores nothing.
 - `device.contacts` - `forDevice`, `contacts`: the book, or a part of it. Every other device that has contacts answers, so several answers may arrive; each is taken in turn.
+- `device.contact` - `device`, `contact`: one entry of the book, in the same form, sent by the device that has just added a contact (it sent the contact request), before the request leaves. The others hold no copy of that request, so without it they would drop the contact's answer and every later message as from a stranger. It is merged as an answer is.
 
 ### The address book
 
