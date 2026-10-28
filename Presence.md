@@ -28,16 +28,17 @@ in the contact card as `presenceDest` and `presenceKey`.
   authorisation** (I2P proposal 123, DH client auth). Without a listed reader's
   secret its lease set cannot be read, so the address cannot be reached or even
   found.
-- **Readers** - at most 100: the account's own presence key, so that its other
-  devices reach it, and the presence keys of up to 99 contacts, taken in the order
-  of the chat list (pinned chats first, then the most recent conversation). The
+- **Readers** - the presence keys of up to 100 contacts, taken in the order of
+  the chat list (pinned chats first, then the most recent conversation). The
   oldest dialogs stop receiving the status. A blocked contact and a contact whose
-  card is not a `user` card are not readers.
+  card is not a `user` card are not readers. The account's own key is not one:
+  its devices do not watch each other.
 - **A change of the list** - a contact added, removed or blocked, or the order
-  crossing the 99th place - re-creates the destination after the list has been
+  crossing the 100th place - re-creates the destination after the list has been
   still for `readersSettle`. The lease set is read at creation only, so there is
   no other way to change it.
-- **It is up** while a device of the account is in focus, plus the tail.
+- **It is up** on every device of the account that is in focus, each with its
+  own tunnels, plus the tail.
 - **The switch** "Show online status" keeps it down when off. The card does not
   change, so the card does not reveal the setting. The switch is not reciprocal:
   hiding one's own status still shows others'.
@@ -45,40 +46,50 @@ in the contact card as `presenceDest` and `presenceKey`.
 A device watches from a **watching address** of its own: a published, minted
 destination that carries the account's presence secret as its lease-set reader
 key, so that it can read the lease sets that list the account. It exists while
-the device is in focus.
+the device is in focus. One is kept built ahead of time and given the secret
+when it is taken, so a device that gains focus watches at once.
 
-## Several devices: holder and siblings
+## Several devices
 
-Exactly one device holds the presence destination at a time. Two routers
-publishing it at once would overwrite each other's lease set, and a contact would
-reach one of them at random.
+A device that gains focus raises the presence destination at once; nothing is
+asked of the account's other devices first. A device holding it is a **holder**.
 
-1. A device that gains focus watches its **own** presence address.
-2. An answer means another device is the **holder**, and this one becomes a
-   **sibling**. A sibling renews every `siblingKeepalive` with whether it is in
-   focus and whom it is typing to, and the holder speaks for it.
-3. No answer within the probe patience - `probeDeadline` plus a random share of
-   up to half of it, so that two devices that start together rarely give up
-   together - and the device raises the destination and becomes the holder.
-4. The holder answers "online" while it or any sibling is in focus, and keeps
-   the destination up for the tail after the last of them, so there is no
-   handover and no gap.
-5. A sibling that hears nothing from the holder for `holderSilence` raises the
-   destination itself; its newer lease set replaces the old one.
-6. A holder in focus watches its own address every `selfCheckEvery`. When the
-   answer comes from another device, two of them raised it at once: this one
-   takes its destination down and continues as that device's sibling.
-7. A holder whose tail runs out tells every subscriber "offline" before it takes
-   the destination down.
+1. A holder answers for itself alone: "online" while it is in focus and for the
+   tail after, and "typing" to the contacts it is typing to.
+2. Two devices in focus at once both hold the destination. The newer lease set
+   wins at the floodfills, and a contact that found one of them keeps it: it sees
+   that device's typing, not the other's.
+3. A holder whose tail runs out tells every subscriber "offline" with `moved`
+   and takes the destination down. The same goes for a holder that re-creates the
+   destination for a new reader list, and for the switch turned off, without
+   `moved`.
 
 ## Watching
 
 A device in focus watches the contacts on its screen: the open conversation and
 the rows of the chat list in view, and no others. For each it sends a **watch**,
 renews it every `renewEvery`, and the holder answers each watch and renew, and
-every change of state, with a **state**. A watch that has had no state for
-`subscriptionLife` is started again, and the contact is shown offline meanwhile.
-A contact that leaves the screen is no longer watched and is shown offline.
+every change of state, with a **state**. A watch not yet answered is resent every
+`watchRetry`. A contact that leaves the screen is no longer watched and is shown
+offline.
+
+A destination that has found a lease set keeps it until the lease set expires,
+up to `leaseSetLife` after its holder is gone, and does not look again, so a
+contact whose holder changed is reached only from a new watching address. The
+device moves all of its watches to a new one when:
+
+- a state says `moved`;
+- an answered watch has had no state for `subscriptionLife`;
+- a watch to a contact heard from within `leaseSetLife` has gone unanswered for
+  `subscriptionLife`;
+- a watch from a contact arrives while the device's own watch to that contact
+  has gone unanswered for `watchRetry`: the contact's address is up now. A watch
+  unanswered for less is only resent at once.
+
+A contact shown online before the move stays online, without typing, until it
+answers or for `subscriptionLife`. A device about to hold sends its watches only
+once its own presence address is up, so that a contact it wakes looks that
+address up after it has been published.
 
 ### Frames
 
@@ -96,11 +107,11 @@ type (1 byte) || subscription id (8 bytes) || body
 | 3 | `state` | holder -> watcher | `nonce (12) || AES-256-GCM(CBOR)` |
 
 The **watch** is
-`{ t: "presence.watch", from, device, reply, sub, key, sentAt, sig }`, sealed with
+`{ t: "presence.watch", from, reply, sub, key, sentAt, sig }`, sealed with
 the hybrid seal to the watched account's sealing key, so only that account learns
 who is watching, now or after a quantum computer exists:
 
-- `from` - the watcher's fingerprint; `device` - the watcher's client id;
+- `from` - the watcher's fingerprint;
 - `reply` - the watching address the state goes to;
 - `sub` - the subscription id, in hex, equal to the one in the frame header;
 - `key` - a fresh 32-byte AES-256-GCM key for this subscription, base64;
@@ -119,7 +130,7 @@ reading later. Neither key ever leaves the device, so a gateway that holds the
 presence secret can neither read a watch nor forge one.
 
 The holder drops a watch whose type or `sub` does not match, whose `from` is
-neither the account itself nor one of its readers, whose `sig` does not verify
+not one of its readers, whose `sig` does not verify
 against the Ed25519 identity key of that `from`, or whose `sentAt` is more than
 120 seconds away from its own clock.
 
@@ -128,11 +139,9 @@ against the Ed25519 identity key of that `from`, or whose `sentAt` is more than
 it, and a 64-bit big-endian sequence that only grows: a frame whose sequence is
 not above the last one opened is dropped, as is one whose direction is wrong.
 
-- A contact's renew is `{}`. A sibling's is `{ focused, typing }`, `typing` being
-  the fingerprints of the contacts it is typing to.
-- A state is `{ online, typing }`, `typing` meaning typing to the watcher. To the
-  account's own devices it also carries `device`, the holder's client id, which
-  is how a holder finds a second holder (step 6). A contact is never told it.
+- A renew is `{}`.
+- A state is `{ online, typing }`, `typing` meaning typing to the watcher, and
+  `moved: true` in the last one before the holder takes the destination down.
 
 Measured sizes: a watch is 1447 bytes, most of it the hybrid seal; a renew is 109
 and a state 64.
@@ -140,24 +149,19 @@ and a state 64.
 ### Typing
 
 Composing in a conversation marks typing to that contact for `typingPulse`. A
-sibling forwards it to the holder at most every `typingResend`. A contact sees
-typing only while it also sees online.
+contact sees typing only while it also sees online.
 
 ### Timings
 
 | Name | Value |
 |---|---|
-| `watchRetry` | 3 s - a watch not yet answered is resent, for `probeDeadline`; then every `renewEvery` |
+| `watchRetry` | 5 s |
 | `renewEvery` | 15 s |
 | `subscriptionLife` | 30 s |
-| `siblingKeepalive` | 5 s |
-| `holderSilence` | 30 s |
-| `probeDeadline` | 20 s, plus a random share of up to 10 s |
 | `onlineTail` | 60 s |
 | `typingPulse` | 5 s |
-| `typingResend` | 2 s |
 | `readersSettle` | 10 s |
-| `selfCheckEvery` | 60 s |
+| `leaseSetLife` | 660 s - i2pd's tunnel lifetime, which bounds a lease set's |
 
 ## Through a gateway
 
@@ -171,7 +175,7 @@ hands over the least that works:
   the following day; with none, the gateway takes the address down a minute
   before the end. The client keeps no clock for it. An operator can keep the
   address silent while a delegation runs, and cannot raise it after.
-- **The reader list,** which names the presence keys of up to 99 contacts.
+- **The reader list,** which names the presence keys of up to 100 contacts.
 - **The account's presence secret,** to read the lease sets that list the
   account. A secret that decrypts cannot be delegated, so this is the lasting
   part: the operator can see when those contacts are online for as long as the
