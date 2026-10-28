@@ -39,15 +39,16 @@ in the contact card as `presenceDest` and `presenceKey`.
   no other way to change it.
 - **It is up** on every device of the account that is in focus, each with its
   own tunnels, plus the tail.
-- **The switch** "Show online status" keeps it down when off. The card does not
-  change, so the card does not reveal the setting. The switch is not reciprocal:
-  hiding one's own status still shows others'.
+- **The switch** "Show online status" keeps it down when off, and the device then
+  watches no one either, since a watch names its sender: with the switch off the
+  user sees no one's status. The card does not change, so the card does not
+  reveal the setting.
 
 A device watches from a **watching address** of its own: a published, minted
 destination that carries the account's presence secret as its lease-set reader
 key, so that it can read the lease sets that list the account. It exists while
-the device is in focus. One is kept built ahead of time and given the secret
-when it is taken, so a device that gains focus watches at once.
+the device is in focus with the switch on. One is kept built ahead of time and
+given the secret when it is taken, so a device that gains focus watches at once.
 
 ## Several devices
 
@@ -66,12 +67,12 @@ asked of the account's other devices first. A device holding it is a **holder**.
 
 ## Watching
 
-A device in focus watches the contacts on its screen: the open conversation and
-the rows of the chat list in view, and no others. For each it sends a **watch**,
-renews it every `renewEvery`, and the holder answers each watch and renew, and
-every change of state, with a **state**. A watch not yet answered is resent every
-`watchRetry`. A contact that leaves the screen is no longer watched and is shown
-offline.
+A device in focus with the switch on watches the contacts on its screen: the
+open conversation and the rows of the chat list in view, and no others. For each
+it sends a **watch**, renews it every `renewEvery`, and the holder answers each
+watch and renew, and every change of state, with a **state**. A watch not yet
+answered is resent every `watchRetry`. A contact that leaves the screen is no
+longer watched and is shown offline.
 
 A destination that has found a lease set keeps it until the lease set expires,
 up to `leaseSetLife` after its holder is gone, and does not look again, so a
@@ -191,7 +192,7 @@ the device. The wire is in the gateway's `PROTOCOL.md` (`bazarish-server/gateway
 - **A contact listed as a reader:** the account's status and typing to that
   contact, while it watches.
 - **A watched contact:** that the watcher has the app in focus with that contact
-  on screen, since a watch names its sender. This holds with the watcher's own
-  switch off: the switch hides the watcher's status, not its watching.
+  on screen, since a watch names its sender. A device with the switch off sends
+  no watch.
 - **Anybody else:** nothing. Without a reader's secret the presence address
   cannot be found, and a watch from a fingerprint that is not a reader is dropped.
