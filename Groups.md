@@ -84,8 +84,9 @@ additive fields:
 - `sentAt` is the moment the host accepted the post. It is the same in every
   copy and in the history a newcomer receives, so history sorts into the past.
 - The author receives no copy: their own outgoing message is the post. The
-  host confirms every post it took with a `receipt` to its author, which is
-  what marks the post delivered on the author's screen.
+  host answers every post a member sends it with a `receipt` to its author,
+  a refused post included, so the author's screen shows the post delivered; a
+  refusal is told by a notice of its own.
 - A client honours `author` only on a message that carries a `group` block.
   On any other message it is ignored, or any contact could put a name over its
   own bubble.

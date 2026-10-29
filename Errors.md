@@ -17,25 +17,24 @@
 }
 ```
 
-The envelope may also carry a `details` object; no component sets one.
-
 ## Registry
 
 | Code | Meaning | Source |
 |---|---|---|
-| `STORAGE_FULL` | User's pending-content quota is exhausted | server |
+| `STORAGE_FULL` | User's pending-content quota is exhausted. Transient: the mailbox takes mail again once its owner's devices have taken in what it holds | server |
 | `RECIPIENT_SERVER_UNREACHABLE` | The recipient's server returned no answer: it could not be dialled, the stream failed, or it asserted a delivery without a verifiable signature. Not a refusal; the sending client may repeat the attempt, and on exhausting its attempts reports this as the reason (`Messages.md`) | client |
 | `MESSAGE_TOO_LARGE` | The payload is over `kMaxMessagePayloadBytes`. Past admission, so only a correspondent ever sees it | server |
-| `CONTACT_RATE_LIMITED` | This destination is taking too many contact requests, or has too many waiting. Transient; says nothing about who is served there | server |
+| `CONTACT_RATE_LIMITED` | This destination is taking too many contact requests, has too many waiting, or has no room for one more; or a correspondent is sending more than its pass admits. Transient; says nothing about who is served there | server |
 | `SESSION_INVALID` | The session a request authenticated with no longer exists. Answered by opening a new tunnel, never by retrying the same way | server |
-| `FACADE_UPSTREAM` | The facade could not reach the server behind it. The only error a facade generates itself | facade |
+| `UPSTREAM_UNAVAILABLE` | The component behind the one that answers did not answer: the server behind a facade, or the service node behind the server. Transient | facade, server |
+| `REQUEST_FAILED` | A request outside delivery failed for a reason no other code names; the status says which (below). It carries no meaning a client acts on beyond the status class | any component |
+| `ACCOUNT_UNKNOWN` | The service node holds no account for the signer. The answer to it is registering (`api/ServicePortal.md`) | service node |
 | `DELIVERY_REJECTED` | Delivery refused. Deliberately combines "unknown pass", "unknown mailbox" and "recipient not served here" into one externally indistinguishable result (anti-enumeration; see `Contacts.md`). A contact request, which presents nothing, is the only alternative admission path | server |
 | `CONTACT_REQUEST_TOO_LARGE` | Contact request exceeds `kMaxContactRequestBytes` (17590, a protocol constant - not an operator setting) | server |
 | `ALIAS_TAKEN` | Requested alias is already held. The registry's portal answers a buy request for it with 409 and this code | alias registry |
 | `ALIAS_UNKNOWN` | Alias resolution found no such alias. Aliases are intended to be discoverable, so this is reported explicitly and is not subject to anti-enumeration | alias registry |
-| `CLIENT_UNREGISTERED` | Request carries a client ID that is not registered for this user (see `DeviceSync.md`) | server |
+| `CLIENT_UNREGISTERED` | Request carries a client ID that is not registered for this user. Only the routes that act for one device check it: the mailbox listing and wait, fetch, ack, the pass set and the write to the account's own devices. The account routes and the client registry take any request the user signed (`DeviceSync.md`) | server |
 | `ACCOUNT_PENDING_APPROVAL` | The account exists but is frozen: a moderated server has not approved it yet, so its destination is not brought up. The message carries the operator's instructions for finishing registration | service node |
-
 | `CARD_UNKNOWN` | A `card` request named a fingerprint that is not this destination's user, or a user with no card - one answer for both (`api/Federation.md`) | server |
 
 A code is never reused for another meaning.
@@ -56,11 +55,12 @@ class: a 4xx is a refusal, a 5xx or no answer is the far side failing for now.
 | `STORAGE_FULL` | 507 |
 | `ALIAS_TAKEN` | 409 |
 | `ALIAS_UNKNOWN` | 404 |
-| `FACADE_UPSTREAM` | 502 |
-| `DELIVERY_REJECTED` | the status of the refusal: 400 for a malformed request, 401 for a signature that does not verify, 403 for a refused identity, 404 for a missing blob, 409 for a write that is not newer, 502 or 503 for a backend that is unreachable or not configured, 500 for an internal failure |
+| `ACCOUNT_UNKNOWN` | 404 |
+| `UPSTREAM_UNAVAILABLE` | 502 |
+| `REQUEST_FAILED` | the status of the failure: 400 for a malformed request, 401 for a signature that does not verify, 403 for a signer that may not do this, 404 for a route or a thing that does not exist, 409 for a write that is not newer, 500 for an internal failure, 503 for a function this component does not offer |
 
-`CONTACT_RATE_LIMITED`, `CONTACT_REQUEST_TOO_LARGE` and `CARD_UNKNOWN` travel only
-in a federation reply, which has no status (`api/Federation.md`); `STORAGE_FULL`
+`DELIVERY_REJECTED`, `CONTACT_RATE_LIMITED`, `CONTACT_REQUEST_TOO_LARGE` and
+`CARD_UNKNOWN` travel only in a federation reply, which has no status (`api/Federation.md`); `STORAGE_FULL`
 and `MESSAGE_TOO_LARGE` travel there as well. `RECIPIENT_SERVER_UNREACHABLE` is
 raised by the sending client and never sent.
 

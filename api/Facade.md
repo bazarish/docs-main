@@ -114,7 +114,7 @@ The facade is the "last mile" between the client and the server infrastructure. 
   in. It changes nothing a client can observe: the paths, the sealed tunnel and
   the uniform 404 are the same on both.
 - Nothing streams through the facade: the only large payload there ever was - a file upload - now goes directly between clients (see `FileTransfer.md`).
-- Holds no key of the server or of its users (only its own I2P destination and a self-signed TLS credential), parses no content (there is nothing left to parse: authentication happens inside the seal, at the backend), stores nothing. An unreachable backend yields a `FACADE_UPSTREAM` 502 - the facade is only a relay.
+- Holds no key of the server or of its users (only its own I2P destination and a self-signed TLS credential), parses no content (there is nothing left to parse: authentication happens inside the seal, at the backend), stores nothing. An unreachable backend yields an `UPSTREAM_UNAVAILABLE` 502 - the facade is only a relay.
 - Implemented in `facade-http/` of the `bazarish-server` repository (`Facade`; covered by tests and live-verified relaying to a running server-core).
 
 ### What the facade still knows
@@ -215,11 +215,11 @@ Consequences for first contact (`Contacts.md`, `Federation.md`):
 
 A server may publish **several** facade addresses, one per facade: a facade has
 exactly one destination. The client holds them as an ordered list and **fails over** across
-it: every request tries the facades in list order and moves to the next only
-when one is *unreachable* (a transport failure); an HTTP error *response* is final
-(the facade is reachable and the request was failed) and does not trigger
-failover. When none answers, the request fails, and a retry starts again from the
-first. Facades can be added or edited at any time without touching the server.
+it: every request starts at the facade that answered last and tries the others in
+list order, moving to the next only when one is *unreachable* (a transport
+failure); an HTTP error *response* is final (the facade is reachable and the
+request was failed) and does not trigger failover. When none answers, the request
+fails. Until a facade has answered, the list's first is the one tried first. Facades can be added or edited at any time without touching the server.
 
 ### Configuration links
 

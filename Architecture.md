@@ -95,6 +95,7 @@ docs-main/                       # this repository - canonical protocol specific
 |-- Bots.md                      # bots & interactive messages
 |-- Groups.md                    # groups and channels as a relaying bot
 |-- Errors.md                    # typed error registry
+|-- ThreatModel.md               # what each party learns and can do
 +-- api/
     |-- ClientApi.md             # client <-> facade <-> {server, service node}
     |-- Facade.md                # last-mile contract

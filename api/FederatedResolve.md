@@ -268,6 +268,42 @@ asked too often; an owner's ops are not counted, because they are signed, are on
 per name held, and a client with twenty names has to be able to repoint all twenty
 in one run.
 
+### Error answers
+
+Both faces answer a refusal with a status and a JSON body `{"errorCode": <code>}`;
+`PROOF_REQUIRED` adds `stamp` and `bits`. A client branches on the code.
+
+The resolve face, `GET /v1/alias/<name>[-<word>]`:
+
+| Status | Code | Meaning |
+|---|---|---|
+| 403 | `NO_CALLER` | The request arrived without the caller's address the tunnel puts on it |
+| 429 | `TOO_MANY_REQUESTS` | This caller's window of resolves is spent |
+| 429 | `PROOF_REQUIRED` | The name is looked up too often; ask again with a solved stamp (*Lookups under pressure*). A wrong, stale or spent answer gets a new stamp |
+| 400 | `MALFORMED_REQUEST` | A stamp came without a usable nonce |
+| 503 | `BUSY` | Too many answers are being checked at once; ask again |
+| 404 | `ALIAS_UNKNOWN` | The name does not resolve with this word, or is not a name (*What a name can answer*) |
+| 503 | `RESOLVER_NO_SIGNING_KEY` | The resolver holds no delegated key and cannot sign an answer |
+
+The owner's ops, `POST /v1/op/<op>`:
+
+| Status | Code | Meaning |
+|---|---|---|
+| 403 | `NO_CALLER` | As above |
+| 404 | `UNSUPPORTED_OP` | The path names no op of this face |
+| 400 | `MALFORMED_REQUEST` | The request could not be processed |
+| 404 | `REQUEST_REFUSED` | The signature does not verify, the request is outside its freshness window, or it names another op than its path |
+| 404 | `NOT_OWNER` | The signer does not hold the name (`alias.update`, `alias.binding`, `alias.word`, `alias.autorenew`, `alias.renew`) |
+| 404 | `BAD_DESCRIPTOR` | `alias.update`: the descriptor or the owner's certificate does not check out |
+| 404 | `WRONG_STATE` | `alias.renew`: the name is not in a state that renews |
+| 404 | `INSUFFICIENT_DEPOSIT` | `alias.renew`: the deposit does not cover the term |
+| 404 | `NO_OFFER` | `alias.transfer.accept`: nothing is offered to this account under that name |
+| 404 | `UNAVAILABLE` | This resolver does not run renewals or transfers |
+| 503 | `RESOLVER_NO_SIGNING_KEY` | As above |
+
+The registry's website is not this API. It refuses a purchase of a held name
+with `409` and `ALIAS_TAKEN` in the common envelope (`../Errors.md`).
+
 ### The coordinate a client is built with
 
 Two values, and no more: the resolver's **root fingerprint** and the **b32 it

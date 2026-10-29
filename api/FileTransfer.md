@@ -61,9 +61,12 @@ at all; the others stay silent rather than reporting it unavailable.
 
 `file.unavailable` is returned when the file is no longer at the path it was
 announced from, or when the sender could not serve it. A request for a file the
-sender has unsent gets no answer. A sender serves a request only if it reads it
-within five minutes of its `sentAt`; an older request is dropped without an
-answer.
+sender has unsent gets no answer. A request is good for five minutes from its
+`sentAt`. A sender serves a request only if it reads it inside that window. A
+requester that has no offer when the window ends reports the request unanswered
+and sends `file.cancel` with its `ask`. The cancel stops a transfer the sender
+began late in the window, so no destination keeps serving a requester that has
+stopped waiting.
 
 ## Stopping
 
@@ -133,7 +136,7 @@ A file is available only while the sender is online **and** the file remains at
 the path from which it was announced. This is the consequence of operating no
 storage service, and a client must report it rather than imply delivery:
 
-- `eRequested` - asked; waiting for the sender to come online
+- `eRequested` - asked; waiting for the sender, for at most five minutes from the request's `sentAt`
 - `eRunning` - bytes being transferred (progress is over the ciphertext stream)
 - `eDone`
 - `eFailed` - with the reason, including "the sender no longer has this file"

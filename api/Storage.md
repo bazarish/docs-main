@@ -22,7 +22,7 @@ never interprets blob contents.
 1. A blob is **deleted immediately** once all **registered** client IDs of the user (see `../DeviceSync.md`) have acked it - before any quota pressure. Retiring a client ID triggers re-evaluation: blobs that were waiting only on the retired client are deleted.
 2. A blob nobody acks is kept: the account's quota is what bounds a mailbox, and admission is refused (rule 4) rather than old content dropped.
 3. When the service node deletes an account (idle, ended by its owner, or removed by an operator), it notifies the messaging server, which discards **everything** held for that fingerprint: pending content, replay markers, delivery passes, the device registry and any quota override. No mailbox may remain in service for an account that no longer exists.
-4. Admission is refused (typed errors, see `../Errors.md`) when a blob exceeds the per-message limit or the user's quota - a contact request over the quota gets `DELIVERY_REJECTED`; nothing is partially stored.
+4. Admission is refused (typed errors, see `../Errors.md`) when a blob exceeds the per-message limit or the user's quota - a contact request over the quota gets `CONTACT_RATE_LIMITED`; nothing is partially stored.
 5. A listing is returned **oldest arrival first**. A mailbox is a queue and must
    behave as one: a backend that enumerated its own storage order would return a
    burst of messages to the client out of order, and the client has no other
@@ -33,7 +33,7 @@ never interprets blob contents.
 
 | Operation | Purpose |
 |---|---|
-| `putBlob(user, blobId, data, class, quota, alreadyAcked)` | Store a pending blob, or report it a duplicate or over the quota; the per-message limit is checked before the call, and `alreadyAcked` is the sending device of a self-delivery |
+| `putBlob(user, blobId, data, class, quota, receivedAt, alreadyAcked)` | Store a pending blob and its replay marker, or report it a duplicate or over the quota; the per-message limit is checked before the call, and `alreadyAcked` is the sending device of a self-delivery |
 | `listPending(user, clientId)` | The blobs this client has not acked, with their class and size, oldest arrival first |
 | `isPendingFor(user, blobId, clientId)` | Whether the blob is held and this client has not acked it; a fetch serves only those |
 | `getBlob(user, blobId)` | Read blob data |
@@ -51,8 +51,16 @@ The server does not encrypt content at rest. What a mailbox holds is already
 sealed end to end to its owner, and the server's state directory is trusted to
 its operator.
 
-Every file is written whole under a temporary name and renamed into place, and an
-ack is recorded before a delivery's files are removed, so a server that stops at
-any point never lists a delivery again to a client whose ack it recorded. Writes
-are not flushed to disk: after a power loss a recorded ack can be lost and the
-delivery listed again, and the client keeps one copy per message id.
+Every file is written whole under a temporary name, flushed to disk, and renamed
+into place, and the directory is flushed after every rename and removal; an
+operation returns only once its change is on disk. A crash or a power loss
+therefore keeps everything that was answered:
+
+- a delivery is stored as its record, its blob and its replay marker, in that
+  order and under one lock, before the sender is answered, so no client can take
+  and ack it before the marker that recognises a retry is on disk;
+- the ack that completes a delivery removes it, blob first, without rewriting its
+  record; a record left without its blob is never listed and counts for nothing;
+- retiring a client removes what only that client still owed before the client
+  itself;
+- a temporary left by an interrupted write is not a blob and counts for nothing.

@@ -459,9 +459,9 @@ stored as the sender's picture, never rendered as a chat bubble:
 ### Forward compatibility
 
 A client that receives a `type` it does not know **must not** crash or drop the
-message. It acknowledges receipt and surfaces a neutral placeholder
-(indicating that the message type is unsupported by this version), preserving the
-envelope so that a later client version can render it. `v` gates breaking changes to the envelope shape
+message. It acknowledges receipt and surfaces a placeholder that names the type
+and says this version does not support it, keeping the message body so that a
+later client version can render it. `v` gates breaking changes to the envelope shape
 itself; unknown `type` within a known `v` is a soft, recoverable condition.
 
 Namespacing is dotted (`call.invite`, not `call-invite`) so related signals
@@ -540,9 +540,10 @@ not evidence about an earlier one that was never delivered.
 No server carries a send, so the number of attempts and the interval between them
 are determined by the sending client. The protocol fixes the following:
 
-- A typed refusal (unknown pass, size, quota, contact rate limit) is final;
-  repeating the delivery does not change the outcome. A failure to reach the
-  recipient's server is not final and may be retried.
+- A refusal of the pass or of the size is final; repeating the delivery does not
+  change the outcome. A full mailbox or a rate limit is transient: the same
+  delivery is accepted later. A failure to reach the recipient's server is not
+  final and may be retried.
 - A `delivered` response that carries no verifiable signature over the delivery id
   that was sent is not a delivery. The attempt is treated as unanswered.
 - Repeating a delivery is idempotent. The delivery id is derived from the message

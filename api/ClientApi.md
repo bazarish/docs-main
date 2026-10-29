@@ -184,4 +184,4 @@ the network the user chose.
 | `DELETE /v1/messaging/clients/{clientId}` | Retire a client ID - own or another (lost) device's. The server re-evaluates ack-completeness of pending content |
 | `POST /v1/messaging/self` | Store `{deliveryId, payload}` (payload base64) in the account's own mailbox for its other devices: answers `{ok, stored}`, and `stored` is false while the account has one registered client (`../DeviceSync.md`) |
 
-Every request carries the client's unique random **client ID**; the "delete when all clients received" rule operates on the registered set. Requests to `events`, `pending`, `ack`, `passes` and `self` from an unregistered client ID fail with `CLIENT_UNREGISTERED`. A successful write that has nothing to report answers `{ok: true}`.
+Every request carries the client's unique random **client ID**; the "delete when all clients received" rule operates on the registered set. Requests to `events`, `pending`, `fetch`, `ack`, `passes` and `self` from an unregistered client ID fail with `CLIENT_UNREGISTERED`. A successful write that has nothing to report answers `{ok: true}`.

@@ -22,6 +22,7 @@ component implements.
 - [DeviceSync](DeviceSync.md) - multi-device enrollment and E2E state sync
 - [Presence](Presence.md) - online and typing, directly between devices over I2P
 - [Errors](Errors.md) - typed error registry
+- [ThreatModel](ThreatModel.md) - what is protected, and what each party learns and can do
 - API contracts:
   - [ClientApi](api/ClientApi.md) - client <-> facade <-> {server, service node}
   - [Facade](api/Facade.md) - the last-mile contract

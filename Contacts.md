@@ -53,7 +53,7 @@ stranger to fill a mailbox with. (A cap below that silently rejects every contac
 
 4. B declines by taking no action: nothing is transmitted. The hash A pre-registered stays until A removes the pending contact, which revokes it.
 
-Contact requests are the only path into a mailbox that presents nothing; they are bounded by rate and by depth rather than by a quota of their own - a mailbox has one quota, and every class is stored against it. Two bounds, not one: **3 per minute** per serving destination (`kContactRequestsPerMinute`) says how fast they may arrive, and **30 waiting at once** (`kMaxPendingContactRequests`, counted over what the mailbox is still holding) says how many may accumulate. Beyond either, the answer is the same transient refusal a rate-limited sender receives - retry later - which says nothing about who is served at that destination.
+Contact requests are the only path into a mailbox that presents nothing; they are bounded by rate and by depth rather than by a quota of their own - a mailbox has one quota, and every class is stored against it. Two bounds, not one: **3 per minute** per serving destination (`kContactRequestsPerMinute`) says how fast they may arrive, and **30 waiting at once** (`kMaxPendingContactRequests`, counted over what the mailbox is still holding) says how many may accumulate. Beyond either, and when the mailbox has no room left for the request, the answer is the same transient refusal a rate-limited sender receives - retry later - which says nothing about who is served at that destination.
 
 ## Display names and avatars
 
@@ -78,8 +78,8 @@ For the same reason the contact request **delivery** is routed by destination ov
 
 ## Residual disclosure to the server
 
-- **Set size** is the number of contacts, which is the degree of the contact graph rather than an estimate of it. Mitigation: clients may pad the set with unused hashes.
-- **Registration timing**: a pass registered immediately after an outgoing contact request indicates that it belongs to that pending contact. Mitigation: randomised delay and pre-registration padding.
+- **Set size** is the number of contacts, which is the degree of the contact graph rather than an estimate of it.
+- **Registration timing**: a pass registered immediately after an outgoing contact request indicates that it belongs to that pending contact.
 - **Traffic volume per mailbox** is inherent to any store-and-forward server.
 
 ## Anti-enumeration
