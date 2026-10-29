@@ -34,7 +34,8 @@ never interprets blob contents.
 | Operation | Purpose |
 |---|---|
 | `putBlob(user, blobId, data, class, quota, alreadyAcked)` | Store a pending blob, or report it a duplicate or over the quota; the per-message limit is checked before the call, and `alreadyAcked` is the sending device of a self-delivery |
-| `listPending(user, clientId)` | The blobs this client has not acked, with their class, oldest arrival first |
+| `listPending(user, clientId)` | The blobs this client has not acked, with their class and size, oldest arrival first |
+| `isPendingFor(user, blobId, clientId)` | Whether the blob is held and this client has not acked it; a fetch serves only those |
 | `getBlob(user, blobId)` | Read blob data |
 | `ackBlob(user, blobId, clientId)` | Record receipt; deletes the blob once every registered client has acked it |
 | `forgetUser(user)` | Drop everything held for a user (account deleted) |
