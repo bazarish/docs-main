@@ -72,9 +72,10 @@ sealed header is what kept the "sender's own server never learns the recipient"
 invariant (`Federation.md`) even when it did;
 it is what keeps the serving key bound to the destination rather than the server.
 
-**Ownership** (so this is not a "server signs" step): the server mints and
-holds the serving key for each destination; the client publishes its public half
-in the card, which carries only U's signature.
+**Ownership** (so this is not a "server signs" step): the account issues the
+serving key with its destination and hands its private half to the server that
+operates it; the client publishes its public half in the card, which carries
+only U's signature.
 
 ## Routing by destination
 
@@ -152,7 +153,8 @@ The destination server selects the key by **which destination the connection
 arrived on** (each dest has its own accept loop already), so there is no
 trial-decryption. After unsealing, the server reads `mailbox` and stores
 the delivery in it. The server holds the private halves of its
-destinations' serving sealing keys.
+destinations' serving sealing keys, as each account handed them over; it issues
+none itself (`../Identity.md`).
 
 No serving sealing key is shared server-wide.
 
@@ -160,9 +162,9 @@ No serving sealing key is shared server-wide.
 
 The same per-destination binding applies to the key that **signs** live
 federation traffic (a delivery confirmation, `Federation.md`). Each serving
-destination carries its own signing keypair, stored bound to the destination
-alongside its serving sealing key - a `(destination, signing key, serving sealing
-key)` group, never reused on another destination:
+destination carries its own signing keypair, issued by the account with the
+destination and its serving sealing key - a `(destination, signing key, serving
+sealing key)` group, never reused on another destination:
 
 - Every dest is one user's own and has its own signing key, so the signer is
   shared with nobody the dest and its serving sealing key are not shared with.
@@ -199,17 +201,15 @@ routing statement) would tell both which server serves the user. Neither exists:
 The card carries no expiry either: routing that has changed is repaired by the
 `routing` field carried in every message.
 
-## How the user learns `dest_U` and the serving sealing key
+## How the user's card gets `dest_U` and the serving sealing key
 
-When the client delegates its destination (grant-gated; see `ServicePortal.md`)
-the server returns:
-
-- the assigned `dest` (brought up from the client's delegated offline
-  transient), and
-- the **public** serving sealing key for that dest.
-
-The client folds both into its self-signed contact card. The server keeps the
-private serving sealing key and the dest<->mailbox mapping.
+The client makes both: the destination is its own offline key, and it issues the
+serving sealing key and signing key with it. When it delegates the destination
+(grant-gated; see `ServicePortal.md`) it hands the server the transient and the
+private halves of both keys, and the server answers with the assigned `dest`
+(brought up from the transient). The client folds the `dest` and the public
+serving sealing key into its self-signed contact card. The server keeps the keys
+it was handed and the dest<->mailbox mapping.
 
 ## Flows
 

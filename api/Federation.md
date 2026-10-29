@@ -207,9 +207,10 @@ real I2P**, and the client is built with the production resolver's coordinate
   signal.
 - The only key that signs live federation traffic is the **per-destination
   signing key**: every serving destination (each personal
-  dest) carries its own signing keypair, persisted **bound to the destination**
-  together with its serving sealing key - a `(destination, signing key, serving
-  sealing key)` group, never reused on another destination. It signs that
+  dest) carries its own signing keypair, issued by the account **with the
+  destination** and its serving sealing key and handed to the server with each
+  delegation - a `(destination, signing key, serving sealing key)` group, never
+  reused on another destination. It signs that
   destination's delivery confirmations and nothing else. The **server root identity** is
   a separate crypto-identity used only **outside** federation - the server card /
   `bazarish://server` configuration link (`Facade.md`) and the service-node

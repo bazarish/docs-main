@@ -41,9 +41,16 @@
   recipient's destination, whose private half the recipient's server holds. There
   is no single server-wide delivery sealing key (`InviteAnonymity.md`).
 - **Federation signing is per-destination too.** Each serving destination also
-  has its **own signing keypair**, stored bound to that destination together with
-  its serving sealing key - a `(destination, signing key, serving sealing key)`
-  group that is never reused on another destination. It is the only key that signs
+  has its **own signing keypair**, bound to that destination together with its
+  serving sealing key - a `(destination, signing key, serving sealing key)`
+  group that is never reused on another destination.
+- **The account issues all three.** The destination's master key, its serving
+  sealing key and its signing key are made by the client together, kept in the
+  account and its backup, and handed to the server with each delegation
+  (`api/ClientApi.md`). A server operates them and generates no key of its own
+  for an address; its own keys sign and seal only what concerns the server itself
+  (its card and the facade tunnel). So an address and its keys do not depend on
+  the server that operates them, which is what lets an account move. It is the only key that signs
   live federation traffic (a delivery confirmation, `api/Federation.md`). The server
   **root identity** signs only **outside** federation - the server card above
   (the `bazarish://server` configuration link carries no signature, only the
@@ -91,9 +98,9 @@ presenceKey, presenceDest }`.
 - `servingKey` - the public **serving sealing key** of that destination: a contact
   seals the delivery envelope's admission header to it. Not a signature and not a
   trust anchor - the user only vouches for it under their one signature; a wrong
-  value only makes delivery fail (`InviteAnonymity.md`). Its private half is held
-  by the user's server, which is what lets the server route without being able to
-  read: the message itself is sealed to `sealingKey`, whose private half never
+  value only makes delivery fail (`InviteAnonymity.md`). The account issues it
+  and hands its private half to the server that operates the destination, which
+  is what lets the server route without being able to read: the message itself is sealed to `sealingKey`, whose private half never
   leaves the user's device.
 - `presenceKey` - the account's X25519 presence key (SPKI DER, base64, a bare
   X25519 key and not a sealing pair), and `presenceDest` - the b33 of its
@@ -116,7 +123,7 @@ per account, whichever device holds it.
 **Forward secrecy: there is none, and the card is where that shows.**
 `sealingKey` is long-lived and never rotated, so whoever obtains its private half
 reads everything that account was ever sent - including what is still stored in
-mailboxes. `servingKey` is re-minted whenever the account raises a new
+mailboxes. `servingKey` is issued anew whenever the account raises a new
 destination, and only then.
 
 This is a decision rather than an oversight, and the reasoning is worth keeping
@@ -134,32 +141,46 @@ Reopen it if something changes the premise - for example, message history
 stored under a key of its own, which is what would make the ciphertext hoard the
 weak point again.
 
-A card is republished to **the server** whenever its contents change, which
-means when the account raises a new destination. Contacts are then told once, by
-a `contact.routing` message carrying the new destination and serving key
-(`Messages.md`); nothing is carried in ordinary messages, and a card is not
-re-broadcast on a schedule.
+A card is republished to **the server** whenever its contents change. When the
+routing it carries changes - a new destination, or a serving key the account
+issued anew - contacts are told once, by a `contact.routing` message carrying
+the new destination and serving key (`Messages.md`); nothing is carried in
+ordinary messages, and a card is not re-broadcast on a schedule.
 
 **Raising a new destination is one action, not three.** A client offers a single
-destructive control - *New key* - and it mints a fresh offline key, delegates it,
-takes the `{dest, servingKey}` the server answers with
-(`api/ClientApi.md`), publishes the card from that answer, sends the new master
-key to the account's own other devices, and only then starts the fan-out. There
-is no separate way to re-mint the serving key and no grace period on the old
-address: the serving key follows the destination, and the old destination stops
-answering inside the same call, which is the intended effect when the reason
-for moving is a flood. The invite links already distributed stop working, and
-the aliases are repointed automatically.
+destructive control - *New key* - and it mints a fresh offline key together with
+a fresh serving sealing key and signing key, delegates the address with them
+(`api/ClientApi.md`), publishes the card, hands the new master and keys to the
+account's own other devices (`device.i2p-master`, `DeviceSync.md`), and only then
+starts the fan-out. There is no separate way to issue the serving key anew and no
+grace period on the old address: the keys follow the destination, and the old
+destination stops answering inside the same call, which is the intended effect
+when the reason for moving is a flood. The invite links already distributed stop
+working, and the aliases are repointed automatically.
 
-### One serving server, hard-cutover migration
+### Moving to another server
 
-A user is served by **exactly one server at a time**. Migration S1 -> S2:
+A user is served by **exactly one server at a time**. The address and its keys
+belong to the account, not to the server, so a move changes nothing a contact
+holds. Moving S1 -> S2:
 
-1. Register on S2, register the delivery passes there, close the account on S1 (or let it go idle).
-2. Push the new contact card (S2 destination + serving key + sealing key) to all contacts over E2E.
-3. Contacts switch as the card arrives. Deliveries that race the cutover **fail and stay on the sender's client** (standard send semantics) and are retried after the new card arrives - messages are delayed, not lost.
+1. Register on S2.
+2. Register there the hash of every pass the account has issued: each is derived
+   from the account's delivery secret and the contact's fingerprint
+   (`Contacts.md`), so the client computes them again rather than keeping a list.
+3. Delegate the same address to S2 with the same serving and signing keys, and
+   publish the same card there.
+4. The client no longer renews the delegation on S1, which runs out by the end
+   of its term, and S1 stops publishing the address. What reached S1 meanwhile
+   stays there: the client does not fetch it or close the account on S1 by
+   itself.
 
-Accepted failure mode: if S1 becomes permanently unavailable before the user has prepared the migration, deliveries from contacts continue to fail until the user publishes a new card (or, where an alias is used, until contacts resolve it again). A user's destination is portable across servers (it is their own offline key), so migration need not change the destination at all.
+No `contact.routing` is sent and nothing on the wire tells anyone that the server
+changed: contacts deliver to the same address with the same key and pass.
+Deliveries that reach S1's lease set while senders still hold it fail and stay on
+the sender's client (standard send semantics), to be retried - messages are
+delayed, not lost. S1 need not be reachable for any of this: a move works the
+same when S1 is gone.
 
 ### Alias certificate
 

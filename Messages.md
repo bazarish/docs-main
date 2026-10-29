@@ -202,8 +202,9 @@ measured against (`api/ClientApi.md`): a request carries no pass and no card, so
 its signature is the only thing that names the sender.
 
 **`routing` - where to answer, sent once when it changes.** A destination is not
-permanent: raising a new I2P key changes the address, and the serving sealing key
-is re-minted with it. The moved account then sends every contact one
+permanent: raising a new I2P key changes the address, and the account issues a
+new serving sealing key with it. Whenever the pair a card carries changes, the
+account sends every contact one
 `contact.routing` message carrying `{dest, servingKey}`, and a receiver whose
 stored pair differs adopts the new one and persists it. It is carried by that
 message alone - an ordinary letter carries no `routing`, because the pair changes
@@ -220,9 +221,9 @@ contacts; what it must not do is lose the obligation, which is why the fan-out i
 a queue in the profile database that survives a restart and is cleared one
 contact at a time, on success.
 
-The queue is written when the server has confirmed the move - the answer to
-`POST /v1/account/i2p-dest` carries the new `{dest, servingKey}`
-(`api/ClientApi.md`) - and it holds every contact, plus the alias registry when
+The queue is written once the server has taken the new address and keys and
+the card naming them is published (`api/ClientApi.md`) - and it holds every
+contact, plus the alias registry when
 this account holds a name that resolves. It is
 tried once immediately, once again whenever the account comes back online, and
 manually. The two kinds of entry report differently, because the remedy differs:
