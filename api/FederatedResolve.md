@@ -66,7 +66,7 @@ home server never sees who is being added (below).
 | Form | Meaning | Trust |
 |---|---|---|
 | `<fp>:<b33>` (descriptor) | identity + direct route; primary QR/link | strongest - `fp` anchor, no substitution, and nothing in between to learn `fp` |
-| `<alias>` | name on the central resolver | trusted alias->`fp` binding; UI must show the resolved `fp` for out-of-band verification |
+| `<alias>`, `<alias>-<word>` | name on the central resolver, with the owner's word when one is set | trusted alias->`fp` binding; UI must show the resolved `fp` for out-of-band verification |
 | ~~`<x>@<fingerprint>`~~ | **removed** | a fingerprint is an identity, not a route - nothing maps it to an endpoint (no resolver, no `peers.json`) |
 
 Aliases are global on the single resolver, so the `@server` form is unnecessary;
@@ -162,6 +162,46 @@ name nobody holds rather than as a fault. The cap also keeps an alias
 structurally distinct from the 52-character base32 fingerprint, so the two can
 never be confused.
 
+A client reads whatever is typed into its add field that is not an invite link
+(`bazarish://invite?...`) as an alias, with or without the `!` sigil; a
+fingerprint is never a way to add a contact. In message text the sigil stays
+required, or every word would be a name.
+
+### The owner's word
+
+An owner may give a name a **word**: the same grammar as a name (`a-z`, `0-9`,
+case-folded, 1 to `kAliasWordMaxLength` = 16), written after a dash -
+`!alice-secret`. Once a word is set, the name is found only as `name-word`; the
+bare name and any other word get `ALIAS_UNKNOWN`, the same answer a free name
+gets, so a scan of the namespace learns nothing from it. The word is meant to be
+published along with the name wherever the owner shares it, and changed when it
+leaks into a spammer's list; nothing else about the name changes with it. The
+owner sets it with `alias.word` or on the registry's website, `alias.status`
+reports it back to the owner's devices, and a transfer clears it.
+
+### Lookups under pressure
+
+The resolver counts the lookups of every name over the last hour, whatever word
+they carry and whether the name exists. While a name is looked up rarely, a
+lookup costs nothing. Past a threshold the resolver answers `429` with
+`{errorCode: PROOF_REQUIRED, stamp, bits}`, and the client asks again with
+`?stamp=<stamp>&nonce=<n>` after finding a nonce for which
+
+```
+Argon2id(pass = n as 8 bytes big-endian, salt = the stamp's bytes,
+         memory = 4096 KiB, passes = 1, lanes = 1, 32 bytes)
+```
+
+starts with `bits` zero bits. The cost is fixed in the core (`kPuzzleCost`,
+about 4 ms an evaluation on a Cortex-A76 and on a desktop core, measured
+2026-10-29), and `bits` never exceeds `kMaxPuzzleBits` = 14, about a minute on one
+core. The stamp is the resolver's own: opaque to the client, bound to the name,
+short-lived, and accepted once. How many lookups are free and how fast the work
+grows with traffic is the resolver's policy (`alias-resolver/docs/Daemon.md`).
+A lookup that is unusual pays nothing; a name being hammered - a word being
+guessed, a list being scraped - costs every asker work in proportion to how hard
+it is hammered.
+
 ### What a name can answer
 
 `ALIAS_UNKNOWN` is the only negative, and it covers every reason a name does not
@@ -190,6 +230,7 @@ POST /v1/op/alias.update            point one of them at {fp, dest}, with
 POST /v1/op/alias.renew             pay for another term from the deposit
 POST /v1/op/alias.autorenew         let the service pay, or stop it
 POST /v1/op/alias.binding           make one of them resolve, or stop it
+POST /v1/op/alias.word              set the word a name is looked up with, or take it off
 POST /v1/op/alias.transfer.accept   take a name offered to this account
 ```
 
@@ -275,7 +316,7 @@ Namespace anti-enumeration is out of scope for the resolver (resolve is unauthen
    client is gone, along with the route it was served on.
 3. **client** - *done.* Descriptor handling, a fetch transport that dials the
    target directly over a transient I2P destination (a served `CARD_UNKNOWN` /
-   `ALIAS_UNKNOWN` is authoritative), address parsing (`fp:b33` vs `<alias>`), `addByAlias`
+   `ALIAS_UNKNOWN` is authoritative), address parsing (an invite link vs `<alias>[-<word>]`), `addByAlias`
    routed to the resolver (record chain verified against the hardcoded root, the
    owner's certificate checked beside it, the typed name normalized against the
    core's own `a-z0-9` bounds before anything is asked), and OOB-fingerprint
