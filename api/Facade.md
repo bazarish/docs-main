@@ -67,33 +67,30 @@ The facade is the "last mile" between the client and the server infrastructure. 
   start and reports it in `GET /settings` on its ops socket. The admin panel reads
   it from there and writes the facades' addresses into the server descriptor
   itself (`AdminPanel.md`), so an operator never copies an address by hand.
-- **Two paths exist, and the facade reads neither.** Both are relayed over the
-  **operator private channel** to the
-  messaging server, which is the facade's only backend. That channel is TLS
-  pinned by the key the messaging server prints, so it need not be a loopback
-  address or a tunnel:
-  - `POST /t` - the client tunnel. One opaque body in, one opaque body out; the
-    answer is always `200`, because a status code outside the seal would be a
+- **Four paths exist, two per backend, and the facade reads none of them.** Each
+  is relayed over the **operator private channel** to its backend: TLS pinned by
+  the key that backend prints, so it need not be a loopback address or a tunnel:
+  - `POST /t` and `POST /n` - the two client tunnels, `/t` to the messaging
+    server and `/n` to the service node. One opaque body in, one opaque body out;
+    the answer is always `200`, because a status code outside the seal would be a
     channel of its own. What is inside - the method, the path, the headers, the
     device the request speaks for, the body, and the real status of the answer -
-    is sealed and unreadable here. The facade cannot even tell mail being fetched
-    from an account being managed. See `ClientApi.md`.
-  - `GET /v1/server/card` - the signed server card, which is what a client seals
-    its tunnel to. Public, identical for every caller, and signed by the
-    fingerprint the user already had, so a facade may withhold it but cannot put
-    one of its own in its place.
+    is sealed and unreadable here. See `ClientApi.md`.
+  - `GET /v1/server/card` and `GET /v1/node/card` - the signed cards a client
+    seals each tunnel to. Public, identical for every caller, and both signed by
+    the fingerprint the user already had, so a facade may withhold one but cannot
+    put its own in its place.
   - anything else -> 404 (never forwarded). The reseed archive is not among
     them: the messaging server passes it to the portal over its private channel
     (`/internal/i2pseeds.su3`) and the portal serves it publicly
     (`ClientApi.md`); the facade has no path for it.
-- **Account management has no route of its own.** Client calls to the
-  service node arrive inside the same tunnel and are forwarded to the node by the
-  messaging server under its own signature; the node is not reachable from
-  the facade at all (`Architecture.md`). One path carries both kinds of request,
-  so nothing outside the seal says which of the two a request is.
+- **The path says which backend a frame is for, and nothing more.** A frame on
+  `/n` is an account call and a frame on `/t` is anything else; which account
+  call, and whose, stays sealed. Neither backend forwards to the other: each opens
+  only its own tunnel (`Architecture.md`).
 - Everything else answers the same bare **404** - an unknown path and the operator liveness endpoint alike. `/healthz` is not on the client-facing socket at all: it is served on a separate private **ops listener** (`opsListen`) that is never published to clients (`AdminPanel.md`).
 - The ops listener also carries the facade's **own configuration**, operator-signed
-  like `/healthz`: `GET /settings` and `PUT /settings` (the backend, the three
+  like `/healthz`: `GET /settings` and `PUT /settings` (the two backends, the three
   sockets, the I2P side, the log level; `GET` adds the facade's address),
   `POST /new-address` and `POST /restart`. They are on the ops socket with
   `/healthz`: every client of the server holds the public address, and none of
@@ -130,7 +127,8 @@ rather than glossed over:
   the others;
 - when a request happens, and when a parked poll returns - which is when mail
   arrived;
-- how large it was, to the nearest step of the padding ladder.
+- how large it was, to the nearest step of the padding ladder;
+- which backend it is for: an account call is told from the rest.
 
 "A facade knows the flow but not whose it is, nor what is in it" is what this
 design achieves. "A facade knows nothing" would be untrue, and nothing here

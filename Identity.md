@@ -23,7 +23,7 @@
   (`{ v, t: "server-card", server, sealingKey, issuedAt }`; it names no transport
   endpoint). It is the server's own identity document (the service node is
   bound to it), and it is also what a **client** fetches in the open before it can
-  speak in private: the tunnel is sealed to the sealing key in it, and the card is
+  speak in private: the messaging tunnel is sealed to the sealing key in it, and the card is
   trusted because it is signed by the fingerprint the user already had
   (`api/ClientApi.md`). That sealing key is hybrid (X25519 + ML-KEM-768), as every
   sealing key in the project is.

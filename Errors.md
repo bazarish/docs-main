@@ -26,7 +26,7 @@
 | `MESSAGE_TOO_LARGE` | The payload is over `kMaxMessagePayloadBytes`. Past admission, so only a correspondent ever sees it | server |
 | `CONTACT_RATE_LIMITED` | This destination is taking too many contact requests, has too many waiting, or has no room for one more; or a correspondent is sending more than its pass admits. Transient; says nothing about who is served there | server |
 | `SESSION_INVALID` | The session a request authenticated with no longer exists. Answered by opening a new tunnel, never by retrying the same way | server |
-| `UPSTREAM_UNAVAILABLE` | The component behind the one that answers did not answer: the server behind a facade, or the service node behind the server. Transient | facade, server |
+| `UPSTREAM_UNAVAILABLE` | The backend behind a facade did not answer: the messaging server or the service node. Transient | facade |
 | `REQUEST_FAILED` | A request outside delivery failed for a reason no other code names; the status says which (below). It carries no meaning a client acts on beyond the status class | any component |
 | `ACCOUNT_UNKNOWN` | The service node holds no account for the signer. The answer to it is registering (`api/ServicePortal.md`) | service node |
 | `DELIVERY_REJECTED` | Delivery refused. Deliberately combines "unknown pass", "unknown mailbox" and "recipient not served here" into one externally indistinguishable result (anti-enumeration; see `Contacts.md`). A contact request, which presents nothing, is the only alternative admission path | server |

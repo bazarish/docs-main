@@ -6,29 +6,32 @@ The single client-facing API, reached through a facade (see `Facade.md`).
 
 - Base: a facade's address, answered at `/`; everything below is relative to it.
 - Control messages: JSON. Binary content (attachments, encrypted blobs): raw HTTP bodies, no base64.
-- **Everything below travels inside one sealed tunnel.** The paths named in this
-  document are what the *server* sees after it opens a frame; on the wire there
-  is a single `POST /t` carrying an opaque body, and a facade in the middle can
-  read none of it (`Facade.md`). The paths keep their meaning - they are not
-  visible outside:
-  - `/v1/messaging/*` - answered by the messaging server itself
-  - `/v1/account/*` - forwarded by it to the service node, under its own
-    signature, with the user named in the path it signs
+- **Everything below travels inside a sealed tunnel, and there are two.** The
+  paths named in this document are what a backend sees after it opens a frame; on
+  the wire there is `POST /t` or `POST /n` carrying an opaque body, and a facade
+  in the middle can read none of it (`Facade.md`). The paths keep their meaning -
+  they are not visible outside:
+  - `/v1/messaging/*` - in the messaging tunnel (`/t`), answered by the messaging
+    server
+  - `/v1/account/*` - in the account tunnel (`/n`), answered by the service node
 
 ### The tunnel
 
 Two kinds of frame, and a client's own identity is presented in exactly one of
-them.
+them. Both tunnels work the same way and are opened independently, each when the
+first call for it is made.
 
-- **hello** - opens a tunnel. Hybrid-sealed to the server's sealing key, which
-  the client takes from `GET /v1/server/card`: that card is public, identical
-  for everyone, and signed by the server root key whose fingerprint the user
-  already had before they saw a facade, so the card can be withheld but not
-  substituted. The frame carries a fresh secret, a one-time key for the answer,
+- **hello** - opens a tunnel. Hybrid-sealed to the sealing key of the backend it
+  is for, which the client takes from that backend's card: `GET /v1/server/card`
+  for the messaging server, `GET /v1/node/card` for the service node. Both cards
+  are public, identical for everyone, and signed by the server root key whose
+  fingerprint the user already had before they saw a facade, so a card can be
+  withheld but not substituted; each names what it is for, so one is not taken
+  for the other. The frame carries a fresh secret, a one-time key for the answer,
   and the hybrid signature that says who is opening it. The answer - the
   tunnel's lifetime - is sealed to that one-time key.
-  The server's sealing key **must be hybrid**: sealing needs the ML-KEM half, and
-  no tunnel can be opened to a server whose key predates hybrid sealing keys. Such
+  Each sealing key **must be hybrid**: sealing needs the ML-KEM half, and no
+  tunnel can be opened to a backend whose key predates hybrid sealing keys. Such
   a server refuses to start rather than leave every client in "connecting".
 - **carry** - everything afterwards. The request is encrypted under AES-256-GCM
   with a key derived from the same secret (a different derivation from the session
@@ -67,7 +70,7 @@ them.
 | `GET /v1/account/portal` | The node's onboarding text and registration terms: `{message, links, registration: {requiresApproval, message}, quotaBytes}` |
 | `GET /v1/account/card?user=X` | The contact card behind a descriptor: returns `{user, card}`. Reached from the messaging server, which serves a peer's query **on the user's own destination** - that destination is the capability, and it answers for its own user alone, so this cannot be used to ask whether a server hosts some other fingerprint. There is no lookup by fingerprint through a facade. The `alias` namespace lives on the central resolver (`api/FederatedResolve.md`) |
 
-The service node is bound to its messaging server by that server's card (passed at startup). Nothing a contact can fetch names that server.
+The service node is bound to its messaging server by that server's card (passed at startup). Its own sealing key is in the node card, which the messaging server signs with the server root at every start of the node (`ServerServiceNode.md`). Nothing a contact can fetch names that server.
 
 ## Messaging (server)
 

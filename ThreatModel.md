@@ -42,9 +42,9 @@ is the user's setting; call media always uses one hop (`Architecture.md`, decisi
 
 ## The facade
 
-The facade relays one sealed tunnel. It learns the flow of each device: a stable
-source address, the time of each request and its padded size. It does not learn
-whose flow it is or what it carries (`api/Facade.md`, What the facade still
+The facade relays two sealed tunnels, one to each backend. It learns the flow of
+each device: a stable source address, the time of each request, its padded size
+and which backend it is for. It does not learn whose flow it is or what it carries (`api/Facade.md`, What the facade still
 knows). It holds no key of the server or of a user.
 
 ## The user's own server

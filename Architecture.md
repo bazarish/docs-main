@@ -18,37 +18,32 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 
 ```
                                    operator-controlled private channel
-                        +.........................................................+
-[Client] -------I2P------> [Facade] --the sealed tunnel--> [Server] --> [Storage: disk]
-    |                   |                                     |                   |
-    |                   |          signed, user named in path  v                   |
-    |                   |                              [Service node] --> [its own records]
-    |                   +..........................................|..............+
-    |                                                              |
-    |                                     [embedded i2pd router] <==+== correspondents' clients (federation)
+                        +....................................................................+
+[Client] -------I2P------> [Facade] --messaging tunnel--> [Server] --> [Storage: disk]       |
+    |                   |      |                            ^ |                              |
+    |                   |      |                     pushes | | card lookups                 |
+    |                   |      |                            | v                              |
+    |                   |      +----account tunnel----> [Service node] --> [its own records] |
+    |                   +....................................................................+
+    |
+    |    [Server] <== its embedded i2pd router ==> correspondents' clients (federation)
     |
     +--clearnet--> portal, reseed
 ```
 
-The facade has exactly one backend. The service node is **not** reachable from it:
-an account call travels in the same tunnel as everything else and the messaging
-server is what forwards it.
+The facade has two backends and a sealed tunnel to each: the messaging tunnel
+ends at the server, the account tunnel at the service node. Neither backend
+forwards a client's call to the other.
 
 - The server has **no public IP interfaces**. Its only public presence is in hidden networks (I2P first).
-- Facade <-> Server and Server <-> Service node communication goes over an **operator-controlled private channel**: TLS in which each side is named by the hash of the key in its certificate, written in the other's configuration, with no certificate authority and no hostname in the question. Splitting the fleet across hosts therefore needs no tunnel of its own; the operator may still place one there.
-- **The facade carries one sealed tunnel and reads nothing.** A client's requests
-  all arrive as opaque frames on a single path; the messaging server opens them
-  and runs what was inside through its own routes. Account calls continue from there
-  to the service node, forwarded under the server's own signature with the user
-  named in the path it signed - so the node authorises them against the server
-  card it is already bound to, without a shared secret or a new setting. The node
-  is not reachable from the facade at all. See `api/Facade.md`, `api/ClientApi.md`.
-- What the node gives up for that is the user's own signature on each account
-  call: it now relies on the server's statement of whose call it is. What must be
-  self-evident still is - the contact card is signed by its owner and the I2P
-  transient carries an offline signature by the user's master key - so the
-  artifacts that matter are self-verifying, and only the fact of the call is
-  vouched for.
+- Facade <-> Server, Facade <-> Service node and Server <-> Service node communication goes over an **operator-controlled private channel**: TLS in which each side is named by the hash of the key in its certificate, written in the other's configuration, with no certificate authority and no hostname in the question. Splitting the fleet across hosts therefore needs no tunnel of its own; the operator may still place one there.
+- **The facade carries two sealed tunnels and reads neither.** A client's
+  requests arrive as opaque frames on one path per backend; each backend opens its
+  own frames, authenticates the user itself and runs what was inside through its
+  own routes. The facade learns which backend a frame is for and nothing else.
+  The service node seals its tunnel under a key of its own, which the server root
+  signs in the node card, so a client checks both cards against the one server
+  fingerprint. See `api/Facade.md`, `api/ClientApi.md`.
 
 ## Key decisions
 
@@ -57,7 +52,7 @@ server is what forwards it.
 3. **Facade <-> server transport** - operator private channel, not a hidden network hop.
 4. **Wire format** - JSON for control messages, raw HTTP bodies for binary content (no base64 overhead). E2E-encrypted payloads are opaque blobs to all server-side components.
 5. **Destination routing** - delivery routes by the recipient's I2P **destination** (its b33), carried in the user-signed contact card, not by server fingerprint; the sender dials it directly (no resolver, no `peers.json`). A server has **no single federation address**: every user is served by their own destination, which admits what arrives and initiates no connections. The sending **client** performs the dialling, from a destination held for that one correspondent; a server that initiates no connections cannot derive a correspondence graph from the addresses it contacted. A contact is shared as a **descriptor** (`fp:b33`); an **alias** resolves at the central resolver. Every routing target is a `.b32.i2p` host. See `Identity.md`, `api/Federation.md`, `api/InviteAnonymity.md`, `api/FederatedResolve.md`.
-6. **Single facade entry point** - the client holds a list of facade addresses and uses one at a time, and behind each one path: the tunnel. The facade fans out to nothing, because there is one backend; the messaging server is what reaches the service node.
+6. **Single facade entry point** - the client holds a list of facade addresses and uses one at a time; behind each one there are two tunnels, `/t` to the messaging server and `/n` to the service node, and the facade relays each to its backend. Account calls (`/v1/account/*`) go into the second, everything else into the first.
 6a. **A changed address is announced once** - an account whose destination or serving sealing key changes sends each contact one `contact.routing` message carrying the new destination and serving sealing key, and the receiver adopts the pair. Ordinary messages carry no routing. There is no second recovery path: a request for someone's new address could only go to their old one, so a party which changes its address tells everyone. See `Messages.md`.
 6b. **Tunnel length is a user setting** - three levels: minimal (1 hop each way, no variance), middle (1 hop, variance 1: I2P adds between zero and one hop and never subtracts), maximum (3 hops, no variance, the depth I2P itself defaults to). The client defaults to minimal and states what one hop does and does not conceal; call media remains minimal at every setting, three hops in each direction introducing audible delay in a live call. Server components accept `i2p.privacy` and default to maximum.
 7. **Docs language** - English (code comments are English per codestyle).
