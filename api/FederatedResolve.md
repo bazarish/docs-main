@@ -378,10 +378,3 @@ Namespace anti-enumeration is out of scope for the resolver (resolve is unauthen
    `<alias>` path (add-user -> I2P resolve -> fp:b33 card fetch -> conversation)
    are live-validated over real I2P, and the deployed resolver's coordinate is the
    one the client is built with.
-
-## Open / follow-up
-
-- `bazarish://resolver/<...>` sharing for a federated (non-central) resolver - the
-  protocol supports it; v1 ships one resolver only.
-- Optional clearnet/Tor DNS-SRV -> b33 convenience for `<alias>@<domain>` (weakest
-  rung; unauthenticated DNS, opt-in, always show the `fp`).
