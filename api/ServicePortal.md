@@ -185,9 +185,9 @@ This mechanism is moderation, not a charge.
 A ban outlives the account it removed - it is what stops the same key from
 registering again - so it is stored apart from the record it deletes, and a
 banned fingerprint stays in the listing (`banned: true`) because that is the only
-way back to lifting it. A banned key is refused at the portal, at
-`POST /portal/register` and at `POST /v1/account/card`, and the reason the
-operator wrote is what its owner is shown.
+way back to lifting it. A banned key is refused at the portal and at
+`POST /v1/account/card`, and the reason the operator wrote is what its owner is
+shown.
 
 Settings changed here are applied live and written back to the node's config
 file, so what an operator sets in the panel is what the node reads at its next
