@@ -213,7 +213,7 @@ real I2P**, and the client is built with the production resolver's coordinate
   reused on another destination. It signs that
   destination's delivery confirmations and nothing else. The **server root identity** is
   a separate crypto-identity used only **outside** federation - the server card /
-  `bazarish://server` configuration link (`Facade.md`) and the service-node
+  `https://bazari.sh/#server` configuration link (`Facade.md`) and the service-node
   binding - and never signs a federated message. Consequently two users the same
   server hosts share no signing key and no fingerprint, so there is no
   server-wide signer to cluster them as co-located. Since no two users ever share

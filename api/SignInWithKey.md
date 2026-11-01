@@ -85,10 +85,11 @@ cache. A login does not need one: its challenge is single-use (section 4).
 
 ## 2. The challenge
 
-Minted by the site as a link: `bazarish://sign?c=` followed by the base64url
+Minted by the site as a link: `https://bazari.sh/#sign?c=` followed by the base64url
 (RFC 4648 section 5, no padding) of this JSON. The link is the challenge: the site
-shows it as text, a link or a QR code, the client signs it as it stands, and it
-comes back with the blob. Nothing else is a challenge; a site may also show a link
+shows it as text, a link or a QR code, the client signs it in this spelling even
+when it arrived as `bazarish://sign?c=` (`Architecture.md`), and it comes back
+with the blob. Nothing else is a challenge; a site may also show a link
 that leads to one (below).
 
 ```json
@@ -131,8 +132,8 @@ Three places and a callback make a QR code too dense for a phone camera to read
 reliably, so a site may show a link to its challenge instead:
 
 ```
-bazarish://sign?at=<host><path>
-bazarish://sign?at=panel.b32.i2p/login/c/5f3c...
+https://bazari.sh/#sign?at=<host><path>
+https://bazari.sh/#sign?at=panel.b32.i2p/login/c/5f3c...
 ```
 
 The host and path follow the callback's rules (section 6): a `.b32.i2p` host, no
@@ -259,7 +260,7 @@ challenge breaks the tag.
 
 Before signing, the client **reads the consumer out of the challenge and shows
 all three fields**, and it **refuses to sign** a challenge that is not a
-`bazarish://sign` link, does not decode, is of another version, does not name a
+`https://bazari.sh/#sign` link, does not decode, is of another version, does not name a
 complete consumer, or names a callback that breaks section 6. A challenge fetched
 by a link is also refused when its callback does not go back to the link's host
 (section 2). Both halves matter:
@@ -301,7 +302,7 @@ POST <path> HTTP/1.1
 Host: <host>
 Content-Type: application/json
 
-{"challenge": "bazarish://sign?c=...", "blob": "..."}
+{"challenge": "https://bazari.sh/#sign?c=...", "blob": "..."}
 ```
 
 A 2xx status means accepted; any other is shown as a refusal with its number.

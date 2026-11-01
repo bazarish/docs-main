@@ -156,7 +156,7 @@ starts over.
 ## Names
 
 - 1 to 32 code points, without control or format characters, and without a
-  `bazarish://` link.
+  Bazarish link in either spelling (`Architecture.md`).
 - Two names that **look alike** are the same name: names are compared by their
   confusable skeleton (Unicode UTS #39) after case folding and NFKC, so `a` and
   Cyrillic `a` clash, and a name that mixes scripts is refused.
@@ -215,7 +215,7 @@ button; the host does not relay it.
 ## Descriptors inside text
 
 Any text message, in any chat, may contain a descriptor link
-(`bazarish://invite?...`, `api/FederatedResolve.md`). Clients render it as a
+(`https://bazari.sh/#invite?...`, `api/FederatedResolve.md`). Clients render it as a
 plate with the name it carries and a **Write** action that opens adding a
 contact with that descriptor filled in; the rest of the text stays in the same
 bubble. This is how a request to join reaches an admin and a contact request

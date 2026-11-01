@@ -9,7 +9,7 @@
 
 - A user **is** a hybrid keypair set. The canonical UID is the identity fingerprint covering both public keys.
 - Address / contact forms:
-  - `<fingerprint>:<b33>` - the **descriptor**: identity fingerprint + the user's own destination, addressed by the blinded b33 of its encrypted LeaseSet2 (written as a `.b32.i2p` host with a 56-character label, where a plain b32 has 52). `fp:b33` is this specification's shorthand; what a client shows, encodes in a QR and accepts is the link `bazarish://invite?v=1&fp=...&dest=...[&name=...]` (`api/FederatedResolve.md`). A fingerprint is an identity, not a route, so it is always paired with a destination - there is no `@server-fingerprint` form (nothing maps a fingerprint to an endpoint).
+  - `<fingerprint>:<b33>` - the **descriptor**: identity fingerprint + the user's own destination, addressed by the blinded b33 of its encrypted LeaseSet2 (written as a `.b32.i2p` host with a 56-character label, where a plain b32 has 52). `fp:b33` is this specification's shorthand; what a client shows, encodes in a QR and accepts is the link `https://bazari.sh/#invite?v=1&fp=...&dest=...[&name=...]` (`api/FederatedResolve.md`). A fingerprint is an identity, not a route, so it is always paired with a destination - there is no `@server-fingerprint` form (nothing maps a fingerprint to an endpoint).
   - `<alias>` - an exclusive **alias** on the central resolver (paid; the project's monetization, `api/FederatedResolve.md`). Resolving it yields a descriptor, after which the contact card is fetched and verified.
 - Users have no binding to a server in anything a contact can see. Registration opens an unbounded channel with the server, and the only thing that expires is the delegation of the user's destination - which the network itself enforces. Nothing signed by the user names the server.
 - All clients (devices/app instances) of a user **share the identity keypair set**; a new device receives it during enrollment (see `DeviceSync.md`). Each client registers a unique random **client ID** so the server can track delivery completeness across clients.
@@ -53,7 +53,7 @@
   the server that operates them, which is what lets an account move. It is the only key that signs
   live federation traffic (a delivery confirmation, `api/Federation.md`). The server
   **root identity** signs only **outside** federation - the server card above
-  (the `bazarish://server` configuration link carries no signature, only the
+  (the `https://bazari.sh/#server` configuration link carries no signature, only the
   fingerprint that card is verified against, `api/Facade.md`) and the
   service-node binding - so two users one server hosts share no signer and cannot be
   clustered by a common server fingerprint: no two users share a destination, so
@@ -207,7 +207,7 @@ looked up (`api/FederatedResolve.md`).
 ### Out-of-band invites (the descriptor)
 
 A contact is shared out of band as a small **descriptor** - the link
-`bazarish://invite?v=1&fp=...&dest=...[&name=...]` (`fp:b33`): identity +
+`https://bazari.sh/#invite?v=1&fp=...&dest=...[&name=...]` (`fp:b33`): identity +
 serving destination, plus an optional advertised
 display name the recipient adopts at add time (static thereafter; see `Messages.md`).
 It fits a single QR. The recipient

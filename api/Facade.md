@@ -194,7 +194,7 @@ server's own clients. This is a hard invariant, not a convention:
 
 Consequences for first contact (`Contacts.md`, `Federation.md`):
 
-- **Descriptor / QR** (`bazarish://invite?v=1&fp=...&dest=...`, `fp:b33` for
+- **Descriptor / QR** (`https://bazari.sh/#invite?v=1&fp=...&dest=...`, `fp:b33` for
   short) - carries the contact's fingerprint and serving destination. The client fetches the user-signed contact card
   for that fingerprint over I2P and verifies it against the fingerprint
   (`FederatedResolve.md`) - a direct fetch over a transient I2P destination of
@@ -225,7 +225,7 @@ So that a user can add a server with no manual entry, its whole configuration is
 carried in one link (also rendered as a QR):
 
 ```
-bazarish://server?v=1&fp=<server fingerprint>&facade=<facade address>[&facade=<facade address>...][&reseed=<reseed address>...]
+https://bazari.sh/#server?v=1&fp=<server fingerprint>&facade=<facade address>[&facade=<facade address>...][&reseed=<reseed address>...]
 ```
 
 Every field is human-readable (no base64): the fingerprint is the trust anchor
@@ -246,8 +246,8 @@ distinct:
 
 | Artifact | Carries | Audience | Facade? |
 |---|---|---|---|
-| `bazarish://server?...` | server fingerprint + facade addresses + reseed addresses | prospective clients of **this** server | **yes** - own server only |
-| `bazarish://invite?...` (descriptor) | fingerprint + own destination (`fp:b33`) | anyone, to add the holder as a contact | no |
+| `https://bazari.sh/#server?...` | server fingerprint + facade addresses + reseed addresses | prospective clients of **this** server | **yes** - own server only |
+| `https://bazari.sh/#invite?...` (descriptor) | fingerprint + own destination (`fp:b33`) | anyone, to add the holder as a contact | no |
 
 The descriptor carries no facade address; the contact card it points at is fetched
 over I2P and is user-signed, so it is verified against the fingerprint and
@@ -265,7 +265,7 @@ intermediaries are trusted for availability only (`Identity.md` /
 - **The facade list.** A facade mints its own address, and the admin panel
   publishes it into the server descriptor and replaces it on request
   (`AdminPanel.md`). A client learns its facade list only from a
-  `bazarish://server` link: the server card names no facade, and nothing the
+  `https://bazari.sh/#server` link: the server card names no facade, and nothing the
   server sends replaces the list a client holds. A changed list reaches an
   existing client when its user enters the new link in the client's
   server-connection settings; the portal shows the current link after sign-in.

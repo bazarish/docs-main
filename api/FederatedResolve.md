@@ -14,7 +14,7 @@ is not here: it is documented in its own repository
 
 - **Descriptor** - a small, single-QR pointer:
   ```
-  bazarish://invite?v=1&fp=<52-char base32 fingerprint>&dest=<b32>.b32.i2p[&name=<percent-encoded>]
+  https://bazari.sh/#invite?v=1&fp=<52-char base32 fingerprint>&dest=<b32>.b32.i2p[&name=<percent-encoded>]
   ```
   identity (`fp`) + the user's **own** destination (`dest`, a `.b32.i2p` host),
   plus an optional `name` the
@@ -163,7 +163,7 @@ structurally distinct from the 52-character base32 fingerprint, so the two can
 never be confused.
 
 A client reads whatever is typed into its add field that is not an invite link
-(`bazarish://invite?...`) as an alias, with or without the `!` sigil; a
+(`https://bazari.sh/#invite?...`) as an alias, with or without the `!` sigil; a
 fingerprint is never a way to add a contact. In message text the sigil stays
 required, or every word would be a name.
 
@@ -323,7 +323,7 @@ centralization is bounded to the name binding: the resolver is **out of the
 delivery path** (routing is federated and never consults it after the one-time
 lookup), it cannot forge an identity (descriptors and cards are user-signed), and
 it cannot see who talks to whom. Names are a convenience layer over a base
-that works without them - two people can always exchange `bazarish://invite?...`
+that works without them - two people can always exchange `https://bazari.sh/#invite?...`
 descriptors by QR or link and never contact the resolver (`../Identity.md`). How
 that registry is built, what it charges and how it is operated are its own
 concern and are not specified here.
@@ -341,7 +341,7 @@ Namespace anti-enumeration is out of scope for the resolver (resolve is unauthen
 
 ## Phasing
 
-1. **common** - *done.* Descriptor parse/encode (`bazarish://invite?...`), the
+1. **common** - *done.* Descriptor parse/encode (`https://bazari.sh/#invite?...`), the
    resolve query/response and signed-record bodies + JSON, and the delegation-cert
    (`record -> delegated -> root`) on the existing hybrid-cert primitives. Unit
    tests round-trip each.

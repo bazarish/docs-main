@@ -175,7 +175,7 @@ signature key and cluster as co-located - re-introducing exactly the shared-serv
 fingerprint this model removes. Binding the signer to the destination means two
 users share an ack key **iff** they already share a destination (and thus a
 k-anonymity set), so it leaks nothing new. The server **root identity** signs only
-outside federation (the server card / `bazarish://server` link, `Facade.md`),
+outside federation (the server card / `https://bazari.sh/#server` link, `Facade.md`),
 never a federated message.
 
 ## No subscription certificate
