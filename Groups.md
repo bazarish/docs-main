@@ -134,22 +134,31 @@ notice. A picture or a voice note that fits one envelope is relayed.
 ## Joining
 
 1. The member adds the host as a contact; the host accepts.
-2. The host asks for a **name in the chat**. The member answers with a plain
-   text message. Only a post is an answer: a receipt or any other service
-   message from the member gets no reply.
-3. The host checks the name (*Names*). A taken or refused name is asked for
-   again.
-4. In an **open** group the member is in. In an **approval** group every admin
-   receives the applicant's name and descriptor with two inline buttons; the
-   first admin to decide settles it, and the host edits the card for every
-   admin to say who decided. Requests no admin has decided are also listed in
-   the host's own interface.
+2. The member's **name in the chat** is the display name their contact
+   request carries (`dn`, `Contacts.md`). The host checks it (*Names*) and
+   says nothing when it is accepted.
+3. Only when the request carries no name, or the name is taken or refused,
+   does the host ask for one. The member answers with a plain text message,
+   checked the same way and asked for again until one is accepted. Only a post
+   is an answer: a receipt or any other service message from the member gets
+   no reply.
+4. In an **open** group the member is in, with no welcome message. In an
+   **approval** group every admin receives the applicant's name and descriptor
+   with two inline buttons; the first admin to decide settles it, and the host
+   edits the card for every admin to say who decided. Requests no admin has
+   decided are also listed in the host's own interface.
 5. A member who is in receives the last N posts (N chosen by the owner, 0
    allowed) and from then on every new one.
 
+Posts waiting for a member go out together: consecutive posts are packed into
+one envelope, oldest first, as many as fit its size limit (`Messages.md`,
+*Encoding*). An edit, a delete or a reactions update ends the pack and goes in
+an envelope of its own, so a member never sees a change before the post it
+changes.
+
 A contact request repeated under the same id by someone already on the way in
 or in - naming, waiting for an admin, or a member - is answered with the accept
-alone: the host does not ask for the name again, admit again or send the
+alone: the host does not ask for a name again, admit again or send the
 history again. A request under a new id is a contact added anew, and joining
 starts over.
 
@@ -205,12 +214,12 @@ is the only signal. A member who left and writes again joins again
 
 ## Settings
 
-The welcome message carries one inline button, **Settings**, and says that
-`/settings` brings it up again, written as an offer to send it (`!!/settings!!`).
-The button turns that message's buttons into the `contactable` switch and
-**Change name** (`rename`). A member who sends `settings` - as a `bot.command`,
-or as the plain text `/settings` - gets a message of their own with the same
-button; the host does not relay it.
+A member who sends `settings` - as a `bot.command`, or as the plain text
+`/settings` - gets a message of their own that names their name in the chat
+and carries two inline buttons: the `contactable` switch and **Change name**
+(`rename`). Pressing the switch redraws that message. The host does not relay
+either. A client offers `settings` in the group chat's header as
+**Account settings**, the way it offers a bot's menu (`Bots.md`).
 
 ## Descriptors inside text
 
@@ -226,7 +235,7 @@ verified, and a descriptor goes stale when its owner raises a new key.
 
 | `bot.command` | From | Meaning |
 |---|---|---|
-| `settings` | member | a message with the Settings button |
+| `settings` | member | a message with the member's name, the `contactable` switch and Change name |
 | `rename` | member | take the next text as the new name |
 | `contactable` `on` / `off` | member | accept or refuse contact requests |
 | `contact <id>` | member | ask the author of post `<id>` for contact |

@@ -42,6 +42,18 @@ and fetched. Base64 would add a third to every such payload (measured at 1.333x)
 and compression yields nothing, both JPEG/PNG and Opus being already
 entropy-coded (gzip on a JPEG: 0.986x; on a PNG: 1.000x).
 
+That body is always a **CBOR array** of layer-2 messages, oldest first, and one
+envelope carries the whole array. A client writing to a contact sends an array of
+one. A group host packs consecutive posts into one array, as many as fit the
+512 KiB envelope (`Groups.md`), so a newcomer's history or a returning member's
+backlog arrives in a few deliveries instead of one per post. There is no second
+form: a reader takes every body as an array. The array is padded and sealed once;
+every message in it keeps its own `auth`, and a receiver checks each on its own.
+A message that fails the checks is dropped alone and the rest are kept. The
+mailbox entry is acknowledged once, after the last message in the array is kept,
+so an envelope is never let go with part of it unkept, and a redelivery is
+recognised message by message through each `id`.
+
 A voice message is Opus in the call format - 48 kHz mono, 20 ms frames, each
 length-prefixed - and nothing further. No container is used: both ends implement
 this protocol, so an Ogg header would carry only parameters already fixed by the
@@ -136,14 +148,17 @@ envelope carrying it:
 
 | | **e2e id** (`id` in the layer-2 envelope) | **delivery id** (`deliveryId` everywhere) |
 |---|---|---|
-| Names | the message | one envelope delivered to a server |
+| Names | the message | one envelope delivered to a server, whatever number of messages it carries |
 | Who knows it | the two clients, and the sender's other devices - it is sealed | the sending client and the recipient's server - it is in the clear |
 | Used for | replies, reactions, edits, read receipts, deletes; the recipient's client recognising a redelivery | the mailbox blob name, the recipient server's dedup and seen-set, and what its confirmation is signed over |
-| Chosen by | the sending client, at random, once per message | derived by the sending client: `HMAC(account secret, e2e id + mailbox)` |
+| Chosen by | the sending client, at random, once per message | derived by the sending client: `HMAC(account secret, e2e id + mailbox)`, where for an envelope of several messages the e2e id is all their ids in order, joined by commas |
 
 The delivery id being **derived** is what makes sending the same message again
 idempotent: the envelope keeps its name, so a recipient's server that already
-stored it recognises it and stores nothing twice. Binding
+stored it recognises it and stores nothing twice. Naming an envelope by every
+message in it keeps that true for an array: the same array again is the same
+envelope, while an array that starts with posts already delivered and adds a new
+one is a different envelope, so the new post is not discarded as a repeat. Binding
 it to the mailbox is what keeps it from linking anything: the copy a sender keeps
 for their own devices and the copy the recipient gets are the same message under
 two unrelated names, so the two servers holding them have nothing to match on.
@@ -153,8 +168,8 @@ with that name before the real envelope arrives.
 
 ## Layer 2 - content type (end-to-end only)
 
-The encrypted payload (sealed to the recipient's user sealing key) is a
-versioned envelope:
+The encrypted payload (sealed to the recipient's user sealing key) is an array
+of versioned envelopes (*Encoding*), each of this shape:
 
 ```
 { "v": 1,
