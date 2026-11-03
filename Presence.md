@@ -156,7 +156,9 @@ and a state 64.
 ### Typing
 
 Composing in a conversation marks typing to that contact for `typingPulse`. A
-contact sees typing only while it also sees online.
+contact sees typing only while it also sees online. Typing ends at once, not at
+the end of the pulse, when the message is sent, the field is emptied or it
+loses focus: the holder sends the new state on its next tick.
 
 ### Timings
 
