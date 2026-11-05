@@ -150,11 +150,11 @@ notice. A picture or a voice note that fits one envelope is relayed.
 5. A member who is in receives the last N posts (N chosen by the owner, 0
    allowed) and from then on every new one.
 
-Posts waiting for a member go out together: consecutive posts are packed into
-one envelope, oldest first, as many as fit its size limit (`Messages.md`,
-*Encoding*). An edit, a delete or a reactions update ends the pack and goes in
-an envelope of its own, so a member never sees a change before the post it
-changes.
+Everything waiting for a member goes out together: posts, edits, deletes and
+reaction counts are packed into one envelope in the order they happened, oldest
+first, as many as fit its size limit (`Messages.md`, *Encoding*). A change
+therefore never arrives before the post it changes. A post goes out with its
+current text, so an edit made before it is not sent again.
 
 A contact request repeated under the same id by someone already on the way in
 or in - naming, waiting for an admin, or a member - is answered with the accept
@@ -199,7 +199,8 @@ sends `group.state` - a message with no body, only the block - when `write` or
   `bot.command` `contact <id>`, and the host passes the requester's descriptor
   to the author, in a message only the author sees. The author decides; the
   author's own descriptor goes nowhere. A member asks a given author once; a repeated ask is
-  not passed on.
+  not passed on. A member who asks an author who refuses contact requests is
+  told so, and the author learns nothing of it.
 - A member turns this on and off with `bot.command` `contactable on` /
   `contactable off`. The owner can switch it off for the whole group.
 
