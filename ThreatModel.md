@@ -100,7 +100,8 @@ invites collected from several users do not show that one server hosts them
 A gateway is optional and chosen by its user. It carries the client's I2P traffic
 and sees the client's IP address and every destination the client dials and
 publishes (`bazarish-server/gateway/PROTOCOL.md`, Trust). A client that runs its
-own router uses no gateway.
+own router uses no gateway. A gateway link can come from anyone, so a client asks
+before it takes one and checks the gateway before keeping it.
 
 ## A contact
 
