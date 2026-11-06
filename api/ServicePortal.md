@@ -181,6 +181,17 @@ This mechanism is moderation, not a charge.
 | `POST /v1/account/unban` | Operator-signed: lift a ban |
 | `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed, and the whole of what an operator can change: registration mode and its two messages, `loginConsumer`, `portalLinks`, `facades`, `reseeds` (each an `https` URL and not a `.b32.i2p` address, or the write is refused; a config file naming a reseed that is not `https` is refused at start), `defaultQuotaBytes`, `idleDeleteDays`, `logLevel`, and the three addresses `listen`, `portalListen`, `messaging` - plus the account count and the sum of the quotas. Everything is written back into the node's config file, so a restart keeps it; `logLevel` and the portal's own words apply at once, the three addresses at the next start |
 | `POST /v1/account/restart` | Operator-signed, on the operator socket: the node exits with the restart code (90) so that its supervisor starts it again |
+| `POST /v1/login/expect` | Operator-signed: `{challenge, token}` - the admin panel's challenge waits in the sign-in box under its nonce |
+| `POST /v1/login/claim` | Operator-signed: `{nonce, token}` -> `{state, challenge, blob}`, `state` being `waiting`, `signed` or `gone`; a signed entry is handed over once |
+
+The **sign-in box** keeps the challenges the portal and the admin panel wait on,
+in memory, for the challenge's window (300 s), at most 1024 of them. On the
+client socket, which only a facade reaches, `GET /login/c/<nonce>` answers the
+challenge and `POST /login/callback` takes `{challenge, blob}`: the node checks
+the blob's signature over that challenge (`403` if it fails) and that the
+challenge is the one waiting under its nonce (`404` if not, or if a signature
+already came). The tag is checked by whoever issued the challenge, when it
+claims the signature.
 
 A ban outlives the account it removed - it is what stops the same key from
 registering again - so it is stored apart from the record it deletes, and a
@@ -208,7 +219,13 @@ no account area, as the node offers nothing to purchase or manage:
 
 1. **the user's key** - the page renders a challenge; the user signs it in their client
    and pastes the blob back. `POST /login` verifies it and sets the session
-   cookie.
+   cookie. When the node's first facade is a `.b32.i2p` address, the challenge
+   names a callback on it and the page also shows a QR code of a link to the
+   challenge (`SignInWithKey.md`). The client fetches the challenge and posts the
+   signature through the facade (`Facade.md`), and the node's sign-in box keeps
+   it until the browser that showed the code asks for it at `GET /login/wait`.
+   Only that browser can: it holds the `signin` cookie the page set. The wait
+   needs scripts; without them the pasted form still works.
 There is no second step: the grant is issued as the key is proven, so the page
 that follows the sign-in already reports the account - its quota, what the
 messaging server holds for it, and the server descriptor to paste into a client -
@@ -226,7 +243,8 @@ fills in the values a template asks for by name:
 |---|---|
 | `page.html` (shell) | `title`, `strapline` (the line naming this node's messaging-server fingerprint), `session`, `content`, and `lang`, `dir`, `switch` for the page's language |
 | `session.html` | `fingerprint` |
-| `signin.html` | `challenge`, `error` |
+| `signin.html` | `challenge`, `error`, `scan` (empty, or `signin-scan.html`) |
+| `signin-scan.html` | `qr`, `nonce` |
 | `registered.html` | `quota`, `descriptor`, `mailbox`, `devices` |
 | `registered-approval.html` (moderated node) | the same, plus `message` - the operator's note |
 | `waiting.html` | the same as the approval page |
@@ -250,6 +268,9 @@ in that directory, of a type the portal publishes, are served.
 | Client | `GET /v1/account/portal` | none | onboarding text + portal links + registration terms |
 | Client | signs the challenge (local) | key | produce the login blob |
 | Browser | `GET /`, `POST /login` | sig -> session | sign-in-with-key, which is the registration |
+| Browser | `GET /login/wait?nonce=` | `signin` cookie | the sign-in by code: `waiting`, `signedIn` (with the session cookie) or `gone` |
+| Client, through a facade | `GET /login/c/<nonce>`, `POST /login/callback` | sig | fetch a challenge by its link, hand over the signature |
+| Panel | `POST /v1/login/expect`, `POST /v1/login/claim` | operator sig | the panel's sign-in by code |
 | Client | `POST /v1/account/registration` | key | the same registration, with no page to visit |
 | Panel | `POST /v1/account/approve` | operator sig | moderation |
 | Panel | `GET /v1/account/users`, `GET /v1/account/user`, `PUT /v1/account/quota` | operator sig | the operator's account list, search and quota |

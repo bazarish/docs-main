@@ -39,6 +39,15 @@ in**. What follows is only what the panel adds to it.
    fingerprint to be one of the configured admins, consumes the challenge, and
    sets a session cookie (`HttpOnly; SameSite=Strict`).
 
+When the deployment's service node answers and its first facade is a
+`.b32.i2p` address, the login page also shows a QR code. Its challenge names a
+callback on that facade, and the panel places it in the node's sign-in box with
+a token it keeps in the browser's `adminsignin` cookie (`ServicePortal.md`). The
+page asks `GET /login/wait?nonce=` every 2 s; the panel claims the signature
+from the node and runs step 4 on it. The node holds the signature, never the
+session. With the node away the page shows the pasted form alone. `/setup`
+shows the pasted form alone too: an unclaimed panel knows no node yet.
+
 What the panel puts in the consumer is listed with the other verifiers' in
 `SignInWithKey.md`.
 

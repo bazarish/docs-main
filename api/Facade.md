@@ -67,7 +67,7 @@ The facade is the "last mile" between the client and the server infrastructure. 
   start and reports it in `GET /settings` on its ops socket. The admin panel reads
   it from there and writes the facades' addresses into the server descriptor
   itself (`AdminPanel.md`), so an operator never copies an address by hand.
-- **Four paths exist, two per backend, and the facade reads none of them.** Each
+- **Six paths exist, and the facade reads none of them.** Each
   is relayed over the **operator private channel** to its backend: TLS pinned by
   the key that backend prints, so it need not be a loopback address or a tunnel:
   - `POST /t` and `POST /n` - the two client tunnels, `/t` to the messaging
@@ -80,6 +80,13 @@ The facade is the "last mile" between the client and the server infrastructure. 
     seals each tunnel to. Public, identical for every caller, and both signed by
     the fingerprint the user already had, so a facade may withhold one but cannot
     put its own in its place.
+  - `POST /login/callback` and `GET /login/c/<nonce>` - a sign-in by code
+    (`SignInWithKey.md`), both to the service node. The client posts the
+    signature for a challenge whose callback names this facade, or fetches the
+    challenge a QR code links to. The facade is the deployment's only I2P
+    address, so it is where the portal and the admin panel name their callback;
+    the service node keeps the challenges they wait on. The nonce is 32
+    lowercase hex characters; any other shape is a 404.
   - anything else -> 404 (never forwarded). The reseed archive is not among
     them: the messaging server passes it to the portal over its private channel
     (`/internal/i2pseeds.su3`) and the portal serves it publicly
