@@ -103,7 +103,7 @@ that leads to one (below).
     "role": "Administrator"
   },
   "tag": "9ab1...",
-  "callback": "http://panel.b32.i2p/login/callback"
+  "callback": "http://api.b32.i2p/login/callback"
 }
 ```
 
@@ -113,8 +113,8 @@ that leads to one (below).
 | `nonce` | 16 random bytes, hex. Single use. Not the blob's `n`: this one belongs to the challenge. |
 | `ts` | When the challenge was minted, seconds, a number. Verified within a freshness window (300 s, either side). |
 | `consumer` | Who consumes the signature. Shown to the user before signing. |
-| `tag` | `hex(HMAC-SHA256(secret, nonce + "\n" + ts + "\n" + canonical(consumer)))` under a portal-local secret, so the portal recognises its own challenge without keeping state, and **the label cannot be changed after minting**. |
-| `callback` | Optional. Where the client may send the blob itself (section 6). |
+| `tag` | `hex(HMAC-SHA256(secret, nonce + "\n" + ts + "\n" + canonical(consumer) + "\n" + callback))` under a portal-local secret, with `callback` the empty string when the challenge has none. The portal recognises its own challenge without keeping state, and **neither the label nor the callback can be changed after minting**. |
+| `callback` | Optional. A `.b32.i2p` address where the client may send the blob itself (section 6). Covered by the tag. |
 
 `canonical(consumer)` is the compact JSON object with keys in lexicographic
 order - `{"name":...,"place":...,"role":...}` - which is what the tag covers and
@@ -241,7 +241,10 @@ over any real API call, and no API signature is a login.
 1. The challenge decodes and `v` is the version this verifier speaks.
 2. `consumer` equals this deployment's own consumer, compared canonically.
 3. `ts` is within the freshness window.
-4. `tag` matches - the challenge was minted here. The comparison is constant-time.
+4. `tag` matches over the consumer and the callback, the empty string when there
+   is none - the challenge was minted here and its callback is the one minted
+   with it. The comparison is constant-time. A verifier that skips this step
+   accepts a blob sent to an address it never named.
 5. The blob verifies as a signed request (section 1) over the login's method,
    path and challenge: `t` fresh, both key types correct, both signatures valid.
    The fingerprint is derived from `k`.
@@ -254,7 +257,7 @@ account at the portal, a configured administrator at the panel.
 
 Steps 2 and 4 are what bind a signature to one place: a blob captured at one
 verifier carries a challenge no other verifier minted, and re-labelling that
-challenge breaks the tag.
+challenge or changing its callback breaks the tag.
 
 ## 5. What the client must do
 
@@ -280,18 +283,19 @@ itself instead of the user pasting it.
 
 The callback is `http://` + host + path, at most 256 bytes:
 
-- the host is a `.b32.i2p` address, b32 or b33, and it is the host of one of the
-  consumer's places - a place written `http://host`, `http://host/...` or `host`;
+- the host is a `.b32.i2p` address, b32 or b33. It does not have to be one of
+  the consumer's places: a place is where the user opens the site, and the
+  callback may be any I2P address of the verifier, its API for one;
 - no port, no user, no fragment; the path starts with `/` and holds only letters,
   digits and `-._~!$&'()*+,;=:@/?%`.
 
-The client refuses a challenge whose callback breaks this. The signature can
-therefore go only to a place the verifier itself names, and only over I2P. The
-tag does not cover the callback: it can name nothing but a place the tag does
-cover, so editing it moves the blob at most to another path of that same place.
+The client refuses a challenge whose callback breaks this, so the signature goes
+only over I2P. The tag covers the callback, and the verifier must check it
+(section 4, step 4). A challenge whose callback was edited no longer matches its
+tag, so a blob sent to an edited callback opens nothing.
 
-With a callback the client offers Send beside Copy; the host it sends to is
-already on the screen, among the consumer's places. Send becomes available **5 seconds** after the challenge is shown, and
+With a callback the client offers Send beside Copy and does not show where it
+sends: what the user compares is the consumer. Send becomes available **5 seconds** after the challenge is shown, and
 only a press sends: not scanning a code, not opening a link.
 
 The client sends from a one-off I2P address, never from the account's own, so
