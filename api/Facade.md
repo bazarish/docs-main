@@ -51,9 +51,12 @@ The facade is the "last mile" between the client and the server infrastructure. 
   other relationship to the server - so where a user bootstraps says nothing
   about where their server is. A server that names reseed addresses this way
   needs no clearnet address of its own.
-- **A third-party reseed host is a last resort.** With no reseed address in the
-  descriptor the client's router falls back to the public hosts it carries - the
-  only case in which the bootstrap leaves the network the user chose.
+- **A third-party reseed host is a last resort.** When the descriptor names no
+  reseed address, or none of those it names produced a network database, the
+  client's router turns to the public hosts it carries - the only case in which
+  the bootstrap leaves the network the user chose. A router that still has no
+  network database tries again, the descriptor's addresses first, each time the
+  client next needs the network.
 - This is the **only** I2P address the server side publishes. Federation runs on
   the users' own destinations (`InviteAnonymity.md`), never a shared one, so a
   facade address discloses nothing about which users a server hosts.

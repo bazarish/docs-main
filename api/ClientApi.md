@@ -68,11 +68,13 @@ first call for it is made.
 | `GET /v1/account/i2p-status` | `{approval, registrationMessage, transientExpires, transientUpdatedAt}`, where `approval` is `none`, `pending` or `approved` - the client polls this to drive transient re-issue and to see whether a moderated account is still awaiting approval |
 | `POST /v1/account/registration` | Register with no portal page to visit (`ServicePortal.md`): answers `{ok, quotaBytes, requiresApproval, message}` |
 | `GET /v1/account/portal` | The node's onboarding text and registration terms: `{message, links, registration: {requiresApproval, message}, quotaBytes}` |
-| `GET /v1/account/card?user=X` | The contact card behind a descriptor: returns `{user, card}`. Reached from the messaging server, which serves a peer's query **on the user's own destination** - that destination is the capability, and it answers for its own user alone, so this cannot be used to ask whether a server hosts some other fingerprint. There is no lookup by fingerprint through a facade. The `alias` namespace lives on the central resolver (`api/FederatedResolve.md`) |
+| `GET /v1/account/card?user=X` | The contact card behind a descriptor: returns `{user, card}`, or `ACCOUNT_UNKNOWN` for an account with no card or one still awaiting approval. Reached from the messaging server, which serves a peer's query **on the user's own destination** - that destination is the capability, and it answers for its own user alone, so this cannot be used to ask whether a server hosts some other fingerprint. There is no lookup by fingerprint through a facade. The `alias` namespace lives on the central resolver (`api/FederatedResolve.md`) |
 
 The service node is bound to its messaging server by that server's card (passed at startup). Its own sealing key is in the node card, which the messaging server signs with the server root at every start of the node (`ServerServiceNode.md`). Nothing a contact can fetch names that server.
 
 ## Messaging (server)
+
+The messaging server serves only the accounts its service node holds and has approved: before anything is written it asks the node for the signer's card, and an account the node does not know, has not approved yet, or has deleted is answered `ACCOUNT_UNKNOWN` (404). So an applicant on a moderated node has no mailbox until the operator approves it, and a deleted account's mailbox cannot come back.
 
 ### Sending
 

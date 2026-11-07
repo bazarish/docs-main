@@ -28,7 +28,7 @@
 | `SESSION_INVALID` | The session a request authenticated with no longer exists. Answered by opening a new tunnel, never by retrying the same way | server |
 | `UPSTREAM_UNAVAILABLE` | The backend behind a facade did not answer: the messaging server or the service node. Transient | facade |
 | `REQUEST_FAILED` | A request outside delivery failed for a reason no other code names; the status says which (below). It carries no meaning a client acts on beyond the status class | any component |
-| `ACCOUNT_UNKNOWN` | The service node holds no account for the signer. The answer to it is registering (`api/ServicePortal.md`) | service node |
+| `ACCOUNT_UNKNOWN` | The service node holds no account for the signer, or the messaging server serves no such account: its node does not hold it or has not approved it yet. The answer to it is registering (`api/ServicePortal.md`), or waiting for approval | service node, server |
 | `DELIVERY_REJECTED` | Delivery refused. Deliberately combines "unknown pass", "unknown mailbox" and "recipient not served here" into one externally indistinguishable result (anti-enumeration; see `Contacts.md`). A contact request, which presents nothing, is the only alternative admission path | server |
 | `CONTACT_REQUEST_TOO_LARGE` | Contact request exceeds `kMaxContactRequestBytes` (17590, a protocol constant - not an operator setting) | server |
 | `ALIAS_TAKEN` | Requested alias is already held. The registry's portal answers a buy request for it with 409 and this code | alias registry |
