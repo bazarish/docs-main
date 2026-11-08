@@ -143,8 +143,8 @@ other with `DELIVERY_REJECTED`.
 The `card` request and its answer:
 
 ```
-request:  {"op":"card","sealed":<base64 of {"v":1,"fp":<fingerprint>}>}\n
-answer:   {"ok":true,"sealed":<base64 card frame>}\n
+request:  {"op":"card","sealed":<base64 of the query sealed under the card key>}\n
+answer:   {"ok":true,"sealed":<base64 of the card frame sealed under the card key>}\n
 refused:  {"ok":false,"errorCode":"CARD_UNKNOWN"}\n
 ```
 

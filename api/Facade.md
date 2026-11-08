@@ -204,7 +204,7 @@ server's own clients. This is a hard invariant, not a convention:
 
 Consequences for first contact (`Contacts.md`, `Federation.md`):
 
-- **Descriptor / QR** (`https://bazari.sh/#invite?v=1&fp=...&dest=...`, `fp:b33` for
+- **Descriptor / QR** (`https://bazari.sh/#invite?v=1&fp=...&dest=...&key=...`, `fp:b33` for
   short) - carries the contact's fingerprint and serving destination. The client fetches the user-signed contact card
   for that fingerprint over I2P and verifies it against the fingerprint
   (`FederatedResolve.md`) - a direct fetch over a transient I2P destination of

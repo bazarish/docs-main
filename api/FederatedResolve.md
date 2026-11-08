@@ -14,13 +14,15 @@ is not here: it is documented in its own repository
 
 - **Descriptor** - a small, single-QR pointer:
   ```
-  https://bazari.sh/#invite?v=1&fp=<52-char base32 fingerprint>&dest=<b32>.b32.i2p[&name=<percent-encoded>]
+  https://bazari.sh/#invite?v=1&fp=<52-char base32 fingerprint>&dest=<b32>.b32.i2p&key=<card key>[&name=<percent-encoded>]
   ```
-  identity (`fp`) + the user's **own** destination (`dest`, a `.b32.i2p` host),
+  identity (`fp`) + the user's **own** destination (`dest`, a `.b32.i2p` host)
+  + the card key that seals the card fetch (`key`, 32 bytes as unpadded base64url;
+  a link without it, or with any other length, is refused),
   plus an optional `name` the
   inviter advertises (percent-encoded). The recipient adopts `name` as the
   contact's local display name at add time - a one-time static label, never
-  re-fetched or transmitted afterwards (`Messages.md`). Older invites omit it.
+  re-fetched or transmitted afterwards (`Messages.md`).
   Rendered for humans as `fp:b32` (the `:` distinguishes it from an alias). It
   does **not** contain the contact card - it points at one.
 - **Contact card** - user-signed (`t`, `issuedAt`, `dest`, `sealingKey`, `servingKey`, the owner taken from the signature;
@@ -93,20 +95,26 @@ than downgraded silently.
 ## Card-fetch protocol (`fp` -> contact card)
 
 ```
-client has descriptor {fp, dest}
-  query   = { v, fp }                                        # plain; the I2P stream is the envelope
+client has descriptor {fp, dest, key}
+  seal(k, m) = nonce(12, random) || ChaCha20-Poly1305(HKDF-SHA256(key, salt = "", info = k), nonce, m)
+  query   = seal("bazarish card request v1", { v, fp })
   -> dial srv (direct dial over a transient I2P destination)
-  srv answers only for its own user's fp, returns:
-  response = <card DER>                                      # plain, same reason
-  client: verify card signature; assert signer fingerprint == fp, card.dest is .b32.i2p
+  srv opens the query with its user's card key; answers only for its own user's fp:
+  response = seal("bazarish card reply v1", <card DER>)
+  client: open, verify card signature; assert signer fingerprint == fp, card.dest is .b32.i2p
 ```
 
-The card carries the serving key the sender seals delivery admission headers
-with (`../Identity.md`, `InviteAnonymity.md`); the fetch itself needs no key. On
-the only path there is, the I2P stream is already confidential to `srv`, so
-nothing is sealed at the application layer (the federation-frame field that
-carries query and card is named `sealed`, but neither is). Integrity is always
-the `fp` anchor.
+`key` is the account's **card key**: 32 random bytes the account makes once, keeps
+with its profile (so it survives a backup and travels with device pairing) and hands
+to its node with every card it publishes; the node gives it to the messaging server
+with the card. It reaches a contact only inside the descriptor - an invite link, a
+QR, a resolver record - or inside the `bootstrap` block of a contact request and its
+acceptance, so a contact who came in by request can share the descriptor onward.
+The stream is already confidential to `srv`; the seal is against whatever relays it
+before that - a gateway is the client's router and reads everything the application
+does not seal, and without the key it learns neither whose card was asked for nor
+the card. A query sealed under another key is answered `CARD_UNKNOWN`, the same as
+a fingerprint the destination does not serve. Integrity is still the `fp` anchor.
 
 ## Alias-resolve protocol (`alias` -> descriptor)
 
@@ -115,7 +123,7 @@ for uniform client automation. The resolver returns a
 **self-verifying signed record**:
 
 ```
-sign_delegated({ v, t: "resolve-record", alias, descriptor: {fp, dest},
+sign_delegated({ v, t: "resolve-record", alias, descriptor: {fp, dest, key},
                  issuedAt, notAfter })
   + delegationCert     # root -> delegated
   + aliasCert          # the owner's own claim over the name, user-signed

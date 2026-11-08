@@ -9,7 +9,7 @@
 
 - A user **is** a hybrid keypair set. The canonical UID is the identity fingerprint covering both public keys.
 - Address / contact forms:
-  - `<fingerprint>:<b33>` - the **descriptor**: identity fingerprint + the user's own destination, addressed by the blinded b33 of its encrypted LeaseSet2 (written as a `.b32.i2p` host with a 56-character label, where a plain b32 has 52). `fp:b33` is this specification's shorthand; what a client shows, encodes in a QR and accepts is the link `https://bazari.sh/#invite?v=1&fp=...&dest=...[&name=...]` (`api/FederatedResolve.md`). A fingerprint is an identity, not a route, so it is always paired with a destination - there is no `@server-fingerprint` form (nothing maps a fingerprint to an endpoint).
+  - `<fingerprint>:<b33>` - the **descriptor**: identity fingerprint + the user's own destination, addressed by the blinded b33 of its encrypted LeaseSet2 (written as a `.b32.i2p` host with a 56-character label, where a plain b32 has 52). `fp:b33` is this specification's shorthand; what a client shows, encodes in a QR and accepts is the link `https://bazari.sh/#invite?v=1&fp=...&dest=...&key=...[&name=...]` (`api/FederatedResolve.md`). A fingerprint is an identity, not a route, so it is always paired with a destination - there is no `@server-fingerprint` form (nothing maps a fingerprint to an endpoint).
   - `<alias>` - an exclusive **alias** on the central resolver (paid; the project's monetization, `api/FederatedResolve.md`). Resolving it yields a descriptor, after which the contact card is fetched and verified.
 - Users have no binding to a server in anything a contact can see. Registration opens an unbounded channel with the server, and the only thing that expires is the delegation of the user's destination - which the network itself enforces. Nothing signed by the user names the server.
 - All clients (devices/app instances) of a user **share the identity keypair set**; a new device receives it during enrollment (see `DeviceSync.md`). Each client registers a unique random **client ID** so the server can track delivery completeness across clients.
@@ -207,7 +207,7 @@ looked up (`api/FederatedResolve.md`).
 ### Out-of-band invites (the descriptor)
 
 A contact is shared out of band as a small **descriptor** - the link
-`https://bazari.sh/#invite?v=1&fp=...&dest=...[&name=...]` (`fp:b33`): identity +
+`https://bazari.sh/#invite?v=1&fp=...&dest=...&key=...[&name=...]` (`fp:b33`): identity +
 serving destination, plus an optional advertised
 display name the recipient adopts at add time (static thereafter; see `Messages.md`).
 It fits a single QR. The recipient
