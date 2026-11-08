@@ -119,7 +119,9 @@ the hybrid seal to the watched account's sealing key, so only that account learn
 who is watching, now or after a quantum computer exists:
 
 - `from` - the watcher's fingerprint;
-- `reply` - the watching address the state goes to;
+- `reply` - the watching address the state goes to. The holder does not check
+  it: a reader may name any address, and that address then receives the holder's
+  sealed state frames for the life of the subscription and nothing more;
 - `sub` - the subscription id, in hex, equal to the one in the frame header;
 - `key` - a fresh 32-byte AES-256-GCM key for this subscription, base64;
 - `sentAt` - Unix seconds;
