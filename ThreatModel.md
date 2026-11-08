@@ -147,8 +147,10 @@ identity itself cannot be revoked. The account database is SQLCipher, opened wit
 key sealed under the user's passphrase by Argon2id
 (`client-qt/docs/AccountStorage.md`).
 
-Pairing a device takes a one-shot destination and a four-digit code. Ten wrong
-codes take the destination down (`DeviceSync.md`, Enrollment).
+Pairing a device takes a one-shot destination, a key in the link and a four-digit
+code. Without the key no guess is counted, and ten wrong codes under it take the
+destination down; the code and the account travel sealed under the key, so a
+gateway on either side reads neither (`DeviceSync.md`, Enrollment).
 
 ## Outside this model
 
