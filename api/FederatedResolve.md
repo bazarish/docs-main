@@ -232,15 +232,17 @@ answer from a sibling device checks it against the same built-in root as a
 record it fetched itself.
 
 ```
-POST /v1/op/alias.status            every name this account holds
-POST /v1/op/alias.update            point one of them at {fp, dest}, with
-                                    the owner's alias certificate over the name
-POST /v1/op/alias.renew             pay for another term from the deposit
-POST /v1/op/alias.autorenew         let the service pay, or stop it
-POST /v1/op/alias.binding           make one of them resolve, or stop it
-POST /v1/op/alias.word              set the word a name is looked up with, or take it off
-POST /v1/op/alias.transfer.accept   take a name offered to this account
+alias.status            every name this account holds
+alias.update            point one of them at {fp, dest, key}, with
+                        the owner's alias certificate over the name
+alias.renew             pay for another term from the deposit
+alias.autorenew         let the service pay, or stop it
+alias.binding           make one of them resolve, or stop it
+alias.word              set the word a name is looked up with, or take it off
+alias.transfer.accept   take a name offered to this account
 ```
+
+Each is an op inside the sealed channel below, as is a lookup (`resolve`).
 
 `alias.binding` carries a boolean, like `alias.autorenew`. Switching it off
 clears the stored descriptor, so the name answers nobody while the account keeps
@@ -266,6 +268,39 @@ an envelope cannot turn a status into an update. A status answer carries its own
 window too, which is how long it may stand in for a freshly fetched one when a
 device forwards it to the account's other devices.
 
+### The sealed channel
+
+Everything a client asks the resolver travels sealed: the name it looks up, the
+puzzle answer, and every owner's op. The stream to the resolver is encrypted to
+its address, but a gateway is the client's own router and reads whatever the
+application does not seal. The face answers two paths and nothing else:
+
+```
+GET  /v1/channel   {"key": <signed channel key>, "delegation": <delegation cert>}
+POST /v1/sealed    hybrid_seal(channel key, pad({op, body, replyKey}))
+                   -> 200, KeyedSeal(replyKey, "bazarish resolver reply v1", pad32k({status, body}))
+```
+
+- **The channel key** is a hybrid sealing key (X25519 + ML-KEM-768) the daemon makes
+  at start and keeps in memory only, so each restart changes it and each node of a
+  pair has its own. It is signed by the delegated key (`{v, t: "resolver-channel",
+  key, issuedAt}`), and a client checks it like any other answer: delegation
+  certificate to the built-in root, signer is the delegated key, `issuedAt` not
+  ahead of its clock. A gateway cannot put its own key in place, having no key the
+  root delegated to.
+- **A request** is CBOR `{op, body, replyKey}` padded to the ladder (`Padding.hpp`)
+  and sealed to the channel key; `replyKey` is 32 random bytes the client makes for
+  this one request. `op` is `resolve` with the lookup `{v, alias, word?, stamp?,
+  nonce?}` as body, or one of the owner's ops with its signed request as body.
+- **The reply** is CBOR `{status, body}` - the status and the JSON a plain face would
+  have answered (tables below) - padded to a multiple of 32 KiB and sealed under
+  the request's `replyKey`. The outer answer is `200` whatever the inner status, so
+  a found name, an unknown one and a puzzle look the same from outside.
+- **A key the daemon no longer holds** - after a restart, or a request sealed for
+  the other node - is answered `409 CHANNEL_KEY_UNKNOWN` in the clear. A client
+  holds the key it checked in memory until it hears that, then fetches the key
+  again and asks once more.
+
 ### What the face refuses, and what it counts
 
 The resolve face answers nobody it cannot name: the i2pd tunnel in front puts the
@@ -278,29 +313,32 @@ in one run.
 
 ### Error answers
 
-Both faces answer a refusal with a status and a JSON body `{"errorCode": <code>}`;
-`PROOF_REQUIRED` adds `stamp` and `bits`. A client branches on the code.
+Outside the channel there are two refusals: `403 NO_CALLER` (no caller address
+from the tunnel) and `409 CHANNEL_KEY_UNKNOWN`; the channel key itself is counted
+against the caller's window (`429 TOO_MANY_REQUESTS`). Inside, every answer is a
+status and a JSON body `{"errorCode": <code>}`; `PROOF_REQUIRED` adds `stamp` and
+`bits`. A client branches on the code.
 
-The resolve face, `GET /v1/alias/<name>[-<word>]`:
+A lookup, op `resolve`:
 
 | Status | Code | Meaning |
 |---|---|---|
 | 403 | `NO_CALLER` | The request arrived without the caller's address the tunnel puts on it |
 | 429 | `TOO_MANY_REQUESTS` | This caller's window of resolves is spent |
 | 429 | `PROOF_REQUIRED` | The name is looked up too often; ask again with a solved stamp (*Lookups under pressure*). A wrong, stale or spent answer gets a new stamp |
-| 400 | `MALFORMED_REQUEST` | A stamp came without a usable nonce |
+| 400 | `MALFORMED_REQUEST` | The lookup does not read |
 | 503 | `BUSY` | Too many answers are being checked at once; ask again |
 | 404 | `ALIAS_UNKNOWN` | The name does not resolve with this word, or is not a name (*What a name can answer*) |
 | 503 | `RESOLVER_NO_SIGNING_KEY` | The resolver holds no delegated key and cannot sign an answer |
 
-The owner's ops, `POST /v1/op/<op>`:
+The owner's ops:
 
 | Status | Code | Meaning |
 |---|---|---|
 | 403 | `NO_CALLER` | As above |
-| 404 | `UNSUPPORTED_OP` | The path names no op of this face |
+| 404 | `UNSUPPORTED_OP` | No op of this face goes by that name |
 | 400 | `MALFORMED_REQUEST` | The request could not be processed |
-| 404 | `REQUEST_REFUSED` | The signature does not verify, the request is outside its freshness window, or it names another op than its path |
+| 404 | `REQUEST_REFUSED` | The signature does not verify, the request is outside its freshness window, it names another op than the one it was sent as, or it was carried out already |
 | 404 | `NOT_OWNER` | The signer does not hold the name (`alias.update`, `alias.binding`, `alias.word`, `alias.autorenew`, `alias.renew`) |
 | 404 | `BAD_DESCRIPTOR` | `alias.update`: the descriptor or the owner's certificate does not check out |
 | 404 | `WRONG_STATE` | `alias.renew`: the name is not in a state that renews |
@@ -315,9 +353,10 @@ with `409` and `ALIAS_TAKEN` in the common envelope (`../Errors.md`).
 ### The coordinate a client is built with
 
 Two values, and no more: the resolver's **root fingerprint** and the **b32 it
-answers at**. There is no third key, because the resolver signs and never
-encrypts - so nothing a client holds goes stale when the resolver rotates its
-signing material behind the same root. The root fingerprint is the single
+answers at**. There is no third key: the channel key is fetched and checked
+against the root each time the resolver changes it, so nothing a client is built
+with goes stale when the resolver rotates its signing or channel key behind the
+same root. The root fingerprint is the single
 constant `bazarish::kResolverRootFingerprint`, the same one the daemon is built
 with. With either half empty the alias path reports that resolution is
 unavailable rather than guessing. A test or a client pointed at another
