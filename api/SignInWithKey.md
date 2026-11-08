@@ -132,15 +132,17 @@ Three places and a callback make a QR code too dense for a phone camera to read
 reliably, so a site may show a link to its challenge instead:
 
 ```
-bazarish://sign?at=<host><path>
-bazarish://sign?at=panel.b32.i2p/login/c/5f3c...
+bazarish://sign?at=<host><path>&key=<key>
+bazarish://sign?at=panel.b32.i2p/login/c/5f3c...&key=Qm9i...
 ```
 
 The host and path follow the callback's rules (section 6): a `.b32.i2p` host, no
 port, a path that starts with `/`, at most 256 bytes with `http://` in front. The
-client fetches it from a one-off I2P address with `GET <path>`. A `200` answer's
-body is the challenge and nothing else, at most 4096 bytes; any other status is
-shown as a refusal with its number.
+`key` (section 6, *The key*) is required; a link without it is refused. The client
+fetches the path from a one-off I2P address with `GET <path>`. A `200` answer's
+body is the challenge sealed under the key and nothing else, the challenge at most
+4096 bytes; any other status is shown as a refusal with its number. The client
+keeps the key with the challenge it fetched, so it can seal the answer as well.
 
 The challenge behind a link must carry a callback on the host the link named.
 The client refuses one without a callback or with a callback elsewhere: a link
@@ -306,8 +308,34 @@ POST <path> HTTP/1.1
 Host: <host>
 Content-Type: application/json
 
-{"challenge": "bazarish://sign?c=...", "blob": "..."}
+{"nonce": "<the challenge's nonce>", "sealed": base64(seal("bazarish sign-in answer v1",
+    {"challenge": "bazarish://sign?c=...", "blob": "..."}))}
 ```
+
+The site finds the key by the nonce, opens the answer and checks that the
+challenge inside carries that nonce; an answer that does not open, or opens to
+another challenge, is refused (`403`).
+
+### The key
+
+A link that hands a challenge over I2P - a `sign?at=` link, or a `sign?c=` link
+whose challenge carries a callback - ends in `&key=`: 32 random bytes as base64url
+without padding, which the site makes for that one challenge and keeps beside its
+nonce until the sign-in ends. Both exchanges over I2P are sealed under it:
+
+```
+seal(label, m) = nonce(12, random) || ChaCha20-Poly1305(HKDF-SHA256(key, salt = "", info = label), nonce, m)
+challenge fetched by at=:   seal("bazarish sign-in challenge v1", <the challenge link>)
+answer to the callback:     seal("bazarish sign-in answer v1", {"challenge", "blob"})
+```
+
+The client's router may be a gateway, which reads whatever the application does
+not seal; the key reaches the client in the link or the QR code, past the gateway,
+so the gateway sees neither the challenge nor the blob. The key is not part of the
+challenge: the tag does not cover it, the client signs and sends the challenge
+without it, and a verifier never sees it in a blob. A `sign?c=` link with a
+callback and no key can still be signed and its blob copied, but not sent. A
+challenge without a callback - pasted into a browser form - needs no key.
 
 A 2xx status means accepted; any other is shown as a refusal with its number.
 The client follows no redirect and shows nothing of the answer's body. What the
