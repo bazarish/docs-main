@@ -41,10 +41,13 @@ three things carry it:
 The **base string** names the request:
 
 ```
-"v2\n" + t + "\n" + METHOD + "\n" + path + "\n" + hex(sha256(body)) + "\n"
+"v2\n" + t + "\n" + METHOD + "\n" + target + "\n" + hex(sha256(body)) + "\n"
 ```
 
 followed by `clientId + "\n"` when the request names a device (`ClientApi.md`).
+`target` is the request target exactly as sent: the path, and `?` and the query
+when there is one - a verifier that acts on a query parameter acts on what was
+signed.
 `body` is the request body's bytes, empty when there is none. The **signed
 string** is the base string followed by `n + "\n"`, with `n` exactly as it
 travels.
