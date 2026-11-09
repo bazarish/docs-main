@@ -8,7 +8,7 @@ it; neither the file name nor a sender-supplied MIME value has that role:
 | `type` | What it carries | What the recipient does |
 |---|---|---|
 | `text` | the text | shows it |
-| `file` | a transfer's metadata (name, size, sha256, mime) | offers to fetch it; the bytes travel client to client |
+| `file` | name, size, sha256, mime - and the bytes too when the file fits one message | keeps carried bytes in the account; otherwise offers to fetch them client to client |
 | `image` | the picture itself, bytes in the envelope | decodes it, keeps it in the account, draws it |
 | `audio` | Opus audio, bytes in the envelope | keeps it in the account, plays it on a press |
 | `contact.request`, `reaction`, `receipt`, `call.*`, `device.*` | as their names say | as documented elsewhere |
@@ -17,8 +17,8 @@ it; neither the file name nor a sender-supplied MIME value has that role:
 nothing to request, so it arrives once, with the message, and it arrives even if
 the sender goes offline the moment after sending - the mailbox holds it like any
 other message. The sender shrinks it first (long edge 1600, re-encoded, at most
-256 KiB) so that it and the envelope around it stay inside the 512 KiB message
-limit.
+`kMaxMediaBytes`, *Size*) so that it and the envelope around it stay inside the
+512 KiB message limit.
 
 Before it is rendered it must decode as an image; a rejection by the decoder is
 final. Such a message is reported as broken. It is not reclassified as a file:
@@ -26,7 +26,8 @@ that would be a fallback, the client reinterpreting what it received. The bytes
 are held in the account database, encrypted with the remainder of its contents,
 and are exported by an explicit save action.
 
-A `file` is the other path and keeps the announcement: the metadata travels in
+A `file` of at most `kMaxMediaBytes` travels like a picture, its bytes in `data`
+inside the message; a larger one keeps the announcement: the metadata travels in
 the message, the bytes travel client to client on demand, and the size has no
 limit other than the time the transfer takes.
 
@@ -68,11 +69,22 @@ client checks the same number on the same bytes before sending: the payload as
 it leaves, signed and sealed. A message over it is refused locally, with a
 request to send it as a file, and nothing is delivered.
 
-Anything larger is a file: `sendFile` puts only its metadata (name, size,
+What a message may carry besides its media is fixed, so the room left for the
+media is too. Of the 512 KiB, sealing takes 1176 bytes (`kHybridSealOverheadBytes`,
+the hybrid frame around a body of 64 KiB or more), and the heaviest picture, voice
+or file message spends 7905 more on everything that is not its bytes
+(`kMediaMessageReserveBytes`: the first reply's `bootstrap` block, the authorship
+signature, a reply to a message id of 64 bytes, the forwarded mark, a name and a
+type of 255 bytes each). That leaves **515207 bytes** for a picture, a voice note
+or a file carried inside one message (`kMaxMediaBytes`), and the heaviest such
+message comes to within 8 bytes of the limit. A name, a type or a reply id longer
+than those bounds is refused before sending.
+
+A larger file is announced: `sendFile` puts only its metadata (name, size,
 sha256, mime) in the message and the bytes travel client to client over a
-one-time destination, so a file never enters a mailbox and its size has no limit
+one-time destination, so it never enters a mailbox and its size has no limit
 other than the time the transfer takes. Pictures sent from the composer are
-scaled and re-encoded to a few hundred KiB before they are sent.
+scaled and re-encoded to fit.
 
 ## Principle: two independent layers
 
@@ -261,9 +273,9 @@ face, with the same retry.
 | `text` | content | `text` - a plain text line. |
 | `contact.routing` | content | A routing change pushed to an established contact: the `routing` block, on a message with nothing else in it. The only message that carries one. |
 | `device.chat-pin` | device | One conversation pinned or unpinned, on every device of the account. |
-| `contact.request` | contact | Carries a `bootstrap` block (`kind`, `sealing` - the same account sealing key the card publishes -, `dest`, `servingKey`, `pass`, and for a `user` `presenceKey` and `presenceDest`) plus `text`. The first message; see `Contacts.md`. |
+| `contact.request` | contact | Carries a `bootstrap` block (`kind`, `sealing` - the same account sealing key the card publishes -, `dest`, `servingKey`, `cardKey`, `pass`, and for a `user` `presenceKey` and `presenceDest`) plus `text`. The first message; see `Contacts.md`. |
 | `contact.accept` | content | Agreeing to a received `contact.request`: an empty-bodied message whose first-reply `bootstrap` delivers our descriptor + our pass to the requester, making the pair mutual contacts. The requester's client completes adding the contact automatically and surfaces a note. See `Contacts.md`. |
-| `file` | content | An announcement: `name`, `size`, `sha256` and `mime`. The bytes stay on the sender's disk until the recipient asks for them. See `api/FileTransfer.md`. |
+| `file` | content | `name`, `size`, `sha256` and `mime`, plus `data` - the bytes - when the file is at most `kMaxMediaBytes`. Without `data` it is an announcement: the bytes stay on the sender's disk until the recipient asks for them. See `api/FileTransfer.md`. |
 | `image` | content | A picture, carried inline: the bytes travel in the envelope rather than being fetched. Its body block is named `image`. |
 | `audio` | content | A voice note, carried inline like `image`. Its body block is named `audio` and holds `durationMs`, `size` and the Opus bytes in `data`; no waveform is sent - the receiver draws it from the audio. |
 | `receipt` | content | `ref` (the read message's `id`). A **read** receipt - the recipient's client sends it only on a genuine read (the chat is open, the app window focused, and the message scrolled into the visible area), confirming the "green" delivery state below. `ref` is the newest read incoming id, so it acknowledges that message and every earlier one **the sender got as far as the recipient's server** (a read high-water); one that never arrived is not carried up by it. While a device is taking in the backlog it found on coming online, it sends no receipt and no `device.read`; once the backlog is in, it sends at most one receipt per conversation, and only for a read newer than what the account's other devices reported (`device.read`), since those devices have answered for theirs. Optional/toggleable. **Never sent about a contact request**: reading a request is not answering it, and a requester who learns that a stranger's client is running and has opened their message has been told something they never agreed to be told. Until the request is accepted, the requester's own plate stops at *delivered*. |
@@ -568,15 +580,21 @@ are determined by the sending client. The protocol fixes the following:
   user, including after a restart, when a delivery that was in progress is
   reported as not performed.
 
-## Files: announced, transferred directly
+## Files: carried when small, otherwise announced and transferred directly
 
-A file is **never** inlined in the mailbox envelope, whatever its size, and it
-is not held on a storage service either - there is none. Pictures and voice
-messages are the exception: `image` and `audio` carry their bytes inside the
-message, within the per-message limit (*Types*, *Size*). For a file the message
-**announces** it and the bytes stay with the sender until the recipient asks for
-them, at which point the sender serves that one file over a one-time I2P
-destination (full design in `api/FileTransfer.md`):
+A file of at most `kMaxMediaBytes` (*Size*) is **carried**: the `file` message
+holds `{name, size, sha256, mime, data}`, the bytes travel and are kept like a
+picture's, and nothing is requested or served - there is no destination to
+publish for a ten-kilobyte document. The receiver checks `size` and `sha256`
+against `data`; a message where they differ is refused. A carried file is
+echoed to the sender's other devices with its bytes and may be kept in Saved
+messages.
+
+A larger file is never put in the mailbox envelope, and it is not held on a
+storage service either - there is none. The message **announces** it and the
+bytes stay with the sender until the recipient asks for them, at which point the
+sender serves that one file over a one-time I2P destination (full design in
+`api/FileTransfer.md`):
 
 1. The sender hashes the plaintext and sends `type: "file"` carrying
    `{name, size, sha256, mime}` - all end-to-end encrypted, no bytes.
@@ -591,10 +609,11 @@ destination (full design in `api/FileTransfer.md`):
 4. `file.unavailable` is returned when the sender no longer holds the
    file.
 
-The path is chosen by the content type, not by size: a picture or a voice
-message is sent inline and a file is announced. Nothing switches one to the
-other: a message over the limit is refused by the client before sending
-(*Size*), and the server's `MESSAGE_TOO_LARGE` is a final refusal.
+For a picture or a voice note the path is fixed: always inline. For a file the
+sender chooses by size alone, once, when it sends: carried up to
+`kMaxMediaBytes`, announced above it. A message over the limit is refused by the
+client before sending (*Size*), and the server's `MESSAGE_TOO_LARGE` is a final
+refusal.
 
 Why announce rather than store: the messaging server never carries a file's
 bytes, so a **quota-constrained recipient can receive arbitrarily large

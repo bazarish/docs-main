@@ -34,8 +34,10 @@ was announced is refused, not delivered as something else.
 
 ## Files and pictures
 
-A file is always announced and fetched directly; a picture travels inside its
-message. A message the recipient's server refuses as too large is reported as
+A file of at most `kMaxMediaBytes` travels inside its message with its bytes in
+`data`, as a picture does, and nothing here applies to it (`Messages.md`, *Files*);
+everything below is about a larger file, which is announced and fetched
+directly. A message the recipient's server refuses as too large is reported as
 refused and is not turned into a transfer.
 
 ## Service messages
