@@ -43,35 +43,26 @@ a session cookie carrying `userId` and an expiry (HttpOnly, SameSite=Strict).
 What this node puts in the consumer, and how an operator changes it without a
 restart, is in `SignInWithKey.md`.
 
-## 2. Portal discovery (server -> links)
+## 2. Registration from a client
 
-The client learns where to onboard from an **unauthenticated** endpoint:
+A client never sends its user to the portal. It publishes its card
+(`POST /v1/account/card`); a node that holds no account and no pending grant for
+that key answers `ACCOUNT_UNKNOWN`, and the client registers itself
+(`POST /v1/account/registration`) and publishes the card again. On a moderated
+node the answer to that card says `approval: pending` and carries the operator's
+`registration.message`, and the client shows it while the account waits.
+Registration is never refused, so there is nothing to point a client to.
 
-```
-GET /v1/account/portal  ->
-{
-  "message": "<human text shown by the client>",
-  "links":   ["https://portal-a.example/...", "https://portal-b.example/..."],  // >=1
-  "registration": {
-    "requiresApproval": false,
-    "message":          "<how to reach the operator, when approval is required>"
-  },
-  "quotaBytes": 52428800
-}
-```
+server-core points nowhere either: it serves only accounts whose card the node
+holds and answers `ACCOUNT_UNKNOWN` for any other key. A client that asks
+server-core for its destination before it has registered reads that answer as
+"no destination served here yet".
 
-The client shows the message and the link(s); the user opens one in a browser.
-Several links allow mirrors/onion/clearnet alternatives. There is no service
-catalogue because nothing is sold here: the only variables are whether an
-operator has to approve the account and the one storage quota every user
-receives.
+The portal's links (`portal.links`) name where users open the portal in a
+browser; they are the place a sign-in challenge names when `portal.address` is
+not set (`SignInWithKey.md`). No client reads them.
 (The global `alias` namespace is a separate product sold by the central
 alias-resolver, not the service node, and is not specified here.)
-
-server-core points nowhere itself: it relays the service node's refusal unchanged,
-and the refusal carries no links. A refused client registers itself
-(`POST /v1/account/registration`); when connecting still fails, it reads
-`GET /v1/account/portal` and shows the message and links found there.
 
 ## 3. Account model
 
@@ -179,7 +170,7 @@ This mechanism is moderation, not a charge.
 | `DELETE /v1/account/user?user=` | Operator-signed: delete the account (certificate, grants, destination) |
 | `POST /v1/account/ban` | Operator-signed: delete the account and refuse this key from now on (reason defaults to "Banned") |
 | `POST /v1/account/unban` | Operator-signed: lift a ban |
-| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed, and the whole of what an operator can change: registration mode and its two messages, `loginConsumer`, `portalLinks`, `facades`, `reseeds` (each an `https` URL and not a `.b32.i2p` address, or the write is refused; a config file naming a reseed that is not `https` is refused at start), `defaultQuotaBytes`, `idleDeleteDays`, `logLevel`, and the three addresses `listen`, `portalListen`, `messaging` - plus the account count and the sum of the quotas. Everything is written back into the node's config file, so a restart keeps it; `logLevel` and the portal's own words apply at once, the three addresses at the next start |
+| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed, and the whole of what an operator can change: registration mode and its message, `loginConsumer`, `portalLinks`, `facades`, `reseeds` (each an `https` URL and not a `.b32.i2p` address, or the write is refused; a config file naming a reseed that is not `https` is refused at start), `defaultQuotaBytes`, `idleDeleteDays`, `logLevel`, and the three addresses `listen`, `portalListen`, `messaging` - plus the account count and the sum of the quotas. Everything is written back into the node's config file, so a restart keeps it; `logLevel` and the portal's own words apply at once, the three addresses at the next start |
 | `POST /v1/account/restart` | Operator-signed, on the operator socket: the node exits with the restart code (90) so that its supervisor starts it again |
 | `POST /v1/login/expect` | Operator-signed: `{challenge, token}` - the admin panel's challenge waits in the sign-in box under its nonce |
 | `POST /v1/login/claim` | Operator-signed: `{nonce, token}` -> `{state, challenge, blob}`, `state` being `waiting`, `signed` or `gone`; a signed entry is handed over once |
@@ -265,7 +256,7 @@ in that directory, of a type the portal publishes, are served.
 
 | Caller | Endpoint | Auth | Purpose |
 |---|---|---|---|
-| Client | `GET /v1/account/portal` | none | onboarding text + portal links + registration terms |
+| Client | `POST /v1/account/card`, `POST /v1/account/registration` | sig | publish the card; register when the node knows no such account |
 | Client | signs the challenge (local) | key | produce the login blob |
 | Browser | `GET /`, `POST /login` | sig -> session | sign-in-with-key, which is the registration |
 | Browser | `GET /login/wait?nonce=` | `signin` cookie | the sign-in by code: `waiting`, `signedIn` (with the session cookie) or `gone` |
