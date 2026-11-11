@@ -18,6 +18,7 @@ that fingerprint; no shared secret is used.
 | Request | Purpose |
 |---|---|
 | `PUT /v1/messaging/i2p-dest` | Supply the user's signed offline transient with the address's keys, `{user, transient, expiresUnix, sealingKey, signingKey}` (private PEM, as the client sent them); an empty transient takes the destination offline. The server operates the destination with exactly these keys and generates none: a request with a transient and without both keys, or with a sealing key that is not hybrid or a signing key that is not Ed25519, is refused with `400`. Offline, the address and its record are dropped; published again, the client hands over the same keys, so every contact's card stays valid; a delegation that runs out is dropped the same way. Answers `{dest}` - the address derived from the transient, known before any tunnel is built. A transient over a **different** address replaces the destination at once: the old one is stopped and dropped inside the same call, so nothing is served on it afterwards and its lease set stops being published |
+| `PUT /v1/messaging/card` | `{user}`: the account published a new card. The server drops the copy it holds, so the next `get-card` reads the new one |
 | `PUT /v1/messaging/quota` | Set the mailbox quota granted by the account, in place of the server's default |
 | `GET /v1/messaging/account?user=` | State held for one account: registered devices, bytes in use, effective quota; displayed by the administration panel |
 | `POST /v1/messaging/node-card` | `{sealingKey}`, the node's public sealing key (DER, base64) -> `{card}`: the **node card**, `{ v, t: "node-card", server, sealingKey, issuedAt }`, signed with the server root like the server card. The node asks for it at every start and serves it at `GET /v1/node/card`; a client seals the account tunnel to the key in it and trusts it by the same fingerprint as the server card (`ClientApi.md`). A node that cannot get one does not start |
@@ -33,7 +34,8 @@ Owned by the **server** (it drives the delete-when-all-acked storage rule, see `
   quota, a deletion) and reconciles the quotas once at
   start, so the messaging server needs the node for nothing on the delivery path.
   The one thing the server asks the node for is a user's contact card, and it holds
-  the answer briefly rather than calling per delivery.
+  the answer briefly rather than calling per delivery; a new card drops that
+  copy at once (`PUT /v1/messaging/card`).
 - **The quota is the node's, the usage is the server's.** The node grants and
   stores the number; only the filesystem under the server knows what is in a
   mailbox, so the panel and the portal read usage from the server
