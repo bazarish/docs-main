@@ -46,8 +46,13 @@ in the contact card as `presenceDest` and `presenceKey`.
 A device watches from a **watching address** of its own: a published, minted
 destination that carries the account's presence secret as its lease-set reader
 key, so that it can read the lease sets that list the account. It exists while
-the device is in focus with the switch on. One is kept built ahead of time and
-given the secret when it is taken, so a device that gains focus watches at once.
+the device is in focus with the switch on. While at least one account open on the
+device has the switch on, one is kept built ahead of time and given the secret
+when it is taken, so a device that gains focus watches at once; with the switch
+off on every open account, the device holds no presence or watching destination
+at all. Each account takes its own watching address and keeps its own presence
+address: two accounts on one device that watch the same contact each watch from
+an address of their own.
 
 ## Several devices
 
