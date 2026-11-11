@@ -80,8 +80,9 @@ stores directly (`ClientApi.md`) - there is no second party for it to reach.
 narrow circle of family or friends. A client on a gateway reaches it over TLS. The
 gateway carries its users' dials to the server it is linked to over TLS
 (`bazarish-server/gateway/PROTOCOL.md`, The server link), and connects two of its
-own users directly, without I2P (Meeting on the gateway, same document). The frame
-and the admission are the same as over I2P.
+own users directly, without I2P (Meeting on the gateway, same document). A dial to
+a recipient that server hosts goes over that TLS link even when the recipient does
+not use the gateway. The frame and the admission are the same as over I2P.
 
 ## Delivery envelope
 
