@@ -30,7 +30,7 @@
 | `REQUEST_FAILED` | A request outside delivery failed for a reason no other code names; the status says which (below). It carries no meaning a client acts on beyond the status class | any component |
 | `ACCOUNT_UNKNOWN` | The service node holds no account for the signer, or the messaging server serves no such account: its node does not hold it or has not approved it yet. The answer to it is registering (`api/ServicePortal.md`), or waiting for approval | service node, server |
 | `DELIVERY_REJECTED` | Delivery refused. Deliberately combines "unknown pass", "unknown mailbox" and "recipient not served here" into one externally indistinguishable result (anti-enumeration; see `Contacts.md`). A contact request, which presents nothing, is the only alternative admission path | server |
-| `CONTACT_REQUEST_TOO_LARGE` | Contact request exceeds `kMaxContactRequestBytes` (17590, a protocol constant - not an operator setting) | server |
+| `CONTACT_REQUEST_TOO_LARGE` | Contact request exceeds `kMaxContactRequestBytes` (17590, a protocol constant) | server |
 | `ALIAS_TAKEN` | Requested alias is already held. The registry's portal answers a buy request for it with 409 and this code | alias registry |
 | `ALIAS_UNKNOWN` | Alias resolution found no such alias. Aliases are intended to be discoverable, so this is reported explicitly and is not subject to anti-enumeration | alias registry |
 | `CLIENT_UNREGISTERED` | Request carries a client ID that is not registered for this user. Only the routes that act for one device check it: the mailbox listing and wait, fetch, ack, the pass set and the write to the account's own devices. The account routes and the client registry take any request the user signed (`DeviceSync.md`) | server |

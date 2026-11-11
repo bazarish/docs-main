@@ -1,8 +1,8 @@
 # Server <-> Service Node API
 
-Internal API over the operator private channel - mutually pinned TLS, each side holding the hash of the other's key, and every call signed by the identity that makes it. What the node asks of the server rides the server's operator socket; the one call the other way, a card lookup by fingerprint, rides the node's own listener and is authorised to the server's fingerprint alone. The service node owns per-operator user-management state (accounts: the quota granted and the card published); the server owns content and delivery, and consults the service node to make admission decisions. The global **alias** namespace is **not** here - it is a separate central service (`api/FederatedResolve.md`), not the operator service node.
+Internal API over the operator private channel - mutually pinned TLS, each side holding the hash of the other's key, and every call signed by the identity that makes it. What the node asks of the server rides the server's operator socket; the one call the other way, a card lookup by fingerprint, rides the node's own listener and is authorised to the server's fingerprint alone. The service node owns per-operator user-management state (accounts: the quota granted and the card published); the server owns content and delivery, and consults the service node to make admission decisions. The global **alias** namespace belongs to a separate central service (`api/FederatedResolve.md`).
 
-An account has **no term**. Registration opens an unbounded channel; the only clock is the delegated destination, and an account that has none for the node's idle window is deleted (`idleDeleteDays`, 180 by default).
+Registration opens an account without a term; the only clock is the delegated destination, and an account that has none for the node's idle window is deleted (`idleDeleteDays`, 180 by default).
 
 ## Server -> Service node
 
@@ -13,7 +13,7 @@ An account has **no term**. Registration opens an unbounded channel; the only cl
 ## Service node -> Server
 
 Requests are signed with the node's own identity and authorised by the server on
-that fingerprint; no shared secret is used.
+that fingerprint.
 
 | Request | Purpose |
 |---|---|
@@ -28,19 +28,17 @@ that fingerprint; no shared secret is used.
 
 Owned by the **server** (it drives the delete-when-all-acked storage rule, see `../DeviceSync.md`); the service node never learns the user's device count.
 
-## What the split settled on
+## Split of responsibilities
 
-- **Push, not pull.** The node pushes what it owns (the delegated transient, the
+- **Push.** The node pushes what it owns (the delegated transient, the
   quota, a deletion) and reconciles the quotas once at
   start, so the messaging server needs the node for nothing on the delivery path.
   The one thing the server asks the node for is a user's contact card, and it holds
-  the answer briefly rather than calling per delivery; a new card drops that
-  copy at once (`PUT /v1/messaging/card`).
+  the answer briefly; a new card drops that copy at once (`PUT /v1/messaging/card`).
 - **The quota is the node's, the usage is the server's.** The node grants and
   stores the number; only the filesystem under the server knows what is in a
   mailbox, so the panel and the portal read usage from the server
   (`GET /v1/messaging/account`).
-- **Localhost HTTP, signed per request.** Channel isolation is not the
-  authentication: every call carries the caller's hybrid signature and each side
-  authorises it by fingerprint - the node by the server card it is bound to, the
-  server by its configured `operators` list. No shared secret.
+- **Signed per request.** Every call carries the caller's hybrid signature and
+  each side authorises it by fingerprint - the node by the server card it is
+  bound to, the server by its configured `operators` list.

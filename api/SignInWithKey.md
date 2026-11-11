@@ -173,18 +173,15 @@ line or reorders the text around it:
 
 A `name` with a newline in it could render a `place` line of its own in the
 client's window, and a bidi override could show an address in an order other
-than the one it has - which is also why `place` is a list rather than one field
-with a separator in it. The set is closed and written out here rather than taken
-from a Unicode category, so every implementation refuses exactly the same
-strings. Joiners (U+200C, U+200D) stay allowed: they are part of the spelling in
+than the one it has - which is also why `place` is a list. The set is closed and
+written out here, so every implementation refuses exactly the same strings. Joiners (U+200C, U+200D) stay allowed: they are part of the spelling in
 Persian, Indic scripts and emoji, and break nothing. A challenge that breaks any
 of these rules is not signed.
 
 **Why more than one.** A place is often reachable two ways at once - over
 clearnet and over I2P - and a challenge naming only one of them is refused by the
 very user it is meant to serve: they arrived by the other. The check a person
-performs changes from "does this match where I am" to "is where I am in this
-list", which is still a question they can answer. It stays answerable only while
+performs is "is where I am in this list", which is a question they can answer. It stays answerable only while
 the list is short, hence the cap, and the client says **"If the address you came
 to is not in the list, do not sign."** when there is more than one.
 
@@ -221,8 +218,8 @@ Produced by the client, `base64(JSON)`:
 {"k": "...", "t": "1756600004", "n": "...", "c": "...", "p": "..."}
 ```
 
-It is a signed request (section 1) whose five values travel as the blob's fields
-rather than as headers, over method `BZ-LOGIN`, path `/portal/login` and body =
+It is a signed request (section 1) whose five values travel as the blob's fields,
+over method `BZ-LOGIN`, path `/portal/login` and body =
 the challenge exactly as issued, the whole link. A login blob names no
 device, so its base string has no device line. The string signed is therefore
 
@@ -355,9 +352,3 @@ will be opened, and a mismatch with the address bar is visible.
 It does not decide for the user. Someone can still relay a genuine challenge from
 a real service and hope the user signs without reading; the client's display, and
 the user comparing it with where they are, is what catches that.
-
-A consumer key fingerprint was considered as a fourth field and dropped. A client
-cannot check a fingerprint it does not already know, so it would be one more
-unverifiable string - and shown as a badge it would do harm, turning "this says
-it is your server" into "this is safe" at exactly the moment the user should be
-reading the two lines above it.

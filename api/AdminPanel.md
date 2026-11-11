@@ -11,9 +11,7 @@ several may front one pair, and different facades may front different pairs. A
 deployment may also list private gateways, as many as it has or none: a gateway is
 an optional part of a deployment and runs without the panel. Every service in a
 deployment has a **name of its own**, because the name is what tells two facades
-or two gateways apart on every page. The
-central alias service is not managed here; it belongs to the project rather than
-to an operator's deployment. The panel reaches each service on that service's
+or two gateways apart on every page. The panel reaches each service on that service's
 private operator socket, and is never exposed through a facade or over I2P.
 Those sockets are mutually pinned TLS, so they need not be on the panel's own
 host: a deployment may be spread over several machines without a tunnel between
@@ -53,8 +51,7 @@ What the panel puts in the consumer is listed with the other verifiers' in
 
 ## Operator authentication (panel <-> services)
 
-Privileged service endpoints are authenticated by **hybrid signature**, not a
-shared secret. The panel has its own identity (generated on first start, kept in
+Privileged service endpoints are authenticated by **hybrid signature**. The panel has its own identity (generated on first start, kept in
 its state directory); every service call it makes is a signed request
 (`SignInWithKey.md`, section 1). Each service verifies it and then requires the
 signer's fingerprint to be one of its configured operators (`operators`,
@@ -110,8 +107,8 @@ A sidebar carries the views:
   deployment and re-probed every few seconds. A facade also reports what it is
   carrying: requests over the last minute, hour and day, and how many are in
   flight. These are sampled from bucketed counters (one per second for the last
-  minute, one per minute for the last day): a current reading rather than a
-  history, so nothing is stored and nothing requires pruning. A service's name
+  minute, one per minute for the last day): a current reading, so nothing is
+  stored. A service's name
   opens its settings: the Server tab, the node's Addresses tab, or the page of
   that one facade or gateway.
 - **Users** - the accounts on the service node. Search by fingerprint or by the
@@ -124,9 +121,7 @@ A sidebar carries the views:
   message its owner is shown in place of the node-wide one), delete it, or ban
   the key. The open account is in the address bar (`#/users/<fingerprint>`), so a
   link points at one account.
-- **Settings** - every setting of the deployment, in eight tabs, because one long
-  page of similar-looking blocks is where an operator cannot find the one they
-  came for. Each tab saves on its own and is in the address bar
+- **Settings** - every setting of the deployment, in eight tabs. Each tab saves on its own and is in the address bar
   (`#/settings/<tab>`, and `#/settings/<tab>/<name>` for one facade or gateway),
   so a link points at one subject. The singletons have tabs of their own; the
   services a deployment may hold many of have one tab each that lists them by
@@ -144,22 +139,18 @@ A sidebar carries the views:
   | Panel | the panel's own file: who may sign in, the words it signs under, the services it manages, and where it listens - plus what it cannot change (its fingerprint, its config file, its state and web directories, its version) |
 
   Every tab that holds a start-only setting also carries a **restart** control
-  for the service that owns it (and the Panel tab one for the panel itself).
-  Without it the rule this page exists for would not hold: a setting saved into a
-  config file is inert until the process reads it again, and the operator would
-  have to return to a terminal. The service exits cleanly with a distinct code
-  and its unit starts it again; a service whose unit has no restart policy says
-  so instead of offering a button that does nothing.
+  for the service that owns it (and the Panel tab one for the panel itself): a
+  setting saved into a config file takes effect when the process reads it again.
+  The service exits cleanly with a distinct code and its unit starts it again; a
+  service whose unit has no restart policy says so in place of the button.
 
-  Two distinctions are made visually rather than in prose. A value the operator
+  Two distinctions are made visually. A value the operator
   owns is an input; a value the panel only knows is plain text against a rule,
   never a field that looks editable. And a setting the service reads only at
-  start carries a **restart** mark beside the field - shown next to the control,
-  because by the time the value has been typed the sentence under it has been
-  read and forgotten. The log level is the exception on the Addresses tab: it
+  start carries a **restart** mark beside the field, next to the control. The log level is the exception on the Addresses tab: it
   applies at once, which is the reason it is there.
 
-The **search is performed on the service node**, not in the browser: the panel
+The **search is performed on the service node**: the panel
 passes `q`, `state`, `limit` and `offset` through and displays the result, so a
 node with many accounts does not transfer the whole set to locate one.
 
@@ -195,12 +186,9 @@ wiped by hand - shows on the Facades tab as **not in the descriptor** until the
 list is saved again.
 
 **New address** replaces a facade's key and restarts it (`POST /new-address`).
-The panel takes the new address from that answer rather than
-asking the facade, which is restarting, writes the descriptor, and then links
-the deployment's gateways again (below), so the route to this facade names the
-new destination. Otherwise a gateway that reached this facade without I2P would
-keep a route to an address nobody serves, and its clients would quietly fall back
-to I2P. The button says what it costs: a client that knows only the old address
+The panel takes the new address from that answer, since the facade is
+restarting, writes the descriptor, and then links the deployment's gateways
+again (below), so the route to this facade names the new destination. The button says what it costs: a client that knows only the old address
 loses the server until it is given the new descriptor.
 
 ### Gateways and the server
@@ -224,18 +212,16 @@ from the gateway to server-core and to the facades directly
 it.
 
 The quota is set **on the service node**, which is the component that grants it and
-pushes it to server-core. Setting it directly on server-core, as an earlier
-revision of the panel did, is overwritten by the node's next push.
+pushes it to server-core. A quota set directly on server-core is overwritten by
+the node's next push.
 
 The panel serves its web files from `assets <dir>` (mandatory): the page shell,
 the sign-in page, the stylesheet, the script and the logo, read once at startup and
 served from memory. An operator changes the presentation by editing these files and
 restarting the panel.
 
-No manual I2P destination form is provided. A user's destination is delegated by
-their own client and published by the service node (`PUT /v1/messaging/i2p-dest`
-on server-core is that push and is retained); manual operator intervention has no
-place in that flow.
+A user's destination is delegated by their own client and published by the
+service node (`PUT /v1/messaging/i2p-dest` on server-core is that push).
 
 ## Configuration
 
@@ -304,8 +290,7 @@ the first key to sign there administers this panel
 The claim is first-come, checked and written under one lock, so two people
 opening the wizard at the same moment cannot both become the owner. The moment
 it succeeds `/setup` stops answering and redirects to `/login` permanently;
-there is no second wizard and no way back to it except editing the config file
-manually. **The window is open from the first start until that first
+the only way back to it is editing the config file manually. **The window is open from the first start until that first
 signature**, so a panel that will be reachable from outside should be claimed
 before it is published, or published only after it is claimed.
 

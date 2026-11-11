@@ -51,9 +51,8 @@ Every `content` envelope a group host sends carries one additive block:
   receives from the host already tells their client it is a group.
 - All five fields are required. A block missing one is rejected with the
   envelope, as any malformed envelope is.
-- `members` is a snapshot the host refreshes **once an hour**, not on every
-  join or leave: a live count would tell every member the moment somebody
-  joined.
+- `members` is a snapshot the host refreshes **once an hour**, so the count
+  does not tell members the moment somebody joined.
 - `write` and `admin` are computed for the recipient. `write` is true while the
   member is choosing a name, true for one who left or was excluded (writing is
   how they join again), true for every member of a `group` and for an admin of
@@ -61,9 +60,9 @@ Every `content` envelope a group host sends carries one additive block:
 - The client keeps the newest block per contact (by `at`). A message from that
   contact with no block and a `sentAt` newer than the kept `at` drops the group
   state: the account is no longer a group host.
-- The group's title is **not** in the block. A contact's name is the
-  recipient's own label, taken from the descriptor at add time
-  (`Messages.md`, *Avatars and display names*).
+- The group's name on the recipient's screen is the recipient's own label for
+  the contact, taken from the descriptor at add time (`Messages.md`, *Avatars
+  and display names*).
 
 ## Relayed posts
 
@@ -142,7 +141,7 @@ notice. A picture or a voice note that fits one envelope is relayed.
    checked the same way and asked for again until one is accepted. Only a post
    is an answer: a receipt or any other service message from the member gets
    no reply.
-4. In an **open** group the member is in, with no welcome message. In an
+4. In an **open** group the member is in. In an
    **approval** group every admin receives the applicant's name and descriptor
    with two inline buttons; the first admin to decide settles it, and the host
    edits the card for every admin to say who decided. Requests no admin has
@@ -226,8 +225,7 @@ names their name in the chat and carries two inline buttons: the `contactable`
 switch and **Change name** (`rename`). Pressing the switch redraws that message.
 The host relays neither the command nor the answer. A client offers `settings` in
 the group chat's header as **Account settings**, the way it offers a bot's menu
-(`Bots.md`). Typed text is never this command: `/settings` written in the chat is
-an ordinary post, since people may simply be talking about settings.
+(`Bots.md`).
 
 ## Descriptors inside text
 

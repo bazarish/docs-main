@@ -4,15 +4,11 @@ The **service node** owns user accounts. It exposes a **web portal** (the
 "Service site") through which a user registers and proves ownership of their key.
 The **messaging server (server-core)** stays a pure delivery layer: it never
 registers anyone. Proving the key is the whole registration, whether it is proven
-in the portal or by a client calling `POST /v1/account/registration`; there is no
-puzzle in front of it, because anything a person reads off a picture a solver
-reads too.
+in the portal or by a client calling `POST /v1/account/registration`.
 
-**This node sells nothing.** It maintains no balance, no ledger and no payment
-gateway, and offers no paid service. The only paid component of the project is the
-alias service, a separate deployment with its own portal and payment layer
-(`FederatedResolve.md`). What a messaging account receives - a storage quota and its
-own I2P destination - is included.
+A messaging account comes with a storage quota and its own I2P destination. The
+alias service is a separate deployment with its own portal and payment layer
+(`FederatedResolve.md`).
 
 ```
             +----------- browser -----------+         +---- Client (holds key) ----+
@@ -50,19 +46,18 @@ A client never sends its user to the portal. It publishes its card
 that key answers `ACCOUNT_UNKNOWN`, and the client registers itself
 (`POST /v1/account/registration`) and publishes the card again. On a moderated
 node the answer to that card says `approval: pending` and carries the operator's
-`registration.message`, and the client shows it while the account waits.
-Registration is never refused, so there is nothing to point a client to.
+`registration.message`, and the client shows it while the account waits. Every
+key that is not banned is registered.
 
-server-core points nowhere either: it serves only accounts whose card the node
-holds and answers `ACCOUNT_UNKNOWN` for any other key. A client that asks
+server-core serves only accounts whose card the node holds and answers `ACCOUNT_UNKNOWN` for any other key. A client that asks
 server-core for its destination before it has registered reads that answer as
 "no destination served here yet".
 
 The portal's links (`portal.links`) name where users open the portal in a
 browser; they are the place a sign-in challenge names when `portal.address` is
 not set (`SignInWithKey.md`). No client reads them.
-(The global `alias` namespace is a separate product sold by the central
-alias-resolver, not the service node, and is not specified here.)
+(The global `alias` namespace belongs to the central alias-resolver, whose own
+repository documents it.)
 
 ## 3. Account model
 
@@ -84,14 +79,13 @@ Per user (`subscriptions/<fp>.json` - the account record - and `grants/<fp>.json
   delegated, recorded so any of the user's devices knows when to issue the next
   one without holding the expiry itself.
 
-Closing an account tears it down rather than merely letting it lapse: the
-destination is revoked and the grants are dropped.
+Closing an account tears it down: the destination is revoked and the grants are dropped.
 
 ### The user's own I2P destination (key custody + lifecycle)
 
 Every account has its own serving destination - it is part of the base protocol,
-not a purchase, and there is no shared pool to fall back on (a shared address
-would make every user behind it provably co-located).
+and no two users share one (a shared address would make every user behind it
+provably co-located).
 
 The master I2P destination key stays on the **client** (the user's long-term
 routing identity, sealed at rest in the account beside the messaging keys). The
@@ -112,7 +106,7 @@ publishes its card first, delegates its transient, and immediately re-publishes 
 contact card (`POST /v1/account/card` again, which grants nothing and consumes no
 grant) with the routing folded in. On a moderated
 node the delegation is refused until an operator approves the account, so the
-client publishes its routing then instead.
+client publishes its routing once the account is approved.
 
 The transient is short: 14 days by default, 1 to 30 as the user sets it (the node
 refuses a longer one), kept the same on every device of the account by a
@@ -155,10 +149,8 @@ An operator chooses one of two modes (`registration.requireApproval`):
   account can neither send nor receive. The error carries the operator's
   `registration.message`, which states how to contact the operator to complete
   registration. Approval is performed by an operator from the admin panel. An
-  account not approved is swept by the same idle sweep as any other, `idleDeleteDays` (default 180) after it was registered - there is no shorter horizon of its own, so an
+  account not approved is swept by the same idle sweep as any other, `idleDeleteDays` (default 180) after it was registered, so an
   abandoned registration does not hold a fingerprint indefinitely.
-
-This mechanism is moderation, not a charge.
 
 | Endpoint | Purpose |
 |---|---|
@@ -170,7 +162,7 @@ This mechanism is moderation, not a charge.
 | `DELETE /v1/account/user?user=` | Operator-signed: delete the account (certificate, grants, destination) |
 | `POST /v1/account/ban` | Operator-signed: delete the account and refuse this key from now on (reason defaults to "Banned") |
 | `POST /v1/account/unban` | Operator-signed: lift a ban |
-| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed, and the whole of what an operator can change: registration mode and its message, `loginConsumer`, `portalLinks`, `facades`, `reseeds` (each an `https` URL and not a `.b32.i2p` address, or the write is refused; a config file naming a reseed that is not `https` is refused at start), `defaultQuotaBytes`, `idleDeleteDays`, `logLevel`, and the three addresses `listen`, `portalListen`, `messaging` - plus the account count and the sum of the quotas. Everything is written back into the node's config file, so a restart keeps it; `logLevel` and the portal's own words apply at once, the three addresses at the next start |
+| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed, and the whole of what an operator can change: registration mode and its message, `loginConsumer`, `portalLinks`, `facades`, `reseeds` (each an `https` URL, or the write is refused; a config file naming a reseed that is not `https` is refused at start), `defaultQuotaBytes`, `idleDeleteDays`, `logLevel`, and the three addresses `listen`, `portalListen`, `messaging` - plus the account count and the sum of the quotas. Everything is written back into the node's config file, so a restart keeps it; `logLevel` and the portal's own words apply at once, the three addresses at the next start |
 | `POST /v1/account/restart` | Operator-signed, on the operator socket: the node exits with the restart code (90) so that its supervisor starts it again |
 | `POST /v1/login/expect` | Operator-signed: `{challenge, token}` - the admin panel's challenge waits in the sign-in box under its nonce |
 | `POST /v1/login/claim` | Operator-signed: `{nonce, token}` -> `{state, challenge, blob}`, `state` being `waiting`, `signed` or `gone`; a signed entry is handed over once |
@@ -193,20 +185,19 @@ shown.
 
 Settings changed here are applied live and written back to the node's config
 file, so what an operator sets in the panel is what the node reads at its next
-start. A write that cannot be persisted is refused rather than applied.
+start. A write that cannot be persisted is refused and not applied.
 
 `q` is a case-insensitive substring of the fingerprint **or of the account's
 destination address**, and `state` is
 `all` / `pending` / `approved`; the answer carries the page (`users`) and the
-number of matches (`total`). The search belongs here rather than in the panel:
-the node is the only side that has the accounts, and sending them all to filter
-one would be both slow and a leak of the whole roster into a browser.
+number of matches (`total`). The search runs on the node, the only side that
+holds the accounts, so no more of the roster than the page asked for reaches a
+browser.
 
 ## 5. Web frontend (JS-free)
 
 The portal is **a single page** at `/`, server-rendered without JavaScript (forms,
-full-page reloads, post-redirect-get). It presents one action at a time; there is
-no account area, as the node offers nothing to purchase or manage:
+full-page reloads, post-redirect-get). It presents one action at a time:
 
 1. **the user's key** - the page renders a challenge; the user signs it in their client
    and pastes the blob back. `POST /login` verifies it and sets the session
@@ -217,14 +208,14 @@ no account area, as the node offers nothing to purchase or manage:
    it until the browser that showed the code asks for it at `GET /login/wait`.
    Only that browser can: it holds the `signin` cookie the page set. The wait
    needs scripts; without them the pasted form still works.
-There is no second step: the grant is issued as the key is proven, so the page
+The grant is issued as the key is proven, so the page
 that follows the sign-in already reports the account - its quota, what the
 messaging server holds for it, and the server descriptor to paste into a client -
 or, on a moderated node, the "waiting for the operator" notice with the
 operator's instructions. An account's owner can also end it from here.
 `POST /logout` drops the session.
 
-The portal's **web files are stored on disk**, not in the binary: `portal.assets
+The portal's **web files are stored on disk**: `portal.assets
 <dir>` (mandatory with `portal.listen`) holds one template per state of the
 flow, the text catalog `messages.json`, the stylesheet, the logo, the fonts and
 an optional `portal.js`. Every word on the page is in those files; the node only
@@ -245,7 +236,7 @@ fills in the values a template asks for by name:
 `error` and `message` carry a whole notice or nothing at all, because a
 placeholder in a file cannot remove its own box when there is nothing to say.
 A placeholder with no value is left in place, so a typo in a template appears
-verbatim rather than vanishing.
+verbatim.
 
 The script is progressive enhancement only: it adds a copy button to the blocks
 meant to be copied, and a browser without scripts loses nothing else. Each file is read once
@@ -270,17 +261,7 @@ in that directory, of a type the portal publishes, are served.
 | Client | `POST /v1/account/i2p-dest` | key | upload a signed offline transient (refused while the account is unapproved) |
 | Client | `GET /v1/account/i2p-status` | key | approval state and the recorded transient validity |
 
-## 7. What the service node does not do
-
-- **Names.** The global `alias` namespace belongs to the central
-  **alias-resolver**, whose own repository documents it. The service node neither
-  sells, stores nor resolves names, and it sells nothing at all: a destination
-  and a mailbox quota come with the account. There is no payment layer here, not
-  even an abstraction.
-- **Captcha.** A puzzle a person can read is a puzzle a solver can read, so there
-  is none; registration has the two modes above.
-
-## 8. Security notes
+## 7. Security notes
 
 - The key never enters the browser; login is a relayed one-shot signature, bound
   to this portal by the consumer and the tag (`SignInWithKey.md`).

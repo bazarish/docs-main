@@ -11,12 +11,11 @@ end-to-end content the server never sees.
 
 This is a direct consequence of the two-layer model:
 
-> The server, facades, federation relays and storage are **unchanged** and
-> never learn that a conversation involved a bot. Adding bots touched only the
+> The server, facades, federation relays and storage treat a bot as any other
+> identity and never learn that a conversation involved a bot. Bots live in the
 > client protocol and the content-type registry.
 
-There is deliberately **no** server-side bot registry, bot flag, or bot
-directory. A bot is reached exactly like any contact: by its invite link or by an
+A bot is reached exactly like any contact: by its invite link or by an
 alias, and its correspondents are limited like any others, 120 messages a minute
 on a pass. Its own contact card says `kind: "bot"` (`Identity.md`), a statement
 the bot makes about itself; a client shows a bot's keyboards under its messages
@@ -94,11 +93,9 @@ are control content, not user-visible lines.
 
 ### Editing in place
 
-Rather than reply with a new message, a bot can edit the keyboard message the
-button belongs to (an `edit`, `Messages.md`), keyed by the callback's `ref` -
-the behaviour in which a message changes in response to a button press. The same
-`edit` primitive lets ordinary users revise their own messages, so it is not a
-bot-only feature. A bot edits only messages it sent; a client enforces that on
+A bot can answer a press by editing the keyboard message the button belongs to
+(an `edit`, `Messages.md`), keyed by the callback's `ref`. The same `edit`
+primitive lets ordinary users revise their own messages. A bot edits only messages it sent; a client enforces that on
 receipt.
 
 ### `bot.menu` - the commands a bot offers
@@ -159,7 +156,7 @@ types (`bot.command`, `bot.callback`, `bot.menu`, `edit`).
 ## Forward compatibility
 
 `bot.command`, `bot.callback` and `bot.menu` are ordinary registry rows: a client
-that does not know them keeps, acks and surfaces them as "unsupported" rather
-than dropping them (`Messages.md`). The `keyboard` field degrades to a plain
-message, and a `menuId` is ignored by anyone that does not know it.
-Nothing here is a breaking change to the envelope, so `v` stays at 1.
+that does not know them keeps, acks and surfaces them as "unsupported"
+(`Messages.md`). The `keyboard` field degrades to a plain message, and a
+`menuId` is ignored by anyone that does not know it. All of them use the
+standard envelope with `v` 1.

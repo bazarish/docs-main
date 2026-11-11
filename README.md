@@ -71,16 +71,14 @@ algorithms.
 
 ## Implementation
 
-The protocol is implemented across all components, with unit tests passing and the
-core flows live-validated over real I2P: E2EE first contact, destination-routed
+The protocol is implemented across all components: E2EE first contact, destination-routed
 federation, the central alias resolver (claim -> resolve -> card fetch ->
 conversation), direct client-to-client file transfer, bots and interactive
 messages, message editing and read receipts, multiple accounts, at-rest
 encryption of all local state, and client-to-client audio calls (Opus over I2P
 RAW datagrams to b33 destinations, per-call AES-256-GCM, minimal-length media
 tunnels; the embedded `libi2pd_bazarish` carries the
-datagram-to-b33 routing in-process). There is no video - see `api/Calls.md` for
-why. The shipped client is built with the production resolver's coordinate
+datagram-to-b33 routing in-process). The shipped client is built with the production resolver's coordinate
 (`defaultResolverCoordinate`), and the desktop client reads invite and
 device-pairing QR codes from a camera.
 

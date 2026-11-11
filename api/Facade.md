@@ -1,14 +1,12 @@
 # Facade Contract
 
-The facade is the "last mile" between the client and the server infrastructure. It is deliberately a thin, replaceable layer: the client side is HTTP over the facade's own I2P destination, while the backend side speaks the standard internal API. Any transport that can carry the request/response exchange to the backend API would satisfy the same contract.
+The facade is the "last mile" between the client and the server infrastructure. It is deliberately a thin, replaceable layer: the client side is HTTP over the facade's own I2P destination, while the backend side speaks the standard internal API. Any transport that can carry the request/response exchange to the backend API satisfies the same contract.
 
 ## HTTP facade
 
 - **The facade's own I2P destination is the way in, and the only one.** A
   facade publishes its API on exactly one encrypted-LeaseSet destination, whose
-  key it keeps in `state`; there is no switch that turns it off and no count of
-  them, because a facade without it serves nobody and a client would not dial
-  it (below). Several addresses for one server are several facades. The
+  key it keeps in `state`. Several addresses for one server are several facades. The
   address is stable across restarts because it travels in the server
   descriptor. It carries 16 tunnels unless `i2p.tunnelQuantity` says
   otherwise. The I2P front parses no HTTP: an accepted stream is relayed to the
@@ -19,10 +17,9 @@ The facade is the "last mile" between the client and the server infrastructure. 
   records when the destination's leaseset has published ("i2p facade ready"),
   because until then a dial fails for reasons that have nothing to do with the
   facade.
-- **A facade is an I2P address, and the API is spoken over nothing else.** A
-  clearnet facade is not tried at all, so there is no first connection in the
-  clear either - which is when a client would otherwise show its address to the
-  server it is about to register with. Where a stand on a LAN has no I2P at all,
+- **A facade is an I2P address, and the API is spoken over nothing else.** Every
+  connection to a facade, the first included, goes over I2P, so a client never
+  shows its address to the server it is about to register with. Where a stand on a LAN has no I2P at all,
   the client is started with `--allow-facade-without-i2p-for-dev-purposes` and
   the node's configuration key of the same name; both state their consequences, and
   both are disabled by default.
@@ -36,10 +33,10 @@ The facade is the "last mile" between the client and the server infrastructure. 
   router reads it with no special case anywhere. It is not a facade and speaks no
   Bazarish API: the client's I2P engine appends that name, fetches the archive,
   unpacks it and loads the routers, each of which carries its own signature. The
-  archive's own signature is not required - a reseed an operator runs privately
-  is signed by nobody a stock client trusts, so requiring it would mean no
-  private reseeds - which is why the address must be **https**: the transport is
-  what stands between the archive and the network. The router refuses a reseed
+  archive's own signature is not required, since a reseed an operator runs
+  privately is signed by nobody a stock client trusts; the address must be
+  **https** because the transport is what stands between the archive and the
+  network. The router refuses a reseed
   entry of any other form.
 - **A server may pack its own**, and its **portal** publishes it at
   `i2pseeds.su3` - never a facade. A facade is an I2P address and this is the one
@@ -65,7 +62,7 @@ The facade is the "last mile" between the client and the server infrastructure. 
   daily, so the address is learned only from someone who holds it. It reaches a
   client solely inside the server descriptor (below); it is never advertised,
   never derived from the server fingerprint, and never sent anywhere else. The
-  facade answers at `/`, with no path prefix of its own.
+  facade answers at `/`.
 - **The facade knows its own address and says it.** It prints the address at
   start and reports it in `GET /settings` on its ops socket. The admin panel reads
   it from there and writes the facades' addresses into the server descriptor
@@ -90,15 +87,15 @@ The facade is the "last mile" between the client and the server infrastructure. 
     address, so it is where the portal and the admin panel name their callback;
     the service node keeps the challenges they wait on. The nonce is 32
     lowercase hex characters; any other shape is a 404.
-  - anything else -> 404 (never forwarded). The reseed archive is not among
-    them: the messaging server passes it to the portal over its private channel
+  - anything else -> 404 (never forwarded). The reseed archive is served by the
+    portal: the messaging server passes it to the portal over its private channel
     (`/internal/i2pseeds.su3`) and the portal serves it publicly
-    (`ClientApi.md`); the facade has no path for it.
+    (`ClientApi.md`).
 - **The path says which backend a frame is for, and nothing more.** A frame on
   `/n` is an account call and a frame on `/t` is anything else; which account
   call, and whose, stays sealed. Neither backend forwards to the other: each opens
   only its own tunnel (`Architecture.md`).
-- Everything else answers the same bare **404** - an unknown path and the operator liveness endpoint alike. `/healthz` is not on the client-facing socket at all: it is served on a separate private **ops listener** (`opsListen`) that is never published to clients (`AdminPanel.md`).
+- Everything else answers the same bare **404** - an unknown path and the operator liveness endpoint alike. `/healthz` is served on a separate private **ops listener** (`opsListen`) that is never published to clients (`AdminPanel.md`).
 - The ops listener also carries the facade's **own configuration**, operator-signed
   like `/healthz`: `GET /settings` and `PUT /settings` (the two backends, the three
   sockets, the I2P side, the log level; `GET` adds the facade's address),
@@ -120,17 +117,16 @@ The facade is the "last mile" between the client and the server infrastructure. 
   (`bazarish-server/gateway/PROTOCOL.md`). Left out, the destination is the only way
   in. It changes nothing a client can observe: the paths, the sealed tunnel and
   the uniform 404 are the same on both.
-- Nothing streams through the facade: the only large payload there ever was - a file upload - now goes directly between clients (see `FileTransfer.md`).
-- Holds no key of the server or of its users (only its own I2P destination and a self-signed TLS credential), parses no content (there is nothing left to parse: authentication happens inside the seal, at the backend), stores nothing. An unreachable backend yields an `UPSTREAM_UNAVAILABLE` 502 - the facade is only a relay.
-- Implemented in `facade-http/` of the `bazarish-server` repository (`Facade`; covered by tests and live-verified relaying to a running server-core).
+- Nothing streams through the facade: files go directly between clients (see `FileTransfer.md`).
+- Holds no key of the server or of its users (only its own I2P destination and a self-signed TLS credential), parses no content (authentication happens inside the seal, at the backend), stores nothing. An unreachable backend yields an `UPSTREAM_UNAVAILABLE` 502 - the facade is only a relay.
+- Implemented in `facade-http/` of the `bazarish-server` repository (`Facade`).
 
-### What the facade still knows
+### What the facade knows
 
-Sealing the traffic removes the **global identifiers** - the caller's public
+Sealing the traffic hides the **global identifiers** - the caller's public
 keys (which are their identity), their destination, their device ids, the passes
 that admit mail to their mailbox, the private transient that operates their
-address. It does not remove the **flow**, and the difference has to be stated
-rather than glossed over:
+address. It does not hide the **flow**:
 
 - a client dials from one stable outbound destination per account, which also
   holds the long poll, so every request of one device is trivially linkable to
@@ -140,9 +136,7 @@ rather than glossed over:
 - how large it was, to the nearest step of the padding ladder;
 - which backend it is for: an account call is told from the rest.
 
-"A facade knows the flow but not whose it is, nor what is in it" is what this
-design achieves. "A facade knows nothing" would be untrue, and nothing here
-should be read as claiming it.
+A facade knows the flow but not whose it is, nor what is in it.
 
 ## Client addressing
 
@@ -170,25 +164,18 @@ machine for nothing.
 
 Over I2P a client dials its facade from **one destination per account**, shared
 by everything that account sends: a destination carries many streams at once,
-and every dial takes its own stream with its own receive queue. A second
-destination would require a second set of tunnels and a second leaseset for the
-same user, producing additional metadata to no benefit.
+and every dial takes its own stream with its own receive queue.
 
 The connection is **kept between requests** (`Connection: keep-alive`; the
 facade relays bytes and the backend's HTTP engine holds the connection open).
-Measured against the stand, a request that opened its own stream took 1185 ms at
-the median (n=149, quartiles 1067-1476); reusing the connection takes 506 ms
-(n=39, quartiles 306-580). The dial itself measures 0 ms - I2P streaming carries
-the first payload in the packet that opens the stream - so what a fresh stream
-costs is its garlic session, the identity and signature in that first packet and
-a fresh socket at the facade, not a round trip. A client that finds its kept
+A client that finds its kept
 connection already closed redials and repeats the request once; request bodies
 are replayable for exactly this reason.
 
 ### Facade locality (invariant)
 
 A facade address belongs to **exactly one** server and is known **only** to that
-server's own clients. This is a hard invariant, not a convention:
+server's own clients. This is a hard invariant:
 
 - A client only ever connects to **its own** server's facade. It never reaches
   another server's facade, and it does not store, learn, or carry a foreign
@@ -215,9 +202,9 @@ Consequences for first contact (`Contacts.md`, `Federation.md`):
 - **By `<alias>`** - resolved at the **central resolver** over its I2P endpoint
   (`FederatedResolve.md`); again the client's own direct dial, never through its
   server and never through the foreign facade.
-- **By bare fingerprint** - a fingerprint is an identity, not a route, so it is
-  always paired with a destination (the descriptor above). Cross-server first
-  contact uses a descriptor or `<alias>`.
+
+Cross-server first contact uses a descriptor or `<alias>`: a fingerprint is
+always paired with a destination (the descriptor above).
 
 ### Multiple facades and failover
 
@@ -283,8 +270,7 @@ intermediaries are trusted for availability only (`Identity.md` /
   user's requests from another's. Its I2P front relays at most 256 streams at
   once and closes any further stream unanswered.
 - **Held requests.** Incoming mail is one held-open request (`ClientApi.md`),
-  which the server holds for at most 30 seconds, and there is no second mechanism
-  behind it. The facade waits 60 seconds for its backend and keeps a client's
-  connection for 90, so it never cuts a parked request short. A facade that
-  closes a client's parked request is not slow, it is broken: the client has no
-  other way to hear that mail arrived.
+  which the server holds for at most 30 seconds. The facade waits 60 seconds for its backend and keeps a client's
+  connection for 90, so it never cuts a parked request short. A facade must
+  not close a client's parked request: it is the client's only way to hear that
+  mail arrived.

@@ -3,8 +3,7 @@
 A file is **announced**, not uploaded. The message carries the file's name, size
 and digest; the bytes stay on the sender's disk until the recipient asks for
 them, at which point the sender creates a one-time I2P destination and serves that
-one file over it. There is no storage service: nothing is ever stored on a third
-party's disk.
+one file over it. Nothing is ever stored on a third party's disk.
 
 ```
  sender                                                     recipient
@@ -30,7 +29,7 @@ The digest is over the **plaintext**, so the recipient checks that what it final
 holds is what was announced, independently of how many transfer attempts it took
 and of the per-transfer encryption below. It hashes while decrypting and removes
 the result when the digests differ: a file changed at the sender's path after it
-was announced is refused, not delivered as something else.
+was announced is refused.
 
 ## Files and pictures
 
@@ -59,7 +58,7 @@ the sender serves it over a separate destination: several transfers proceed
 concurrently,
 each with its own address, its own progress and its own cancel. On the sending
 side only the device that announced the file (and still holds the bytes) answers
-at all; the others stay silent rather than reporting it unavailable.
+at all; the others stay silent.
 
 `file.unavailable` is returned when the file is no longer at the path it was
 announced from, or when the sender could not serve it. A request for a file the
@@ -75,17 +74,14 @@ stopped waiting.
 A transfer is stopped from **either** side, and stopping it ends **both** halves:
 the side that stops sends `file.cancel`, and the other side ends its half of the
 same transfer on receipt. A transfer costs both of them a destination and a set of
-tunnels, so a stop that ended only the half on which it was issued would leave
-the other half serving no one until its window expired - which is up to half an
-hour of tunnels for a file no one is receiving.
+tunnels, and a stop frees both.
 
 `ask` names the transfer, in both directions, because that is what identifies the
 half: one contact may be pulling the same file onto two devices at once, each over
 its own one-time address and with its own ask. A stop that names one of them
 leaves the other transfer running.
 
-A stop is reported as an ended transfer with its reason, not as a failure of the
-transport, and the side that issued it and the side that was notified are
+A stop is reported as an ended transfer with its reason, and the side that issued it and the side that was notified are
 distinguished: neither is left with a progress bar that continues to move.
 
 ## The one-time destination
@@ -100,15 +96,14 @@ sealed offer.
 
 ## Wire protocol
 
-Deliberately minimal - no HTTP:
+Over the stream:
 
 ```
 fetcher -> server:  offset   (8 bytes, big-endian)
 server  -> fetcher: total    (8 bytes, big-endian), then every byte from offset on
 ```
 
-A dropped stream is not a special case: the fetcher reconnects and sends the next
-offset. The driver stops after a bounded number of attempts that transfer no
+After a dropped stream the fetcher reconnects and sends the next offset. The driver stops after a bounded number of attempts that transfer no
 bytes, so a sender that stops responding does not block the transfer
 indefinitely.
 
@@ -116,8 +111,8 @@ indefinitely.
 
 The sender encrypts the file to a temp ciphertext with a fresh per-transfer key
 (CMS password-based envelope, RFC 3211 PWRI, AES-256-CBC - standard primitives
-only). Encrypting in advance, rather than on the fly, is what makes arbitrary byte
-ranges servable and gives the digest before the first byte is sent.
+only). Encrypting in advance makes arbitrary byte ranges servable and gives the
+digest before the first byte is sent.
 
 The envelope's encrypted content is detached (RFC 5652 lets `encryptedContent`
 be absent): what is served is the bare ciphertext, and the envelope itself - a
@@ -135,8 +130,7 @@ a file substantially larger than available memory transfers without difficulty.
 ## Availability constraint
 
 A file is available only while the sender is online **and** the file remains at
-the path from which it was announced. This is the consequence of operating no
-storage service, and a client must report it rather than imply delivery:
+the path from which it was announced. A client reports the transfer state:
 
 - `eRequested` - asked; waiting for the sender, for at most five minutes from the request's `sentAt`
 - `eRunning` - bytes being transferred (progress is over the ciphertext stream)

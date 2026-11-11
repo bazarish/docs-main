@@ -2,8 +2,8 @@
 
 ## Types
 
-A message declares its type, and the type determines the recipient's handling of
-it; neither the file name nor a sender-supplied MIME value has that role:
+A message declares its type, and the type alone determines the recipient's
+handling of it:
 
 | `type` | What it carries | What the recipient does |
 |---|---|---|
@@ -13,17 +13,14 @@ it; neither the file name nor a sender-supplied MIME value has that role:
 | `audio` | Opus audio, bytes in the envelope | keeps it in the account, plays it on a press |
 | `contact.request`, `reaction`, `receipt`, `call.*`, `device.*` | as their names say | as documented elsewhere |
 
-`image` carries the picture **inside the message**: there is no announcement and
-nothing to request, so it arrives once, with the message, and it arrives even if
-the sender goes offline the moment after sending - the mailbox holds it like any
+`image` carries the picture **inside the message**: it arrives once, with the
+message, and it arrives even if the sender goes offline the moment after sending - the mailbox holds it like any
 other message. The sender shrinks it first (long edge 1600, re-encoded, at most
 `kMaxMediaBytes`, *Size*) so that it and the envelope around it stay inside the
 512 KiB message limit.
 
 Before it is rendered it must decode as an image; a rejection by the decoder is
-final. Such a message is reported as broken. It is not reclassified as a file:
-that would be a fallback, the client reinterpreting what it received. The bytes
-are held in the account database, encrypted with the remainder of its contents,
+final. Such a message is reported as broken. The bytes are held in the account database, encrypted with the remainder of its contents,
 and are exported by an explicit save action.
 
 A `file` of at most `kMaxMediaBytes` travels like a picture, its bytes in `data`
@@ -36,29 +33,23 @@ progress bar belongs to the transfer that follows it, not to the announcement.
 
 ## Encoding
 
-The body inside the seal is **CBOR**, not JSON text: the same document with the
-same field names, but binary values travel as themselves. That is what lets a
-picture or a voice message travel inside the message rather than being announced
-and fetched. Base64 would add a third to every such payload (measured at 1.333x),
-and compression yields nothing, both JPEG/PNG and Opus being already
-entropy-coded (gzip on a JPEG: 0.986x; on a PNG: 1.000x).
+The body inside the seal is **CBOR**: binary values travel as themselves, which
+lets a picture or a voice message travel inside the message.
 
 That body is always a **CBOR array** of layer-2 messages, oldest first, and one
 envelope carries the whole array. A client writing to a contact sends an array of
 one. A group host packs consecutive posts into one array, as many as fit the
 512 KiB envelope (`Groups.md`), so a newcomer's history or a returning member's
-backlog arrives in a few deliveries instead of one per post. There is no second
-form: a reader takes every body as an array. The array is padded and sealed once;
+backlog arrives in a few deliveries. A reader takes every body as an array. The
+array is padded and sealed once;
 every message in it keeps its own `auth`, and a receiver checks each on its own.
 A message that fails the checks is dropped alone and the rest are kept. The
 mailbox entry is acknowledged once, after the last message in the array is kept,
 so an envelope is never let go with part of it unkept, and a redelivery is
 recognised message by message through each `id`.
 
-A voice message is Opus in the call format - 48 kHz mono, 20 ms frames, each
-length-prefixed - and nothing further. No container is used: both ends implement
-this protocol, so an Ogg header would carry only parameters already fixed by the
-specification.
+A voice message is a bare sequence of Opus frames in the call format - 48 kHz
+mono, 20 ms frames, each length-prefixed.
 
 ## Size
 
@@ -105,8 +96,8 @@ The resulting invariant:
 > registry below**. The server, the storage backend and the federation relay
 > require **no change** and never learn what kind of content they carried.
 
-A picture is not a server concept. It is a `content` delivery whose encrypted
-payload happens to have `type: "image"`. The server stores and relays the
+To the server a picture is a `content` delivery whose encrypted payload has
+`type: "image"`. The server stores and relays the
 identical opaque envelope it would for a text line or a call invite.
 
 ## Layer 1 - delivery class (server-visible)
@@ -121,10 +112,9 @@ never appear here:
 |---|---|---|
 | `contact` | nothing | Bootstrap. Size-capped (`kMaxContactRequestBytes`), rate-limited per serving destination. The only path into a mailbox that presents nothing. |
 | `content` | the recipient's delivery pass (required) | Looked up, not consumed (see `Contacts.md`). The path for every established-contact message, whatever its content type. |
-| `device` | an authenticated request from one of the account's registered devices | An account writing to its own other devices, through `POST /v1/messaging/self` rather than through federation. Outside the budget a stranger's request is counted against, and stored only when the account has more than one device. |
+| `device` | an authenticated request from one of the account's registered devices | An account writing to its own other devices, through `POST /v1/messaging/self`. Outside the budget a stranger's request is counted against, and stored only when the account has more than one device. |
 
-There is no separate quota for any of them: a mailbox has one, and every class is
-stored against it.
+A mailbox has one quota, and every class is stored against it.
 
 The server branches on `class` and nothing else: it validates the mailbox,
 deduplicates by `deliveryId` (below), enforces the pass (for
@@ -234,15 +224,12 @@ new serving sealing key with it. Whenever the pair a card carries changes, the
 account sends every contact one
 `contact.routing` message carrying `{dest, servingKey}`, and a receiver whose
 stored pair differs adopts the new one and persists it. It is carried by that
-message alone - an ordinary letter carries no `routing`, because the pair changes
-rarely and adding 227 bytes to every reaction and read receipt to announce it
-was not justified. The sender's queue keeps retrying a contact it could not reach,
+message alone. The sender's queue keeps retrying a contact it could not reach,
 so the update is not lost to one offline device.
 
-The resulting rule is: **after changing an address, tell everyone.** No other
-mechanism restores a pair whose stored routing is stale, because the only path to
-a contact is the destination currently held for them, and a request for a new
-address would be sent to the address that is no longer served. Sending outward
+The resulting rule is: **after changing an address, tell everyone.** This message
+is the only mechanism that restores a pair whose stored routing is stale: the only
+path to a contact is the destination currently held for them. Sending outward
 does not depend on one's own destination, so a moved account can always reach its
 contacts; what it must not do is lose the obligation, which is why the fan-out is
 a queue in the profile database that survives a restart and is cleared one
@@ -257,11 +244,9 @@ manually. The two kinds of entry report differently, because the remedy differs:
 
 - a **contact** that could not be reached leaves a notice in that contact's own
   chat, saying the new details did not arrive, with a **Try again** beside it.
-  One notice per contact, not one global warning, and it is removed when the
-  update is delivered;
+  One notice per contact, removed when the update is delivered;
 - the **alias registry** is asked again every 10 seconds, silently, until it
-  takes the new descriptor. It is one global service whose permanent absence is
-  out of scope, and the person has nothing to decide about it.
+  takes the new descriptor.
 
 A client with no chat window (the daemon) lists the pending entries on its own
 face, with the same retry.
@@ -276,10 +261,10 @@ face, with the same retry.
 | `contact.request` | contact | Carries a `bootstrap` block (`kind`, `sealing` - the same account sealing key the card publishes -, `dest`, `servingKey`, `cardKey`, `pass`, and for a `user` `presenceKey` and `presenceDest`) plus `text`. The first message; see `Contacts.md`. |
 | `contact.accept` | content | Agreeing to a received `contact.request`: an empty-bodied message whose first-reply `bootstrap` delivers our descriptor + our pass to the requester, making the pair mutual contacts. The requester's client completes adding the contact automatically and surfaces a note. See `Contacts.md`. |
 | `file` | content | `name`, `size`, `sha256` and `mime`, plus `data` - the bytes - when the file is at most `kMaxMediaBytes`. Without `data` it is an announcement: the bytes stay on the sender's disk until the recipient asks for them. See `api/FileTransfer.md`. |
-| `image` | content | A picture, carried inline: the bytes travel in the envelope rather than being fetched. Its body block is named `image`. |
-| `audio` | content | A voice note, carried inline like `image`. Its body block is named `audio` and holds `durationMs`, `size` and the Opus bytes in `data`; no waveform is sent - the receiver draws it from the audio. |
+| `image` | content | A picture, carried inline: the bytes travel in the envelope. Its body block is named `image`. |
+| `audio` | content | A voice note, carried inline like `image`. Its body block is named `audio` and holds `durationMs`, `size` and the Opus bytes in `data`; the receiver draws the waveform from the audio. |
 | `receipt` | content | `ref` (the read message's `id`). A **read** receipt - the recipient's client sends it only on a genuine read (the chat is open, the app window focused, and the message scrolled into the visible area), confirming the "green" delivery state below. `ref` is the newest read incoming id, so it acknowledges that message and every earlier one **the sender got as far as the recipient's server** (a read high-water); one that never arrived is not carried up by it. While a device is taking in the backlog it found on coming online, it sends no receipt and no `device.read`; once the backlog is in, it sends at most one receipt per conversation, and only for a read newer than what the account's other devices reported (`device.read`), since those devices have answered for theirs. Optional/toggleable. **Never sent about a contact request**: reading a request is not answering it, and a requester who learns that a stranger's client is running and has opened their message has been told something they never agreed to be told. Until the request is accepted, the requester's own plate stops at *delivered*. |
-| `reaction` | content | A reaction to a message: `ref` (the target message's `id`), `text` (**at most 4 characters and 20 bytes** - enough for an emoji with a modifier or a joined pair; **empty removes** the reactor's reaction). Both limits are checked when sending and again on receipt: a peer's client is not the receiver's to trust, and an oversized one is dropped rather than rendered on someone's message. One reaction per user per message - a new one overwrites the old at every recipient. A single sealed delivery to the peer. Never a chat bubble - clients render it as a chip on the target message. See *Reactions*. |
+| `reaction` | content | A reaction to a message: `ref` (the target message's `id`), `text` (**at most 4 characters and 20 bytes** - enough for an emoji with a modifier or a joined pair; **empty removes** the reactor's reaction). Both limits are checked when sending and again on receipt, where an oversized one is dropped. One reaction per user per message - a new one overwrites the old at every recipient. A single sealed delivery to the peer. Clients render it as a chip on the target message. See *Reactions*. |
 | `bot.command` | content | A command invocation aimed at a bot: `command` (name, no leading slash), `args` (raw argument string). See *Bots & interactive messages*. |
 | `bot.callback` | content | An inline-keyboard button press: `data` (the button's payload), `ref` (the `id` of the keyboard message). See *Bots & interactive messages*. |
 | `bot.menu` | content | The commands a bot offers a contact: `menuId` (a random unsigned 32-bit integer) and `items` of `{ title, command }`. A client names the menu it holds in the `menuId` of what it sends back. A silent service message. See `Bots.md`. |
@@ -341,7 +326,7 @@ No server, facade, federation or storage change accompanies a new row.
 
 ### Bots & interactive messages
 
-A bot is not a server concept either: it is an **ordinary identity** that
+A bot is an **ordinary identity** that
 registers on a server like any client, accepts contacts and exchanges the same
 `content`/`contact` envelopes. "Botness" lives entirely in Layer 2 - four
 client-only pieces, all forward-compatible:
@@ -377,8 +362,8 @@ conversation, and every message a client answers it with names the menu it
 holds.
 
 Because all four are `content`-class deliveries, the server, facades,
-federation and storage are unchanged and never learn that a conversation
-involved a bot. The full model is in `Bots.md`.
+federation and storage handle them like any other and never learn that a
+conversation involved a bot. The full model is in `Bots.md`.
 
 ### Editing and deleting messages
 
@@ -393,8 +378,7 @@ recipient finds the message whose `id` equals `ref` and replaces its `text` and
   `edit` so the peer updates theirs.
 
 A `delete` is the sibling primitive: the recipient removes the message whose `id`
-equals `ref` outright, leaving **no tombstone** (a true delete-for-everyone, not
-an empty edit). The client always removes its own copy; for a one-to-one message
+equals `ref` outright, leaving **no tombstone** (a true delete-for-everyone). The client always removes its own copy; for a one-to-one message
 it sends the `delete` so the peer removes theirs too.
 
 A client applies an `edit` or a `delete` **only** to a message sent by the `from`
@@ -460,7 +444,7 @@ label:
 - From an **alias**, the alias the user typed becomes the name.
 
 Thereafter the name is **static**: it is never re-fetched and never transmitted to
-the peer - there is no "my name changed" message. The user may rename a contact
+the peer. The user may rename a contact
 at any time, but that rename is **local only**, mirrored to the user's *own* other
 devices via a `device.contact-name` self-message (`DeviceSync.md`) and to no one
 else.
@@ -491,7 +475,7 @@ and says this version does not support it, keeping the message body so that a
 later client version can render it. `v` gates breaking changes to the envelope shape
 itself; unknown `type` within a known `v` is a soft, recoverable condition.
 
-Namespacing is dotted (`call.invite`, not `call-invite`) so related signals
+Namespacing is dotted (`call.invite`) so related signals
 group and a client can pattern-match a family (`call.*`) it partially supports.
 
 ### Ordering and timestamps
@@ -505,10 +489,7 @@ A recipient orders a conversation by `sentAt`, with one bound: a message from th
 other side never goes above a message the recipient had already written in that
 conversation when it arrived. The order key of such a message is the later of its
 `sentAt` and one millisecond after the recipient's newest own message, while the
-time it shows stays its `sentAt`. Apart from that bound there is nothing from a
-server to order by: a mailbox is told the delivery class and the size of an
-envelope and never its contents, so no server is in a position to say when a
-message was written - and none is asked. The local arrival clock stands in only
+time it shows stays its `sentAt`. The local arrival clock stands in only
 for an envelope that carries no `sentAt` at all.
 
 Two things disturb the order before the reader sees it, and each is repaired
@@ -519,8 +500,7 @@ where it happens:
   recipient's mailbox seconds apart and in either order. The recipient repairs
   this by sorting on `sentAt`.
 - **In the mailbox.** A mailbox returns its waiting items in the order it received
-  them (`api/ClientApi.md`), so a burst is fetched in the order it arrived rather
-  than in whatever order the server's storage happens to enumerate.
+  them (`api/ClientApi.md`), so a burst is fetched in the order it arrived.
 
 Concretely each message gets a stable **order key**: its `sentAt`, raised to the
 bound above when it came from the other side. The conversation is kept sorted by
@@ -533,11 +513,10 @@ late arrival is unread whatever its timestamp says.
 
 The bound exists because two clocks are compared. A reply written a second after
 a question, by a clock a second and a half behind the asker's, would otherwise
-land above the question it answers. The other costs of ordering by a clock the recipient does not
-control remain: a correspondent whose clock is wrong (or who lies about it)
-places their own messages wrongly among themselves, and nothing but their own
-signature backs the time. This is accepted deliberately - the alternative is to
-let the party that is meant to know nothing about a message decide where it goes.
+land above the question it answers. Ordering by the sender's clock has one more
+consequence: a correspondent whose clock is wrong (or who lies about it) places
+their own messages wrongly among themselves, and nothing but their own signature
+backs the time.
 
 ## Delivery status
 
@@ -564,8 +543,8 @@ every earlier message it sent that peer **which reached the recipient's server**
 A message that never reached it retains its state: a later message being read is
 not evidence about an earlier one that was never delivered.
 
-No server carries a send, so the number of attempts and the interval between them
-are determined by the sending client. The protocol fixes the following:
+The sending client delivers each message itself and determines the number of
+attempts and the interval between them. The protocol fixes the following:
 
 - A refusal of the pass or of the size is final; repeating the delivery does not
   change the outcome. A full mailbox or a rate limit is transient: the same
@@ -584,14 +563,13 @@ are determined by the sending client. The protocol fixes the following:
 
 A file of at most `kMaxMediaBytes` (*Size*) is **carried**: the `file` message
 holds `{name, size, sha256, mime, data}`, the bytes travel and are kept like a
-picture's, and nothing is requested or served - there is no destination to
-publish for a ten-kilobyte document. The receiver checks `size` and `sha256`
+picture's, and nothing is requested or served. The receiver checks `size` and `sha256`
 against `data`; a message where they differ is refused. A carried file is
 echoed to the sender's other devices with its bytes and may be kept in Saved
 messages.
 
-A larger file is never put in the mailbox envelope, and it is not held on a
-storage service either - there is none. The message **announces** it and the
+A larger file never enters a mailbox envelope or any storage. The message
+**announces** it and the
 bytes stay with the sender until the recipient asks for them, at which point the
 sender serves that one file over a one-time I2P destination (full design in
 `api/FileTransfer.md`):
@@ -601,13 +579,12 @@ sender serves that one file over a one-time I2P destination (full design in
 2. When the recipient wants it, its client sends a silent `file.request`; the
    sender answers `file.offer` with a one-time destination and the key it
    encrypted a temporary ciphertext with (CMS password-based envelope, AES-256 -
-   standard primitives only, no custom construction).
+   standard primitives only).
 3. The recipient connects to that destination, streams the ciphertext with
    `offset`-based resume, verifies the announced digest and decrypts. Each
    attempt dials from a **fresh** destination, so a resumed transfer is
    unlinkable to the one it continues.
-4. `file.unavailable` is returned when the sender no longer holds the
-   file.
+4. `file.unavailable` is returned when the sender does not hold the file.
 
 For a picture or a voice note the path is fixed: always inline. For a file the
 sender chooses by size alone, once, when it sends: carried up to
@@ -615,16 +592,15 @@ sender chooses by size alone, once, when it sends: carried up to
 client before sending (*Size*), and the server's `MESSAGE_TOO_LARGE` is a final
 refusal.
 
-Why announce rather than store: the messaging server never carries a file's
-bytes, so a **quota-constrained recipient can receive arbitrarily large
-content**, and no third party holds the ciphertext at any point. The constraint
-that follows: a file is available only while the sender is online and still holds
-it, which `TransferState` reports rather than implying delivery.
+The messaging server never carries a file's bytes, so a **quota-constrained
+recipient can receive arbitrarily large content**, and no third party holds the
+ciphertext at any point. The constraint that follows: a file is available only
+while the sender is online and still holds it, which `TransferState` reports.
 
 ## Calls
 
 Call signaling (`api/Calls.md`) is exactly Layer 2 content: `call.invite`,
 `call.accept`, `call.decline`, `call.end` are `content`-class deliveries the
 server relays as ordinary opaque envelopes. Media itself flows peer-to-peer
-over a one-time hidden-network tunnel and never touches a server. A call is not
-a server feature; it is a family of content types.
+over a one-time hidden-network tunnel and never touches a server. A call is a
+family of content types.

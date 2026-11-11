@@ -35,8 +35,7 @@ in the contact card as `presenceDest` and `presenceKey`.
   its devices do not watch each other.
 - **A change of the list** - a contact added, removed or blocked, or the order
   crossing the 100th place - re-creates the destination after the list has been
-  still for `readersSettle`. The lease set is read at creation only, so there is
-  no other way to change it.
+  still for `readersSettle`. The lease set is read at creation only.
 - **It is up** on every device of the account that is in focus, each with its
   own tunnels, plus the tail.
 - **The switch** "Show online status" keeps it down when off, and the device then
@@ -52,8 +51,8 @@ given the secret when it is taken, so a device that gains focus watches at once.
 
 ## Several devices
 
-A device that gains focus raises the presence destination at once; nothing is
-asked of the account's other devices first. A device holding it is a **holder**.
+A device that gains focus raises the presence destination at once. A device
+holding it is a **holder**.
 
 1. A holder answers for itself alone: "online" while it is in focus and for the
    tail after, and "typing" to the contacts it is typing to.
@@ -132,10 +131,8 @@ who is watching, now or after a quantum computer exists:
 The signature is Ed25519 alone, the one exception to the rule that an identity
 signs with both halves (`Identity.md`). It is checked once, when the watch
 arrives, and a watch older than 120 seconds is dropped, so forging one later
-gains nothing: a post-quantum signature would guard against a forger who breaks
-Ed25519 within those seconds, and costs 3309 bytes on every watch. The seal stays
-hybrid, because what it hides - who watches whom - is worth recording now and
-reading later. Neither key ever leaves the device, so a gateway that holds the
+gains nothing. The seal is hybrid, because what it hides - who watches whom - is
+worth recording now and reading later. Neither key ever leaves the device, so a gateway that holds the
 presence secret can neither read a watch nor forge one.
 
 The holder drops a watch whose type or `sub` does not match, whose `from` is
@@ -158,9 +155,8 @@ and a state 64.
 ### Typing
 
 Composing in a conversation marks typing to that contact for `typingPulse`. A
-contact sees typing only while it also sees online. Typing ends at once, not at
-the end of the pulse, when the message is sent, the field is emptied or it
-loses focus: the holder sends the new state on its next tick.
+contact sees typing only while it also sees online. Typing ends at once when
+the message is sent, the field is emptied or it loses focus: the holder sends the new state on its next tick.
 
 ### Timings
 
@@ -184,7 +180,7 @@ hands over the least that works:
   gets an offline transient that ends with the UTC day. Before it ends the
   gateway asks for the next one and the client sends a delegation to the end of
   the following day; with none, the gateway takes the address down a minute
-  before the end. The client keeps no clock for it. An operator can keep the
+  before the end. An operator can keep the
   address silent while a delegation runs, and cannot raise it after.
 - **The reader list,** which names the presence keys of up to 100 contacts.
 - **The account's presence secret,** to read the lease sets that list the
