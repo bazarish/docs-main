@@ -2,7 +2,7 @@
 
 ## Transport
 
-- Delivery is **I2P-only**.
+- Delivery between servers is **I2P-only**.
   Each user's serving destination runs its
   own STREAM accept loop and is persisted so addresses are stable across restarts;
   a first-contact `op:card` is answered on those same destinations. The server's
@@ -76,10 +76,12 @@ so delivery latency reveals no co-location (`InviteAnonymity.md`). The one write
 federate is a message to the sender's **own other devices**, which their server
 stores directly (`ClientApi.md`) - there is no second party for it to reach.
 
-The one route around I2P is a gateway linked to this server by its operator: the
-gateway carries its users' dials to this server's destinations over TLS
-(`bazarish-server/gateway/PROTOCOL.md`, The server link). The frame and the
-admission are the same as over I2P.
+**Through a gateway.** A gateway is the server's most trusted node, run for a
+narrow circle of family or friends. A client on a gateway reaches it over TLS. The
+gateway carries its users' dials to the server it is linked to over TLS
+(`bazarish-server/gateway/PROTOCOL.md`, The server link), and connects two of its
+own users directly, without I2P (Meeting on the gateway, same document). The frame
+and the admission are the same as over I2P.
 
 ## Delivery envelope
 

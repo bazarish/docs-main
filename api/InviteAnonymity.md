@@ -97,12 +97,15 @@ Rationale: every recipient is reached the same way, so **delivery latency** does
 not indicate whether the two parties share a server. The client holds a
 destination and dials it, and cannot determine which server operates it.
 
-The exception is a gateway its user chose. A gateway linked to the server of the
-same operator carries its users' dials to that server's destinations over TLS
-(`bazarish-server/gateway/PROTOCOL.md`, The server link), so those users can tell
-from the latency which recipients that server hosts. The operator who runs both
-already knows it, and a gateway is a node its users picked. A client on its own
-router, or on a gateway somebody else runs, sees no difference.
+Through a gateway its user chose, dials take a shorter path. A gateway linked to
+the server of the same operator carries its users' dials to that server's
+destinations over TLS (`bazarish-server/gateway/PROTOCOL.md`, The server link),
+and connects two of its own users directly, without I2P (Meeting on the gateway,
+same document). Those users can tell from the latency which recipients that
+server and that gateway host. The operator who runs both already knows it, and a
+gateway serves a narrow circle of family or friends who chose it. A client on its
+own router, or on a gateway somebody else runs, sees the same latency for every
+recipient.
 
 ## The destination parameter (`dest_U`)
 

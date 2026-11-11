@@ -14,16 +14,16 @@ is not here: it is documented in its own repository
 
 - **Descriptor** - a small, single-QR pointer:
   ```
-  https://bazari.sh/#invite?v=1&fp=<52-char base32 fingerprint>&dest=<b32>.b32.i2p&key=<card key>[&name=<percent-encoded>]
+  https://bazari.sh/#invite?v=1&fp=<52-char base32 fingerprint>&dest=<b33>.b32.i2p&key=<card key>[&name=<percent-encoded>]
   ```
-  identity (`fp`) + the user's **own** destination (`dest`, a `.b32.i2p` host)
+  identity (`fp`) + the user's **own** destination (`dest`, a b33 `.b32.i2p` host)
   + the card key that seals the card fetch (`key`, 32 bytes as unpadded base64url;
   a link without it, or with any other length, is refused),
   plus an optional `name` the
   inviter advertises (percent-encoded). The recipient adopts `name` as the
   contact's local display name at add time - a one-time static label, never
   re-fetched or transmitted afterwards (`Messages.md`).
-  Rendered for humans as `fp:b32` (the `:` distinguishes it from an alias). It
+  Rendered for humans as `fp:b33` (the `:` distinguishes it from an alias). It
   points at the contact card.
 - **Contact card** - user-signed (`t`, `issuedAt`, `dest`, `sealingKey`, `servingKey`, the owner taken from the signature;
   ~= 8.7 KB, the hybrid post-quantum signature dominates), fetched live and
@@ -50,7 +50,7 @@ and the home server never sees who is being added (below).
    protocol*, below) inside an I2P stream that is encrypted and authenticated to
    the destination.
 
-   The **destination is the capability**. A blinded `.b32.i2p` address cannot be
+   The **destination is the capability**. A b33 (blinded `.b32.i2p`) address cannot be
    guessed and cannot be recovered from the network - a floodfill holds only the
    day's blinded key - so the only way to reach the card is to have received
    the descriptor. The destination answers for its own user alone, so the fetch
@@ -90,7 +90,7 @@ client has descriptor {fp, dest, key}
   -> dial srv (direct dial over a transient I2P destination)
   srv opens the query with its user's card key; answers only for its own user's fp:
   response = seal("bazarish card reply v1", <card DER>)
-  client: open, verify card signature; assert signer fingerprint == fp, card.dest is .b32.i2p
+  client: open, verify card signature; assert signer fingerprint == fp, card.dest is a b33 .b32.i2p host
 ```
 
 `key` is the account's **card key**: 32 random bytes the account makes once, keeps
@@ -337,7 +337,7 @@ with `409` and `ALIAS_TAKEN` in the common envelope (`../Errors.md`).
 
 ### The coordinate a client is built with
 
-Two values: the resolver's **root fingerprint** and the **b32 it answers at**.
+Two values: the resolver's **root fingerprint** and the **b32 it answers at** (a plain, unblinded address).
 The channel key is fetched and checked against the root each time the resolver
 changes it, so nothing a client is built with goes stale when the resolver rotates its signing or channel key behind the
 same root. The root fingerprint is the single
