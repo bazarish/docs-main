@@ -221,12 +221,13 @@ A member who left and writes again joins again (*Joining*), under the same name.
 
 ## Settings
 
-A member who sends `settings` - as a `bot.command`, or as the plain text
-`/settings` - gets a message of their own that names their name in the chat
-and carries two inline buttons: the `contactable` switch and **Change name**
-(`rename`). Pressing the switch redraws that message. The host does not relay
-either. A client offers `settings` in the group chat's header as
-**Account settings**, the way it offers a bot's menu (`Bots.md`).
+A member who sends the `bot.command` `settings` gets a message of their own that
+names their name in the chat and carries two inline buttons: the `contactable`
+switch and **Change name** (`rename`). Pressing the switch redraws that message.
+The host relays neither the command nor the answer. A client offers `settings` in
+the group chat's header as **Account settings**, the way it offers a bot's menu
+(`Bots.md`). Typed text is never this command: `/settings` written in the chat is
+an ordinary post, since people may simply be talking about settings.
 
 ## Descriptors inside text
 
