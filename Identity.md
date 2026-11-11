@@ -68,8 +68,9 @@ Issued **by the user** and signed with their identity key: the cryptographic
 answer to "where and how do I deliver to U?". Signed by U, so it stays
 trustworthy through any untrusted intermediary.
 
-Body: `{ v, t: "contact-card", issuedAt, kind, dest, sealingKey, servingKey,
-presenceKey, presenceDest }`.
+Body: `{ v, t: "contact-card", issuedAt, kind, dest, sealingKey, servingKey }`,
+the same for every kind. A card is refused unless it carries every one of these
+fields, each non-empty, no other field, and `v` 1.
 
 - `t` - what this document is. Checked before any of the body is believed, so
   that one signed document cannot be read as another.
@@ -96,11 +97,6 @@ presenceKey, presenceDest }`.
   and hands its private half to the server that operates the destination, which
   is what lets the server route without being able to read: the message itself is sealed to `sealingKey`, whose private half never
   leaves the user's device.
-- `presenceKey` - the account's X25519 presence key (SPKI DER, base64, a bare
-  X25519 key), and `presenceDest` - the b33 of its
-  presence destination (`Presence.md`). A `user` card carries both and a card of
-  another kind carries neither; any other combination is refused. Both are made
-  with the account and never change.
 
 **The owner is the signer.** A card is a statement its signer makes about
 themselves, so the subject is taken from the keys that signed it. A reader who
@@ -108,8 +104,8 @@ wants a particular person compares fingerprints, because only the reader knows
 whose card they asked for.
 
 A card names **no server** (no server fingerprint or server card), so cards
-cannot be grouped by who hosts them, and **nothing about the owner's devices** -
-the presence destination is one per account, whichever device holds it.
+cannot be grouped by who hosts them, **nothing about the owner's devices**, and
+no presence address: a contact learns those from a schedule (`Presence.md`).
 
 **Forward secrecy: there is none, and the card is where that shows.**
 `sealingKey` is long-lived and never rotated, so whoever obtains its private half
@@ -215,4 +211,4 @@ Trust ladder for adding a contact, strongest first:
   - **CMS is used for the password envelope only** (RFC 3211 PWRI, AES-256-CBC): the account backup and the file-transfer payload are keyed by a password, involve no asymmetric key, and stream, so the standard container is used there.
 - **Alias syntax**: `a-z` and `0-9` only, case-insensitive (normalized to lowercase), 1-16 characters (`api/FederatedResolve.md`). The length cap keeps an alias distinct from the 52-character fingerprint form.
 
-Implementation: the `common` repository (`Crypto`, `Hybrid`, `Certificates` modules; `Cms` is the password envelope alone). Tests cover tamper, downgrade and half-splicing cases. Notable sizes, measured: ML-DSA-65 signature 3309 bytes and public key 1974 bytes against Ed25519's 64 and 44, so an alias certificate is 5593 bytes and a `user` contact card, which carries two sealing pairs and the presence fields, is 9172 (a `bot` card, without them, is 9012).
+Implementation: the `common` repository (`Crypto`, `Hybrid`, `Certificates` modules; `Cms` is the password envelope alone). Tests cover tamper, downgrade and half-splicing cases. Notable sizes, measured: ML-DSA-65 signature 3309 bytes and public key 1974 bytes against Ed25519's 64 and 44, so an alias certificate is 5593 bytes and a contact card, which carries two sealing pairs, is 9013 for a `user` or `chat` account and 9012 for a `bot` (the length of `kind`).

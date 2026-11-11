@@ -103,17 +103,27 @@ publishes (`bazarish-server/gateway/PROTOCOL.md`, Trust). A client that runs its
 own router uses no gateway. A gateway link can come from anyone, so a client asks
 before it takes one and checks the gateway before keeping it.
 
+For presence it holds, for each day it serves, that day's presence address as a
+delegation, the day's reader keys of up to 100 contacts and the account's reader
+secret for the day (`Presence.md`, Through a gateway). It sees when the account and
+the contacts it watches are online on those days. The seed they come from never
+reaches it, so a gateway the user has left learns nothing about the days after.
+
 ## A contact
 
 A contact holds the user's descriptor and card. It may write within its pass, at
 most 120 messages a minute (`Contacts.md`). The user stops a contact by revoking
 its pass. A contact listed as a presence reader sees the user's status and typing
-while it watches (`Presence.md`, What anyone learns). The card names no server, so
+while it watches. A contact holds the presence schedule it was last sent, up to 14
+days ahead: one removed, blocked or past the 100 readers stops being a reader at
+once, and until that schedule runs out can still tell from the network database
+when the user is online (`Presence.md`, What anyone learns). The card names no server, so
 a contact cannot tell which server hosts the user.
 
 ## Anyone with a descriptor
 
-A descriptor is enough to fetch the card and send a contact request. Requests are
+A descriptor is enough to fetch the card and send a contact request. Neither
+names a presence address, so it tells nothing about when the user is online. Requests are
 bounded per destination: 3 a minute, 30 waiting, and one a day from each sending
 address (`api/Federation.md`, Limits). A destination answers a card fetch for its
 own user only (`Contacts.md`).
