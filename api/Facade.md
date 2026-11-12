@@ -270,7 +270,7 @@ intermediaries are trusted for availability only (`Identity.md` /
   user's requests from another's. Its I2P front relays at most 256 streams at
   once and closes any further stream unanswered.
 - **Held requests.** Incoming mail is one held-open request (`ClientApi.md`),
-  which the server holds for at most 30 seconds. The facade waits 60 seconds for its backend and keeps a client's
-  connection for 90, so it never cuts a parked request short. A facade must
+  which the server holds until mail arrives. The facade sets no deadline on its
+  backend's answer, so it never cuts a parked request short. A facade must
   not close a client's parked request: it is the client's only way to hear that
   mail arrived.

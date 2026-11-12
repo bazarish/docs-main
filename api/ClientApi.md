@@ -37,8 +37,8 @@ first call for it is made.
   MAC key: one secret, two purposes, and holding one is not holding the other),
   addressed by the per-request handle described below. No asymmetric work per
   request, which matters over a session's life: the held-open `events` request
-  alone is sent again each time it is answered, at most 30 seconds apart, and
-  every fetch and acknowledgement is a request of its own.
+  alone is sent again each time it is answered, and every fetch and
+  acknowledgement is a request of its own.
 - **A tunnel cannot open the next tunnel.** That is structural: a hello is only
   hybrid-sealed and signature-verified, and a carried frame is only opened with a
   tunnel key. So a leaked secret cannot renew itself, and the identity is
@@ -126,7 +126,7 @@ non-Latin alphabet). A value over either cap is refused where it is typed.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /v1/messaging/events` | Hold the request open until something is pending for this client (or `wait` seconds pass, capped at 30), then answer in the same shape as `pending`. How a server holds it open is an implementation matter; what the protocol requires is that a delivery ends the wait, at once. This is the **only** way a client learns that mail has arrived, and a wait that ends in an error is repeated |
+| `GET /v1/messaging/events` | Answer in the same shape as `pending`, at once. With `hold=1` and nothing pending, hold the request open until something is pending for this client, with no time limit: the wait ends when mail arrives, when the same client ID asks again (the earlier wait is answered with what is pending, which may be nothing) or when the link breaks. How a server holds it open is an implementation matter; what the protocol requires is that a delivery ends the wait, at once. This is the **only** way a client learns that mail has arrived, and a wait that ends in an error is repeated |
 | `GET /v1/messaging/pending` | List pending entries for this client ID: `{pending: [{id, class, bytes}]}` where `class` is the delivery class `content`, `contact` or `device` (the admission selector, not the content type - see `../Messages.md`) and `bytes` the size of the stored item, so a client can cut its fetches and show how much is left. **Oldest arrival first**, and `events` answers in the same order: a burst is fetched in the order the mailbox took it. The order is arrival only - the position of each message in the conversation is decided by the `sentAt` inside the sealed envelope, which no server sees. The list is not paged: one answer lists every entry this client has not acknowledged, and the mailbox quota bounds its length. A client takes in as many entries per pass as it chooses and acknowledges them; while any remain unacknowledged, `events` answers at once |
 | `POST /v1/messaging/fetch` | Fetch several pending items in one answer: `{ids: [...]}` in, `application/cbor` out - `{items: [{id, blob}]}` with each `blob` a CBOR byte string holding the raw E2E payload, in the order asked. An item this client has already acknowledged, or that is no longer held, is left out. The items named may add up to at most `kMaxFetchBytes` (1 MiB, twice the largest item any delivery or self copy may be), otherwise the request is refused with `400`; the `bytes` of the listing is what a client cuts by. A client coming online takes its backlog as one stream: the next fetch is under way while it takes in the previous answer |
 | `POST /v1/messaging/ack` | Confirm receipt of `{ids: [...]}` for this client ID, at most `kMaxAckIdsPerRequest` (256) at once; when all registered client IDs of the user have acked an item, the server deletes it immediately |
