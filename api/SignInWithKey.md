@@ -101,7 +101,7 @@ that leads to one (below).
   "nonce": "5f3c...",
   "ts": 1756600000,
   "consumer": {
-    "name": "Bazarish admin panel - north fleet",
+    "name": "Bazarish admin panel",
     "place": ["https://panel.example", "http://panel.b32.i2p"],
     "role": "Administrator"
   },
@@ -192,7 +192,7 @@ What each of the project's verifiers puts there:
 | Service node portal | `portal.name`, else "Bazarish server" | `portal.address`, else all of `portal.links` | `portal.role`, else Account owner |
 | Alias registry, visitor face | `portal.name`, else "Bazarish alias resolver" | `portal.address` (required) | `portal.role`, else Alias owner |
 | Alias registry, operator face | `admin.name`, else "Bazarish alias resolver admin" | `admin.address` (required) | `admin.role`, else Operator |
-| Admin panel | `consumer.name`, else "Bazarish admin panel" plus the fleet name when the config names exactly one | `consumer.place`, else where it listens | `consumer.role`, else Administrator |
+| Admin panel | `consumer.name`, else "Bazarish admin panel" | `consumer.place`, else where it listens | `consumer.role`, else Administrator |
 
 Each of those settings is a **list** in the configuration file.
 

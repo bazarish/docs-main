@@ -36,7 +36,7 @@ ends at the server, the account tunnel at the service node. Neither backend
 forwards a client's call to the other.
 
 - The server has **no public IP interfaces**. Its only public presence is in hidden networks (I2P first).
-- Facade <-> Server, Facade <-> Service node and Server <-> Service node communication goes over an **operator-controlled private channel**: TLS in which each side is named by the hash of the key in its certificate, written in the other's configuration, with no certificate authority and no hostname in the question. Splitting the fleet across hosts therefore needs no tunnel of its own; the operator may still place one there.
+- Facade <-> Server, Facade <-> Service node and Server <-> Service node communication goes over an **operator-controlled private channel**: TLS in which each side is named by the hash of the key in its certificate, written in the other's configuration, with no certificate authority and no hostname in the question. Splitting the services across hosts therefore needs no tunnel of its own; the operator may still place one there.
 - **The facade carries two sealed tunnels and reads neither.** A client's
   requests arrive as opaque frames on one path per backend; each backend opens its
   own frames, authenticates the user itself and runs what was inside through its
@@ -47,7 +47,7 @@ forwards a client's call to the other.
 
 ## Key decisions
 
-1. **Repository scope** - the server fleet lives in one repository, `bazarish-server` (`server-core`, `service-node`, `facade-http`, `admin-panel` and the optional `gateway`, a host that runs the I2P router for a client that will not, sharing one build of `common`); separate from it are `client-qt` (client core + Qt6 GUI), `bazarish-bot` (the same core with a REST API and a web UI instead of a window), `common-cpp` (the shared C++ library, checked out as each repository's `common` submodule), `alias-resolver` (the alias registry, the only paid component) and `docs-main` (this repository - the canonical protocol specification all components implement). Repositories are developed side by side in a single workspace.
+1. **Repository scope** - the server components live in one repository, `bazarish-server` (`server-core`, `service-node`, `facade-http`, `admin-panel` and the optional `gateway`, a host that runs the I2P router for a client that will not, sharing one build of `common`); separate from it are `client-qt` (client core + Qt6 GUI), `bazarish-bot` (the same core with a REST API and a web UI instead of a window), `common-cpp` (the shared C++ library, checked out as each repository's `common` submodule), `alias-resolver` (the alias registry, the only paid component) and `docs-main` (this repository - the canonical protocol specification all components implement). Repositories are developed side by side in a single workspace.
 2. **Service node is a separate process** with its own API, keeping messaging logic and user management separated.
 3. **Facade <-> server transport** - operator private channel.
 4. **Wire format** - JSON for control messages, raw HTTP bodies for binary content (no base64 overhead). E2E-encrypted payloads are opaque blobs to all server-side components.
@@ -103,15 +103,15 @@ docs-main/                       # this repository - canonical protocol specific
     |-- ServerServiceNode.md     # internal server <-> service node API
     |-- FileTransfer.md          # direct client-to-client file transfer over I2P
     |-- Calls.md                 # call signaling and media tunnels
-    |-- AdminPanel.md            # fleet status + management web panel
+    |-- AdminPanel.md            # server status + management web panel
     +-- Storage.md               # storage backend interface
 
 common-cpp/ (dir: common/)      # shared C++ library: protocol types, OpenSSL wrappers, embedded i2pd
-bazarish-server/                 # the server fleet, one build tree:
+bazarish-server/                 # the server components, one build tree:
     server-core/                 #   messaging server daemon (I2P federation, destination-routed)
     service-node/                #   service node daemon (accounts, portal, moderation)
     facade-http/                 #   HTTP facade daemon (I2P last mile)
-    admin-panel/                 #   fleet status + management web panel (sign-in-with-key)
+    admin-panel/                 #   server status + management web panel (sign-in-with-key)
     gateway/                     #   optional: runs the I2P router for a client that will not
 client-qt/                       # client core + Qt6 GUI
 bazarish-bot/                    # the same core with no interface: a REST API for bots and a web UI

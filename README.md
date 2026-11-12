@@ -34,7 +34,7 @@ component implements.
   - [FileTransfer](api/FileTransfer.md) - direct client-to-client file transfer over I2P
   - [Storage](api/Storage.md) - pending-content storage backends
   - [Calls](api/Calls.md) - audio calls
-  - [AdminPanel](api/AdminPanel.md) - fleet status + management web panel (sign-in-with-key)
+  - [AdminPanel](api/AdminPanel.md) - server status + management web panel (sign-in-with-key)
   - [FederatedResolve](api/FederatedResolve.md) - descriptor + card fetch, and the
     `alias -> descriptor` contract a client is held to
 
@@ -45,7 +45,7 @@ One repository per component, developed side by side:
 | Component | Repository |
 |---|---|
 | Shared C++ library | [common-cpp](https://github.com/bazarish/common-cpp) |
-| Server fleet: messaging server, service node, HTTP facade, admin panel, optional gateway (runs the I2P router for a client that does not run its own) | [bazarish-server](https://github.com/bazarish/bazarish-server) |
+| Server components: messaging server, service node, HTTP facade, admin panel, optional gateway (runs the I2P router for a client that does not run its own) | [bazarish-server](https://github.com/bazarish/bazarish-server) |
 | Client (core, Qt6 GUI) | [client-qt](https://github.com/bazarish/client-qt) |
 | Client daemon (the same core behind a REST API and a web UI, for bots) | [bazarish-bot](https://github.com/bazarish/bazarish-bot) |
 | Alias registry (signed resolve + portal; the one paid component; closed, and documented in its own repository) | [alias-resolver](https://github.com/bazarish/alias-resolver) |
@@ -82,7 +82,7 @@ datagram-to-b33 routing in-process). The shipped client is built with the produc
 (`defaultResolverCoordinate`), and the desktop client reads invite and
 device-pairing QR codes from a camera.
 
-The `admin-panel` provides one web interface to monitor and manage the fleet:
+The `admin-panel` provides one web interface to monitor and manage one server:
 every service exposes a signed `GET /healthz` (name, version, uptime, current and
 peak RAM) and the panel drives the operator endpoints (per-user quota, per-user
 I2P destination). Operator-internal calls are authenticated by hybrid signature -

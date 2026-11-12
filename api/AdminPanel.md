@@ -1,27 +1,25 @@
 # Admin panel
 
-The `admin-panel` is a web interface for monitoring and managing Bazarish
-deployments. A deployment is the unit of scaling: **one messaging server, the
-service node bound to it, and the facades placed in front of the pair**. A
-registration certificate names one messaging server, and the node that issues it
-is bound to that server's card, so the two do not scale independently: a
-deployment holds **one server-core and one service-node**, and the panel refuses a
-second of either - a second server is a second deployment. Facades do scale:
-several may front one pair, and different facades may front different pairs. A
-deployment may also list private gateways, as many as it has or none: a gateway is
-an optional part of a deployment and runs without the panel. Every service in a
-deployment has a **name of its own**, because the name is what tells two facades
-or two gateways apart on every page. The panel reaches each service on that service's
+The `admin-panel` is a web interface for monitoring and managing one Bazarish
+server: **one messaging server, the service node bound to it, and the facades
+placed in front of the pair**. One setup has one admin panel. A registration
+certificate names one messaging server, and the node that issues it is bound to
+that server's card, so the two do not scale independently: the panel holds **one
+server-core and one service-node**, and refuses a second of either. Facades do
+scale: several may front the pair. The panel may also list private gateways, as
+many as the server has or none: a gateway is an optional part of the server and
+runs without the panel. Every service has a **name of its own**, because the name
+is what tells two facades or two gateways apart on every page. The panel reaches each service on that service's
 private operator socket, and is never exposed through a facade or over I2P.
 Those sockets are mutually pinned TLS, so they need not be on the panel's own
-host: a deployment may be spread over several machines without a tunnel between
+host: the services may be spread over several machines without a tunnel between
 them.
 
 ## Sign-in-with-key (panel access)
 
 Access is restricted to the configured **admin identities**; there are no
 passwords and no account store. `admin` is a fingerprint or a list of
-fingerprints, so a deployment with several operators need not share one key.
+fingerprints, so a server with several operators need not share one key.
 
 Login is the project's one sign-in-with-key contract (`SignInWithKey.md`), with
 the panel as a self-contained verifier: **no backend has to be online to log
@@ -37,7 +35,7 @@ in**. What follows is only what the panel adds to it.
    fingerprint to be one of the configured admins, consumes the challenge, and
    sets a session cookie (`HttpOnly; SameSite=Strict`).
 
-When the deployment's service node answers and its first facade is a
+When the service node answers and its first facade is a
 `.b32.i2p` address, the login page also shows a QR code. Its challenge names a
 callback on that facade, and the panel places it in the node's sign-in box with
 a token it keeps in the browser's `adminsignin` cookie (`ServicePortal.md`). The
@@ -98,13 +96,12 @@ version, uptime, current/peak RAM and round-trip latency.
 Past the sign-in page the panel is a small script communicating with a JSON API of
 its own. It is an operator tool within an operator's perimeter and therefore
 requires JavaScript; the sign-in page does not, so that an operator can still sign
-in when the deployment is down.
+in when the services are down.
 
 A sidebar carries the views:
 
-- **Monitoring** - every configured service of every deployment probed
-  concurrently (status, version, uptime, current/peak RAM, latency), grouped by
-  deployment and re-probed every few seconds. A facade also reports what it is
+- **Monitoring** - every configured service probed concurrently (status,
+  version, uptime, current/peak RAM, latency) and re-probed every few seconds. A facade also reports what it is
   carrying: requests over the last minute, hour and day, and how many are in
   flight. These are sampled from bucketed counters (one per second for the last
   minute, one per minute for the last day): a current reading, so nothing is
@@ -121,10 +118,10 @@ A sidebar carries the views:
   message its owner is shown in place of the node-wide one), delete it, or ban
   the key. The open account is in the address bar (`#/users/<fingerprint>`), so a
   link points at one account.
-- **Settings** - every setting of the deployment, in eight tabs. Each tab saves on its own and is in the address bar
+- **Settings** - every setting of the server, in eight tabs. Each tab saves on its own and is in the address bar
   (`#/settings/<tab>`, and `#/settings/<tab>/<name>` for one facade or gateway),
   so a link points at one subject. The singletons have tabs of their own; the
-  services a deployment may hold many of have one tab each that lists them by
+  services the server may hold many of have one tab each that lists them by
   name, and a name opens that one's page:
 
   | Tab | What it holds |
@@ -133,8 +130,8 @@ A sidebar carries the views:
   | Portal | the login consumer (name, address, role) the client shows before a user signs, the portal's public links, and the socket the portal binds |
   | Addresses | the facades' addresses as they report them (read-only: the panel writes them, see below), the reseeds, the descriptor built from both, the node's own API (where facades and the messaging server reach it) and the messaging server it is bound to, and the log level |
   | Accounts | the storage a new account gets and how long an idle one is kept, beside the two numbers that show whether that promise can still be kept: what the quotas have allocated and what the disk holds (`GET /v1/messaging/storage`) |
-  | Server | server-core's own file: log level and libi2pd's logging, its I2P privacy and tunnel count, its private listener, the listener its gateways reach it on (`gatewayListen`) and the node it reports to |
-  | Facades | every facade of the deployment with its address and whether the descriptor carries it; a facade's page holds its own file, read and written over its ops socket - its three listeners (`listen`, `directListen`, `opsListen`), the messaging server and the service node it forwards to, its I2P address's privacy and tunnel count - its address, read-only, and **New address** |
+  | Server | server-core's own file: log level and libi2pd's log level, its I2P privacy and tunnel count, its private listener, the listener its gateways reach it on (`gatewayListen`) and the node it reports to |
+  | Facades | every facade with its address and whether the descriptor carries it; a facade's page holds its own file, read and written over its ops socket - its three listeners (`listen`, `directListen`, `opsListen`), the messaging server and the service node it forwards to, its I2P address's privacy and tunnel count - its address, read-only, and **New address** |
   | Gateways | every gateway with its sessions and destinations; a gateway's page holds the tunnels it builds for all its clients (privacy, count), its two warm pools (streams, calls), and its link to server-core and its routes to the facades, read-only (the panel writes them, see below) |
   | Panel | the panel's own file: who may sign in, the words it signs under, the services it manages, and where it listens - plus what it cannot change (its fingerprint, its config file, its state and web directories, its version) |
 
@@ -149,6 +146,13 @@ A sidebar carries the views:
   never a field that looks editable. And a setting the service reads only at
   start carries a **restart** mark beside the field, next to the control. The log level is the exception on the Addresses tab: it
   applies at once, which is the reason it is there.
+
+  The page of every service - the Server tab, the Addresses tab for the node, a
+  facade's page and a gateway's page - opens with its **Logs** section: the
+  service's log level and, where the service embeds the I2P router (server-core,
+  a facade, a gateway), libi2pd's log level (`none`, `error`, `warn`, `info`,
+  `debug`; `i2pLogLevel` in the service's settings, `i2p.logLevel` in its file).
+  Both apply at once; `[open]` beside the heading opens the service's log.
 
 The **search is performed on the service node**: the panel
 passes `q`, `state`, `limit` and `offset` through and displays the result, so a
@@ -174,30 +178,29 @@ node with many accounts does not transfer the whole set to locate one.
 
 A facade mints its own address - its I2P destination - and reports it
 (`Facade.md`); the operator never types one. The panel is what puts them into
-the server descriptor: it asks every facade of the deployment for its address
+the server descriptor: it asks every facade for its address
 and writes the list, in the order the facades are listed on the Panel tab,
 into the node's `facades` (`PUT /v1/account/settings`). It does so whenever that
 list is saved and whenever a facade is given a new address. If a facade does not
 answer, the descriptor is left as it was and the panel says which facade it was:
 a descriptor missing a working facade is worse than one that is a step behind.
-A deployment with no facade keeps the addresses it had, and the panel says that
+A panel with no facade listed keeps the addresses the descriptor had, and the panel says that
 too. An address that changes behind the panel's back - a facade's `state`
 wiped by hand - shows on the Facades tab as **not in the descriptor** until the
 list is saved again.
 
 **New address** replaces a facade's key and restarts it (`POST /new-address`).
 The panel takes the new address from that answer, since the facade is
-restarting, writes the descriptor, and then links the deployment's gateways
+restarting, writes the descriptor, and then links the gateways
 again (below), so the route to this facade names the new destination. The button says what it costs: a client that knows only the old address
 loses the server until it is given the new descriptor.
 
 ### Gateways and the server
 
-The panel links every gateway of a deployment to its server-core and its
-facades; nothing of it is typed by hand. Over the ops sockets it writes:
+The panel links every gateway to server-core and the facades; nothing of it is typed by hand. Over the ops sockets it writes:
 
 - into server-core (`PUT /v1/messaging/settings`): `gateways`, the key of every
-  gateway of the deployment, as each is pinned on the Panel tab;
+  gateway, as each is pinned on the Panel tab;
 - into each gateway (`PUT /settings`): `server`, server-core's `gatewayListen`
   and key, and `direct`, one route for every facade with a `directListen`: the
   facade's destination, that socket and the facade's key.
@@ -231,17 +234,15 @@ service node (`PUT /v1/messaging/i2p-dest` on server-core is that push).
   "state": "/var/lib/bazarish/admin-panel",
   "assets": "/opt/bazarish/bazarish-server/admin-panel/web",
   "listen": {"host": "127.0.0.1", "port": 8460},
-  "fleets": [
-    {"name": "home", "services": [
-      {"name": "server-core", "kind": "server-core",
-       "url": "https://127.0.0.1:8428", "pin": "<key server-core prints>"},
-      {"name": "service-node", "kind": "service-node",
-       "url": "https://127.0.0.1:8427", "pin": "<key service-node prints>"},
-      {"name": "facade", "kind": "facade",
-       "url": "https://127.0.0.1:8429", "pin": "<key facade-http prints>"},
-      {"name": "gateway", "kind": "gateway",
-       "url": "https://127.0.0.1:8439", "pin": "<key the gateway prints>"}
-    ]}
+  "services": [
+    {"name": "server-core", "kind": "server-core",
+     "url": "https://127.0.0.1:8428", "pin": "<key server-core prints>"},
+    {"name": "service-node", "kind": "service-node",
+     "url": "https://127.0.0.1:8427", "pin": "<key service-node prints>"},
+    {"name": "facade", "kind": "facade",
+     "url": "https://127.0.0.1:8429", "pin": "<key facade-http prints>"},
+    {"name": "gateway", "kind": "gateway",
+     "url": "https://127.0.0.1:8439", "pin": "<key the gateway prints>"}
   ]
 }
 ```
@@ -249,9 +250,10 @@ service node (`PUT /v1/messaging/i2p-dest` on server-core is that push).
 Each service is reached on its operator socket over TLS and is named by the key
 it prints at startup (`pin`); an `http` URL or a missing pin is refused. A
 private gateway is reached the same way: the panel shows its health and edits its
-tunnels and warm pools. Names are unique within a deployment, and a deployment
-holds one `server-core` and one `service-node` at most; a configuration that
-breaks either is refused at start and on save. An optional `consumer` (`name`,
+tunnels and warm pools. Names are unique, and the list holds one `server-core`
+and one `service-node` at most; a configuration that breaks either, or carries a
+key the panel does not know, is refused at start, and a list that breaks either
+is refused on save. An optional `consumer` (`name`,
 `place`, `role`) sets the words the panel signs under.
 
 The configuration contains no secrets. The panel prints its own operator
@@ -263,7 +265,7 @@ Everything above is also editable from the Panel tab, and the panel writes it
 back into this same file one value at a time - the operator's key order, spacing
 and comments survive a save.
 
-Between them, the tabs cover every value in the four fleet config files except the
+Between them, the tabs cover every value in the four services' config files except the
 ones that would let the panel lock itself out or move a service's data: the state
 and asset directories, the operator fingerprint lists, and a server's own
 identity. Those are shown read-only. **Everything else an operator would edit
