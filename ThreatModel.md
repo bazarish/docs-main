@@ -34,11 +34,15 @@ sees bursts of page and resource requests over up to six connections, with
 read pauses between them, the shape of browsing one host; real traffic takes
 the place of a burst and is not added to one. While the user is idle it sees
 one WebSocket that stays open, with a ping after 270 s of silence. Every
-message inside the WebSocket is padded: for messages up to 1.5 KB the length
-of a record tells nothing, above that only a lower bound. What still shows is
-when traffic flows and how much of it (a call is a steady stream of small
-records, a file transfer is volume), when the device changes network, and the
-client's TLS handshake, which is not a browser's.
+message inside the WebSocket but a call's media is padded: for messages up to
+1.5 KB the length of a record tells nothing, above that only a lower bound. What
+still shows is when traffic flows and how much of it (a call is a steady stream
+of small records, each as long as its voice frame; a file transfer is volume),
+and when the device changes network. The
+client's TLS handshake is Chrome's (its ClientHello, a WebSocket offering
+`http/1.1` and a page offering `h2,http/1.1`, session resumption), pinned to one
+Chrome release: a client that falls behind Chrome's releases shows an older
+Chrome. On Windows the handshake is still OpenSSL's, not a browser's.
 
 An observer can block I2P or the reseed. The router can reach I2P through a SOCKS5
 proxy, and a device can start from any https reseed it is given
