@@ -105,6 +105,8 @@ Until that question is settled a device **publishes nothing**: creating an addre
 
 **Every `device.*` type is a message from one of the account's own devices, and only that.** The channel is the account's own mailbox, but a mailbox is where correspondents write too: admission (a delivery pass) is not authorship, so a receiver checks the signer of a device message against its own identity and drops it otherwise - before any field of it is read. Without that check an admitted contact could change an account setting or write into its address book, both of which these types do.
 
+A self-message leaves through the same outbox as a message to a contact (`Messages.md`): while the account's own server does not answer it waits, and it goes when that server answers a request again.
+
 A self-message is named by a **delivery id of its own**, unrelated to the one the same message carries to its recipient (`Messages.md`): the copy kept for the account's devices and the copy the contact receives share no name, so the two servers holding them cannot be matched against each other.
 
 ## Quota interplay

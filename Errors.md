@@ -22,7 +22,6 @@
 | Code | Meaning | Source |
 |---|---|---|
 | `STORAGE_FULL` | User's pending-content quota is exhausted. Transient: the mailbox takes mail again once its owner's devices have taken in what it holds | server |
-| `RECIPIENT_SERVER_UNREACHABLE` | The recipient's server returned no answer: it could not be dialled, the stream failed, or it asserted a delivery without a verifiable signature. Not a refusal; the sending client may repeat the attempt, and on exhausting its attempts reports this as the reason (`Messages.md`) | client |
 | `MESSAGE_TOO_LARGE` | The payload is over `kMaxMessagePayloadBytes`. Past admission, so only a correspondent ever sees it | server |
 | `CONTACT_RATE_LIMITED` | This destination is taking too many contact requests, has too many waiting, or has no room for one more; or a correspondent is sending more than its pass admits. Transient; says nothing about who is served there | server |
 | `SESSION_INVALID` | The session a request authenticated with no longer exists. Answered by opening a new tunnel, never by retrying the same way | server |
@@ -61,8 +60,8 @@ class: a 4xx is a refusal, a 5xx or no answer is the far side failing for now.
 
 `DELIVERY_REJECTED`, `CONTACT_RATE_LIMITED`, `CONTACT_REQUEST_TOO_LARGE` and
 `CARD_UNKNOWN` travel only in a federation reply, which has no status (`api/Federation.md`); `STORAGE_FULL`
-and `MESSAGE_TOO_LARGE` travel there as well. `RECIPIENT_SERVER_UNREACHABLE` is
-raised by the sending client and never sent.
+and `MESSAGE_TOO_LARGE` travel there as well. A recipient's server that does not
+answer is not an error: the delivery waits (`api/Federation.md`).
 
 ## Anti-enumeration policy
 

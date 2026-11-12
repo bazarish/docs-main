@@ -211,10 +211,11 @@ refusal makes the member one who left, and the host stops sending. A server does
 not say whether a pass is unknown or a mailbox is someone else's, so the refusal
 is the only signal.
 
-A member whose deliveries keep failing in any other way goes on an offline list,
-with the time of the first failure. The next delivery that arrives takes them
-off it. A member still on the list 30 days after the first failure is a dead
-account: they leave, the host stops sending, and the member count drops.
+A member whose server does not answer goes on an offline list, with the time it
+first did not; what is relayed to them waits in the host's outbox
+(`Messages.md`). The next delivery that arrives takes them off it. A member still
+on the list 30 days later is a dead account: they leave, what waits for them is
+withdrawn, the host stops sending, and the member count drops.
 
 A member who left and writes again joins again (*Joining*), under the same name.
 

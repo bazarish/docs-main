@@ -528,7 +528,7 @@ authority.
 | State | Definition | Asserted by |
 |---|---|---|
 | **preparing** | The sending client is making ready the address the message will be sent from. | The sending client (local knowledge). |
-| **in flight** | The sending client is dialling the recipient's serving destination and transferring the envelope. | The sending client (local knowledge). |
+| **in flight** | The message is in the sending client's outbox: being transferred to the recipient's serving destination, or waiting for it to answer. | The sending client (local knowledge). |
 | **stored** | The envelope is held in the recipient's mailbox. | The recipient's server, in a confirmation signed over the delivery id and returned in the reply on the same stream (`api/Federation.md`). The client dials from an address that accepts no inbound connections, so the reply is the only path available to a confirmation. |
 | **read** | The recipient has read the message. | The recipient's client, in a read `receipt` content message. Optional: a client may be configured not to send receipts. |
 
@@ -544,21 +544,28 @@ every earlier message it sent that peer **which reached the recipient's server**
 A message that never reached it retains its state: a later message being read is
 not evidence about an earlier one that was never delivered.
 
-The sending client delivers each message itself and determines the number of
-attempts and the interval between them. The protocol fixes the following:
+The sending client delivers each message itself. Everything it sends - to a
+contact's server or to its own account's mailbox, a message the user sees or a
+control message such as an acceptance, a schedule, a receipt or an avatar - goes
+through one outbox, which keeps it until the recipient's server has answered,
+across a restart included. The protocol fixes the following:
 
 - A refusal of the pass or of the size is final; repeating the delivery does not
   change the outcome. A full mailbox or a rate limit is transient: the same
-  delivery is accepted later. A failure to reach the recipient's server is not
-  final and may be retried.
+  delivery is accepted later.
 - A `delivered` response that carries no verifiable signature over the delivery id
   that was sent is not a delivery. The attempt is treated as unanswered.
+- An unanswered attempt does not end a delivery. The next attempt is made on a
+  leaseset of the recipient's that is newer than the one the unanswered attempt
+  used (`api/Federation.md`), so a recipient that restarted is not dialled again
+  on the leaseset its previous process left in the netDb.
+- A call signal, a file request and a file offer are worth sending only for a
+  while (`api/Calls.md`, `api/FileTransfer.md`); one that waits longer is dropped
+  from the outbox and reported as out of date.
 - Repeating a delivery is idempotent. The delivery id is derived from the message
   and the recipient mailbox, so a server that has already stored the envelope
-  recognises the repetition and stores no second copy.
-  This is what permits a client to stop retrying and leave the decision to its
-  user, including after a restart, when a delivery that was in progress is
-  reported as not performed.
+  recognises the repetition and stores no second copy. A delivery whose answer
+  was lost is therefore simply sent again.
 
 ## Files: carried when small, otherwise announced and transferred directly
 
