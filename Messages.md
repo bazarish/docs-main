@@ -238,12 +238,14 @@ contact at a time, on success.
 The queue is written once the server has taken the new address and keys and
 the card naming them is published (`api/ClientApi.md`) - and it holds every
 contact, plus the alias registry when
-this account holds a name that resolves. It is
-tried once immediately, once again whenever the account comes back online, and
-manually. The two kinds of entry report differently, because the remedy differs:
+this account holds a name that resolves. Each contact on it is sent a
+`contact.routing` letter that goes by the delivery rule of every outgoing message
+(Delivery status, below): it waits in the outbox until the contact's server stores
+it, and the contact leaves the queue when it does. The two kinds of entry report
+differently, because the remedy differs:
 
-- a **contact** that could not be reached leaves a notice in that contact's own
-  chat, saying the new details did not arrive, with a **Try again** beside it.
+- a **contact** whose server refused the update leaves a notice in that contact's
+  own chat, saying the new details did not arrive, with a **Try again** beside it.
   One notice per contact, removed when the update is delivered;
 - the **alias registry** is asked again every 10 seconds, silently, until it
   takes the new descriptor.
