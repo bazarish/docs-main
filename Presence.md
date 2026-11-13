@@ -5,9 +5,11 @@ Client: `client-qt`; engine: `common` (`client/Presence`).
 ## What is shown
 
 - **Online** - the app window is open and in focus, on a desktop and on a phone
-  alike, with a one-minute tail after focus is lost so that the status does not
-  flicker. A running core with no focused window is not online, and neither is
-  an account that is switched off.
+  alike, with a one-minute tail after focus is lost to another window or app so
+  that the status does not flicker. Locking the phone screen, hiding the window
+  to the tray and quitting the app end online at once, with no tail. A running
+  core with no focused window is not online, and neither is an account that is
+  switched off.
 - **Typing** - the user is composing in the conversation with that contact.
 
 Neither is stored anywhere: both are signals that live for seconds. No server
@@ -54,7 +56,7 @@ the account derives the same destination byte for byte.
 - **The day turns over** with `dayOverlap`: from 5 minutes before 00:00 UTC to
   5 minutes after, the addresses of both days are up and both are watched. At
   the end of the overlap each holder of the old day's address tells its
-  subscribers "offline" with `moved` and takes it down.
+  subscribers "offline" and takes it down.
 - **The switch** "Show online status" keeps it down when off, and the device then
   watches no one either, since a watch names its sender: with the switch off the
   user sees no one's status. No contact is told of the setting.
@@ -105,43 +107,50 @@ holding it is a **holder**.
 2. Two devices in focus at once both hold the destination. The newer lease set
    wins at the floodfills, and a contact that found one of them keeps it: it sees
    that device's typing, not the other's.
-3. A holder whose tail runs out tells every subscriber "offline" with `moved`
-   and takes the destination down. The same goes for a holder that re-creates the
-   destination for a new reader list, and for the switch turned off, without
-   `moved`.
+3. A holder whose tail runs out, or whose device locks the screen, hides the
+   window to the tray or quits, tells every subscriber "offline" and takes the
+   destination down. The same goes for a holder that re-creates the destination
+   for a new reader list, and for the switch turned off. A contact that was
+   watching that device shows offline, and online again once its next watch
+   finds the lease set of another device that holds the destination.
 
 ## Watching
 
 A device in focus with the switch on watches the contacts on its screen: the
 open conversation and the rows of the chat list in view, and no others. For each
 it sends a **watch**, renews it every `renewEvery`, and the holder answers each
-watch and renew, and every change of state, with a **state**. A watch not yet
-answered is resent every `watchRetry`. A contact that leaves the screen is no
-longer watched and is shown offline.
+watch and renew, and every change of state, with a **state**. A contact that
+leaves the screen is no longer watched and is shown offline.
 
 A destination that has found a lease set keeps it until the lease set expires,
-up to `leaseSetLife` after its holder is gone, and does not look again, so a
-contact whose holder changed is reached only from a new watching address. The
-device moves all of its watches to a new one when:
+so a watch to a holder that has gone, or has been replaced by a new destination
+with the same address, is lost. The watcher handles this from the same watching
+address:
 
-- a state says `moved`;
-- an answered watch has had no state for `subscriptionLife`;
-- a watch to a contact heard from within `leaseSetLife` has gone unanswered for
-  `subscriptionLife`;
-- a watch from a contact arrived, which says the contact's address is up, and
-  the device's own watch to that contact is still unanswered `watchRetry` after
-  it. The own watch is resent at once when such a watch arrives;
-- its own presence address has just come up.
+- A state "offline" is the holder's last word: the contact is shown offline at
+  once, and the watcher sends a new watch `watchRetry` later.
+- A watch not yet answered is resent every `watchRetry`. Each resend first looks
+  the contact's presence address up in the netDb past the lease set the watching
+  address holds, and goes to whatever the lookup found: a newer lease set means
+  the holder is back.
+- A renew not answered within `watchRetry` turns into a new watch, sent at once
+  with that lookup. A contact shown online stays online, without typing, until
+  it answers or for `subscriptionLife`.
+- A watch from a contact sends the device's own unanswered watch to that contact
+  again at once, with the lookup.
 
-A contact shown online before the move stays online, without typing, until it
-answers or for `subscriptionLife`.
+Through SAM there is no lookup past the cached lease set: the resend goes to the
+lease set the watching address holds, and a returning holder is found only once
+that lease set expires, up to 660 seconds (i2pd's tunnel lifetime) after the
+holder went down.
+
+A watching address that the transport takes down is replaced, and every watch
+goes again from the new one. Otherwise the device keeps one watching address
+per day while it is in focus.
 
 Watches go out as soon as the device is in focus, without waiting for its own
 presence address: a contact on the same gateway is met inside it (the gateway's
-`PROTOCOL.md`) and answers at once. A contact woken by such an early watch may
-look the address up before it is published and find the one before; the move
-that follows the address coming up sends every watch again from a new watching
-address, which wakes that contact once more.
+`PROTOCOL.md`) and answers at once.
 
 ### Frames
 
@@ -192,8 +201,9 @@ it, and a 64-bit big-endian sequence that only grows: a frame whose sequence is
 not above the last one opened is dropped, as is one whose direction is wrong.
 
 - A renew is `{}`.
-- A state is `{ online, typing }`, `typing` meaning typing to the watcher, and
-  `moved: true` in the last one before the holder takes the destination down.
+- A state is `{ online, typing }`, `typing` meaning typing to the watcher. A
+  holder in place says `online: true`; `online: false` is sent only as the last
+  state before the holder takes the destination down.
 
 Measured sizes: a watch is 1447 bytes, most of it the hybrid seal; a renew is 109
 and a state 64.
@@ -214,7 +224,6 @@ the message is sent, the field is emptied or it loses focus: the holder sends th
 | `onlineTail` | 60 s |
 | `typingPulse` | 5 s |
 | `readersSettle` | 10 s |
-| `leaseSetLife` | 660 s - i2pd's tunnel lifetime, which bounds a lease set's |
 | `dayOverlap` | 10 min, 00:00 UTC in its middle |
 | `horizon` | 14 days |
 | `refreshBelow` | 7 days |
