@@ -2,7 +2,9 @@
 
 This document names what Bazarish protects, who can act against it, and what each
 of them learns and can do. The mechanisms are specified in the documents it
-links.
+links. The parties come in order of what they can take: first those the user does
+not choose, from a device in other hands to the parties that see only traffic, then
+those the user chooses to trust, ending with a gateway.
 
 ## Assets
 
@@ -22,46 +24,18 @@ links.
 - A server operator is relied on to store mail and hand it over. The operator is
   not trusted with content, the contact graph or co-location.
 
-## A network observer
+## A device in other hands
 
-An observer of a device's link sees I2P transport traffic. A device without a
-network database also fetches a reseed over https (`api/Facade.md`). The observer
-does not see which destinations the device talks to or what it carries.
+Every device of an account holds the same identity keys (`DeviceSync.md`). A device
+in other hands keeps the identity. Retiring it stops deliveries to it, and the
+identity itself cannot be revoked. The account database is SQLCipher, opened with a
+key sealed under the user's passphrase by Argon2id
+(`client-qt/docs/AccountStorage.md`).
 
-Through a gateway the observer sees TLS to the gateway's host instead
-(`bazarish-server/gateway/PROTOCOL.md`, Cover). While the user is active it
-sees bursts of page and resource requests over up to six connections, with
-read pauses between them, the shape of browsing one host; real traffic takes
-the place of a burst and is not added to one. While the user is idle it sees
-one WebSocket that stays open, with a ping after 270 s of silence. Every
-message inside the WebSocket but a call's media is padded: for messages up to
-1.5 KB the length of a record tells nothing, above that only a lower bound. What
-still shows is when traffic flows and how much of it (a call is a steady stream
-of small records, each as long as its voice frame; a file transfer is volume),
-and when the device changes network. The
-client's TLS handshake is Chrome's (its ClientHello, a WebSocket offering
-`http/1.1` and a page offering `h2,http/1.1`, session resumption), pinned to one
-Chrome release: a client that falls behind Chrome's releases shows an older
-Chrome. On Windows the handshake is still OpenSSL's, not a browser's.
-
-An observer can block I2P or the reseed. The router can reach I2P through a SOCKS5
-proxy, and a device can start from any https reseed it is given
-(`client-qt/docs/I2pRouter.md`).
-
-## I2P routers
-
-A router that carries a tunnel sees encrypted traffic between its neighbours.
-Every published destination is a b33, so a floodfill holds only encrypted lease
-sets and cannot list the destinations behind them (`Identity.md`). Tunnel length
-is the user's setting; call media always uses one hop (`Architecture.md`, decision
-6b).
-
-## The facade
-
-The facade relays two sealed tunnels, one to each backend. It learns the flow of
-each device: a stable source address, the time of each request, its padded size
-and which backend it is for. It does not learn whose flow it is or what it carries (`api/Facade.md`, What the facade still
-knows). It holds no key of the server or of a user.
+Pairing a device takes a one-shot destination, a key in the link and a four-digit
+code. Without the key no guess is counted, and ten wrong codes under it take the
+destination down; the code and the account travel sealed under the key, so a
+gateway on either side reads neither (`DeviceSync.md`, Enrollment).
 
 ## The user's own server
 
@@ -111,30 +85,46 @@ invites collected from several users do not show that one server hosts them
   which recipients that server hosts (`api/InviteAnonymity.md`, No local
   delivery).
 
-## A gateway
+## A network observer
 
-A gateway is optional and chosen by its user. It carries the client's I2P traffic
-and sees the client's IP address and every destination the client dials and
-publishes (`bazarish-server/gateway/PROTOCOL.md`, Trust). A client that runs its
-own router uses no gateway. A gateway link can come from anyone, so a client asks
-before it takes one and checks the gateway before keeping it.
+An observer of a device's link sees I2P transport traffic. A device without a
+network database also fetches a reseed over https (`api/Facade.md`). The observer
+does not see which destinations the device talks to or what it carries.
 
-For presence it holds, for each day it serves, that day's presence address as a
-delegation, the day's reader keys of up to 100 contacts and the account's reader
-secret for the day (`Presence.md`, Through a gateway). It sees when the account and
-the contacts it watches are online on those days. The seed they come from never
-reaches it, so a gateway the user has left learns nothing about the days after.
+Through a gateway the observer sees TLS to the gateway's host instead
+(`bazarish-server/gateway/PROTOCOL.md`, Cover). While the user is active it
+sees bursts of page and resource requests over up to six connections, with
+read pauses between them, the shape of browsing one host; real traffic takes
+the place of a burst and is not added to one. While the user is idle it sees
+one WebSocket that stays open, with a ping after 270 s of silence. Every
+message inside the WebSocket but a call's media is padded: for messages up to
+1.5 KB the length of a record tells nothing, above that only a lower bound. What
+still shows is when traffic flows and how much of it (a call is a steady stream
+of small records, each as long as its voice frame; a file transfer is volume),
+and when the device changes network. The
+client's TLS handshake is Chrome's (its ClientHello, a WebSocket offering
+`http/1.1` and a page offering `h2,http/1.1`, session resumption), pinned to one
+Chrome release: a client that falls behind Chrome's releases shows an older
+Chrome. On Windows the handshake is still OpenSSL's, not a browser's.
 
-## A contact
+An observer can block I2P or the reseed. The router can reach I2P through a SOCKS5
+proxy, and a device can start from any https reseed it is given
+(`client-qt/docs/I2pRouter.md`).
 
-A contact holds the user's descriptor and card. It may write within its pass, at
-most 120 messages a minute (`Contacts.md`). The user stops a contact by revoking
-its pass. A contact listed as a presence reader sees the user's status and typing
-while it watches. A contact holds the presence schedule it was last sent, up to 14
-days ahead: one removed, blocked or past the 100 readers stops being a reader at
-once, and until that schedule runs out can still tell from the network database
-when the user is online (`Presence.md`, What anyone learns). The card names no server, so
-a contact cannot tell which server hosts the user.
+## I2P routers
+
+A router that carries a tunnel sees encrypted traffic between its neighbours.
+Every published destination is a b33, so a floodfill holds only encrypted lease
+sets and cannot list the destinations behind them (`Identity.md`). Tunnel length
+is the user's setting; call media always uses one hop (`Architecture.md`, decision
+6b).
+
+## The facade
+
+The facade relays two sealed tunnels, one to each backend. It learns the flow of
+each device: a stable source address, the time of each request, its padded size
+and which backend it is for. It does not learn whose flow it is or what it carries (`api/Facade.md`, What the facade still
+knows). It holds no key of the server or of a user.
 
 ## Anyone with a descriptor
 
@@ -154,29 +144,49 @@ The registry cannot point a name at an identity that did not sign for it. A name
 with a word resolves only with that word. The registry is not on the delivery
 path: a contact added once is reached without it.
 
-## A site that accepts sign-in with the key
-
-A site the user signs in to with the account key learns the account's fingerprint
-(`api/SignInWithKey.md`). Two such sites can link their visitors by it.
-
 ## A group host
 
 The host of a group knows every member's fingerprint and name and every post with
 its author. Authorship inside a group is the host's statement. Members see the
 member count and each other's names in the chat (`Groups.md`).
 
-## A device in other hands
+## A site that accepts sign-in with the key
 
-Every device of an account holds the same identity keys (`DeviceSync.md`). A device
-in other hands keeps the identity. Retiring it stops deliveries to it, and the
-identity itself cannot be revoked. The account database is SQLCipher, opened with a
-key sealed under the user's passphrase by Argon2id
-(`client-qt/docs/AccountStorage.md`).
+A site the user signs in to with the account key learns the account's fingerprint
+(`api/SignInWithKey.md`). Two such sites can link their visitors by it.
 
-Pairing a device takes a one-shot destination, a key in the link and a four-digit
-code. Without the key no guess is counted, and ten wrong codes under it take the
-destination down; the code and the account travel sealed under the key, so a
-gateway on either side reads neither (`DeviceSync.md`, Enrollment).
+## A contact
+
+A contact holds the user's descriptor and card. It may write within its pass, at
+most 120 messages a minute (`Contacts.md`). The user stops a contact by revoking
+its pass. A contact listed as a presence reader sees the user's status and typing
+while it watches. A contact holds the presence schedule it was last sent, up to 14
+days ahead: one removed, blocked or past the 100 readers stops being a reader at
+once, and until that schedule runs out can still tell from the network database
+when the user is online (`Presence.md`, What anyone learns). The card names no server, so
+a contact cannot tell which server hosts the user.
+
+## A gateway
+
+A gateway is optional and chosen by its user, and it is a trusted node: the
+user's own or a friend's, as the client says when it offers one. It carries the
+client's I2P traffic and sees the client's IP address and every destination the
+client dials and publishes (`bazarish-server/gateway/PROTOCOL.md`, Trust). A
+client that runs its own router uses no gateway. A gateway link can come from
+anyone, so a client asks before it takes one and checks the gateway before keeping
+it.
+
+For presence it holds, for each day it serves, that day's presence address as a
+delegation, the day's reader keys of up to 100 contacts and the account's reader
+secret for the day (`Presence.md`, Through a gateway). It sees when the account and
+the contacts it watches are online on those days. The seed they come from never
+reaches it, so a gateway the user has left learns nothing about the days after.
+
+A device watches every contact on its screen from one watching address
+(`Presence.md`, Watching). A gateway that carries the traffic of two of those
+contacts sees watches from one address reach both, and so learns that the two
+share a contact, without learning who it is. Their gateways are their own choice,
+so this is part of the trust a user places in a gateway.
 
 ## Outside this model
 
