@@ -29,10 +29,13 @@
 | `REQUEST_FAILED` | A request outside delivery failed for a reason no other code names; the status says which (below). It carries no meaning a client acts on beyond the status class | any component |
 | `ACCOUNT_UNKNOWN` | The service node holds no account for the signer, or the messaging server serves no such account: its node does not hold it or has not approved it yet. The answer to it is registering (`api/ServicePortal.md`), or waiting for approval | service node, server |
 | `DELIVERY_REJECTED` | Delivery refused. Deliberately combines "unknown pass", "unknown mailbox" and "recipient not served here" into one externally indistinguishable result (anti-enumeration; see `Contacts.md`). A contact request, which presents nothing, is the only alternative admission path | server |
-| `CONTACT_REQUEST_TOO_LARGE` | Contact request exceeds `kMaxContactRequestBytes` (17590, a protocol constant) | server |
+| `CONTACT_REQUEST_TOO_LARGE` | Contact request exceeds `kMaxContactRequestBytes` (33966, a protocol constant) | server |
 | `ALIAS_TAKEN` | Requested alias is already held. The registry's portal answers a buy request for it with 409 and this code | alias registry |
 | `ALIAS_UNKNOWN` | Alias resolution found no such alias. Aliases are intended to be discoverable, so this is reported explicitly and is not subject to anti-enumeration | alias registry |
-| `CLIENT_UNREGISTERED` | Request carries a client ID that is not registered for this user. Only the routes that act for one device check it: the mailbox listing and wait, fetch, ack, the pass set and the write to the account's own devices. The account routes and the client registry take any request the user signed (`DeviceSync.md`) | server |
+| `CLIENT_UNREGISTERED` | The device that signed the request is not registered for this user, or a write to the account's own devices names no other active device of the account. Only the routes that act for one device check it: the mailbox listing and wait, fetch, ack, the pass set and the write to the account's own devices. The account routes and the device registry take any request one of the account's devices signed (`DeviceSync.md`) | server |
+| `DEVICE_REVOKED` | The device that signed the request is on the account's revocation list (`Identity.md`). Final for that device: a revoked device is not readmitted | service node, server |
+| `DEVICE_TAKEN` | The device is already registered from another copy of the account database: a device's keys serve one copy only (`DeviceSync.md`) | server |
+| `DEVICE_NOT_PRIMARY` | Only a primary device may do this: delete the account, or delegate an address other than the one the published card names | service node |
 | `ACCOUNT_PENDING_APPROVAL` | The account exists but is frozen: a moderated server has not approved it yet, so its destination is not brought up. The message carries the operator's instructions for finishing registration | service node |
 | `CARD_UNKNOWN` | A `card` request named a fingerprint that is not this destination's user, or a user with no card - one answer for both (`api/Federation.md`) | server |
 
@@ -48,7 +51,10 @@ class: a 4xx is a refusal, a 5xx or no answer is the far side failing for now.
 | Code | Status |
 |---|---|
 | `SESSION_INVALID` | 401 |
-| `CLIENT_UNREGISTERED` | 403 |
+| `CLIENT_UNREGISTERED` | 403; 404 for a write to the account's own devices that names no other active device |
+| `DEVICE_REVOKED` | 403 |
+| `DEVICE_TAKEN` | 409 |
+| `DEVICE_NOT_PRIMARY` | 403 |
 | `ACCOUNT_PENDING_APPROVAL` | 403 |
 | `MESSAGE_TOO_LARGE` | 413 |
 | `STORAGE_FULL` | 507 |

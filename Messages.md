@@ -11,7 +11,7 @@ handling of it:
 | `file` | name, size, sha256, mime - and the bytes too when the file fits one message | keeps carried bytes in the account; otherwise offers to fetch them client to client |
 | `image` | the picture itself, bytes in the envelope | decodes it, keeps it in the account, draws it |
 | `audio` | Opus audio, bytes in the envelope | keeps it in the account, plays it on a press |
-| `contact.request`, `reaction`, `receipt`, `call.*`, `device.*` | as their names say | as documented elsewhere |
+| `contact.request`, `reaction`, `receipt`, `call.*`, `account.*`, `device.*` | as their names say | as documented elsewhere |
 
 `image` carries the picture **inside the message**: it arrives once, with the
 message, and it arrives even if the sender goes offline the moment after sending - the mailbox holds it like any
@@ -61,14 +61,15 @@ it leaves, signed and sealed. A message over it is refused locally, with a
 request to send it as a file, and nothing is delivered.
 
 What a message may carry besides its media is fixed, so the room left for the
-media is too. Of the 512 KiB, sealing takes 1176 bytes (`kHybridSealOverheadBytes`,
+media is too. Of the 512 KiB, sealing takes 1200 bytes (`kHybridSealOverheadBytes`,
 the hybrid frame around a body of 64 KiB or more), and the heaviest picture, voice
-or file message spends 7905 more on everything that is not its bytes
-(`kMediaMessageReserveBytes`: the first reply's `bootstrap` block, the authorship
-signature, a reply to a message id of 64 bytes, the forwarded mark, a name and a
-type of 255 bytes each). That leaves **515207 bytes** for a picture, a voice note
-or a file carried inside one message (`kMaxMediaBytes`), and the heaviest such
-message comes to within 8 bytes of the limit. A name, a type or a reply id longer
+or file message spends 9522 more on everything that is not its bytes
+(`kMediaMessageReserveBytes`: the first reply's `bootstrap` block with its two
+epoch keys, the authorship signature, a reply to a message id of 64 bytes, the
+forwarded mark, a name and a type of 255 bytes each). That leaves **513566 bytes**
+for a picture, a voice note or a file carried inside one message
+(`kMaxMediaBytes`), and a test holds the heaviest such message within 64 bytes of
+the limit. A name, a type or a reply id longer
 than those bounds is refused before sending.
 
 A larger file is announced: `sendFile` puts only its metadata (name, size,
@@ -112,7 +113,7 @@ never appear here:
 |---|---|---|
 | `contact` | nothing | Bootstrap. Size-capped (`kMaxContactRequestBytes`), rate-limited per serving destination. The only path into a mailbox that presents nothing. |
 | `content` | the recipient's delivery pass (required) | Looked up, not consumed (see `Contacts.md`). The path for every established-contact message, whatever its content type. |
-| `device` | an authenticated request from one of the account's registered devices | An account writing to its own other devices, through `POST /v1/messaging/self`. Outside the budget a stranger's request is counted against, and stored only when the account has more than one device. |
+| `device` | an authenticated request from one of the account's registered devices | An account writing to one of its own other devices, through `POST /v1/messaging/self`. Outside the budget a stranger's request is counted against; stored for the one active device it names, listed to that device alone and deleted once that device acknowledges it. |
 
 A mailbox has one quota, and every class is stored against it.
 
@@ -170,8 +171,10 @@ with that name before the real envelope arrives.
 
 ## Layer 2 - content type (end-to-end only)
 
-The encrypted payload (sealed to the recipient's user sealing key) is an array
-of versioned envelopes (*Encoding*), each of this shape:
+The encrypted payload is an array of versioned envelopes (*Encoding*), sealed to
+the recipient's epoch key current at the attempt (`Identity.md`, Epoch keys) - or,
+for the `device` class, to the own key of the one device it is for - each of this
+shape:
 
 ```
 { "v": 1,
@@ -181,10 +184,11 @@ of versioned envelopes (*Encoding*), each of this shape:
   "sentAt": <unix milliseconds>,   // client send clock; drives ordering and the displayed time
   "replyTo": <id>,            // optional
   "routing": { "dest": <sender b32>, "servingKey": <base64 SPKI> },   // contact.routing only
-  "auth": { "c": <Ed25519 signature, CBOR bytes>,
+  "auth": { "d": <the author device's id>,
+            "c": <Ed25519 signature, CBOR bytes>,
             "p": <ML-DSA-65 signature, CBOR bytes>,
-            "kc": <author's Ed25519 public key, SPKI DER - contact request only>,
-            "kp": <author's ML-DSA public key, SPKI DER - contact request only> },
+            "cert": <the author device's certificate, CBOR bytes - contact.request,
+                     account.devices and device.devices only> },
   ... type-specific fields ...
 }
 ```
@@ -193,28 +197,34 @@ of versioned envelopes (*Encoding*), each of this shape:
 delivery pass is *admission*: it says somebody the recipient issued a pass to
 put this in their mailbox, not which of their correspondents it was. The seal
 says only who may read. `from` on its own is a claim by the sender, so every
-envelope carries the author's own proof: their identity public keys and both
-signatures over the CBOR of the envelope with the `auth` key removed. Hybrid,
-like every identity statement here - both signatures must verify.
+envelope carries the author's own proof: the id of the device that wrote it and
+that device's two signatures over the CBOR of the envelope with the `auth` key
+removed. Hybrid, like every identity statement here - both signatures must
+verify.
 
-A receiver determines the author from the signature, not from `from`: the keys
-give a fingerprint, that fingerprint must be what `from` claims, and an envelope
-that fails either test is consumed before it reaches a chat, a contact entry or
-the user. Without this an admitted contact could put another contact's name on a
-message and have it filed in that other conversation.
+A receiver determines the author from the signature, not from `from`: the
+signatures must verify under the keys of the named device's certificate
+(`Identity.md`), that certificate's root is the author, it must be what `from`
+claims, and the device must not be on the account's revocation list. An envelope
+that fails any test is consumed before it reaches a chat, a contact entry or the
+user. Without this an admitted contact could put another contact's name on a
+message and have it filed in that other conversation, and a revoked device could
+go on writing in its account's name.
 
-The keys travel in one place only: the **contact request**. Adding a contact
-goes through their card, so the adder holds the added party's keys before the
-first word is sent, and the added party takes the adder's from the request that
-started the dialog. Everywhere else the block is the two signatures alone, and the reader checks them against the keys it kept when the
-correspondent introduced themselves - from their card when it added them, or
-from the request that started the dialog. A message from somebody it has no keys
-for is one it cannot check, and it is dropped exactly like a message from a
-stranger.
+The certificate travels in three places only: the **contact request**, the
+`account.devices` letter a device sends its account's contacts, and the
+`device.devices` letter it sends its account's own devices - the first thing each
+of them hears of a device. Adding a contact goes through their card, so the adder
+holds the certificates of the added party's devices before the first word is
+sent, and the added party takes the adder's from the request that started the
+dialog. Everywhere else the block is the device id and the two signatures alone,
+and the reader checks them against the certificate it holds for that device. A
+message from a device it holds no certificate for is one it cannot check, and it
+is dropped exactly like a message from a stranger.
 
-Measured: **3388 bytes** for the two signatures, **5417** when the keys are
-included. Every message pays the first figure - a reaction and a read receipt as
-much as a letter. That is what the contact-request cap is
+Measured: **3401 bytes** for the device id and the two signatures, **11794** when
+the certificate is included. Every message pays the first figure - a reaction and
+a read receipt as much as a letter. The second is what the contact-request cap is
 measured against (`api/ClientApi.md`): a request carries no pass and no card, so
 its signature is the only thing that names the sender.
 
@@ -260,7 +270,7 @@ face, with the same retry.
 | `text` | content | `text` - a plain text line. |
 | `contact.routing` | content | A routing change pushed to an established contact: the `routing` block, on a message with nothing else in it. The only message that carries one. |
 | `device.chat-pin` | device | One conversation pinned or unpinned, on every device of the account. |
-| `contact.request` | contact | Carries a `bootstrap` block (`kind`, `sealing` - the same account sealing key the card publishes -, `dest`, `servingKey`, `cardKey`, `pass`) plus `text`. The first message; see `Contacts.md`. |
+| `contact.request` | contact | Carries a `bootstrap` block (`kind`, `epochs` - the account's current and next epoch keys, as the card publishes them -, `dest`, `servingKey`, `cardKey`, `pass`) plus `text`, and the author device's certificate in `auth`. The first message; see `Contacts.md`. |
 | `contact.accept` | content | Agreeing to a received `contact.request`: an empty-bodied message whose first-reply `bootstrap` delivers our descriptor + our pass to the requester, making the pair mutual contacts. The requester's client completes adding the contact automatically and surfaces a note. See `Contacts.md`. |
 | `file` | content | `name`, `size`, `sha256` and `mime`, plus `data` - the bytes - when the file is at most `kMaxMediaBytes`. Without `data` it is an announcement: the bytes stay on the sender's disk until the recipient asks for them. See `api/FileTransfer.md`. |
 | `image` | content | A picture, carried inline: the bytes travel in the envelope. Its body block is named `image`. |
@@ -276,9 +286,9 @@ face, with the same retry.
 | `chat.timer` | content | Sets the one-to-one conversation's auto-delete timer for both sides: `seconds` is one of 0 (off), 3600, 86400, 604800 or 2592000, and any other value is ignored. The recipient's client takes the same timer and leaves a "set the auto-delete timer" notice. See *Auto-delete timer*. |
 | `avatar` | content | The sender's avatar pushed to a contact: `avatar` = `{ mime, data }`, `data` being the bytes of a square PNG/JPEG (a CBOR byte string, as in an `image`) compressed client-side to at most **500 KB**. A silent service message - stored as that contact's picture, never shown as a chat bubble. Sent once the dialog is mutually established and re-sent to every contact when the avatar changes. See *Avatars and display names* and `Contacts.md`. |
 | `presence.schedule` | content | A `user` account's presence addresses and reader keys for the days ahead: `days` = a list of `{ d, dest, reader }`. A silent service message, sent between `user` contacts only. See `Presence.md`, The schedule. |
-| `device.avatar` | device | Self-sync of the user's own avatar to their other devices: the same `avatar` block, sealed to the user's own key and stored through `POST /v1/messaging/self`. See `DeviceSync.md`. |
+| `device.avatar` | device | Self-sync of the user's own avatar to their other devices: the same `avatar` block, sealed to each device's own key and stored through `POST /v1/messaging/self`. See `DeviceSync.md`. |
 | `device.contact-name` | device | Self-sync of a local contact rename to the user's other devices: `peer` (fingerprint), `name`. A purely local label, never sent to the contact. See `DeviceSync.md`. |
-| `device.i2p-master` | device | Self-sync of the user's own I2P master key to their other devices: `i2pMaster` (base64), sealed to the user's own key and stored through `POST /v1/messaging/self`, so every device keeps the same personal address. Applied only when `from` is the user themselves. See `DeviceSync.md`, `Identity.md`. |
+| `device.i2p-master` | device | Self-sync of the user's own I2P master key to their other devices: `i2pMaster` (base64), sealed to each device's own key and stored through `POST /v1/messaging/self`, so every device keeps the same personal address. Applied only when `from` is the user themselves. See `DeviceSync.md`, `Identity.md`. |
 | `call.invite` | content | Places an audio call: `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b32), `key` (base64 per-call media key). See `api/Calls.md`. |
 | `call.accept` | content | Accepts a call: `callId`, `dest` (the callee's media b32). See `api/Calls.md`. |
 | `call.decline` | content | Rejects a call: `callId`, `reason`. See `api/Calls.md`. |
@@ -286,7 +296,11 @@ face, with the same retry.
 | `call.ring` | content | A device of the callee's is showing the call: `callId`. What turns the caller's "invitation delivered" into "their device is ringing". See `api/Calls.md`. |
 | `group.state` | content | From a group host only: no body, only the `group` block, sent when the recipient's `write` or `admin` changes and the host has nothing else to send. See `Groups.md`. |
 | `group.reactions` | content | From a group host only: `reactions` = `[{ref, counts: {emoji: n}}]`, the reaction counts of relayed posts, batched, leaving out the recipient's own reaction. See `Groups.md`. |
-| `call.taken` | device | Self-sync: the device that answered or refused an incoming call, so the account's other devices stop ringing - `callId`, `device`. See `api/Calls.md`, `DeviceSync.md`. |
+| `call.taken` | device | Self-sync: the device that answered or refused an incoming call, so the account's other devices stop ringing - `callId`; the device is the author. See `api/Calls.md`, `DeviceSync.md`. |
+| `account.epochs` | content | The sender's public epoch keys from the current epoch on: `epochs` = `[{n, from, g, by, key}]`. Taken only when a primary device of the sender signed it; a key whose maker is not an active primary device is dropped. A silent service message, sent to every contact the account has agreed to. See `Identity.md`, Epoch keys. |
+| `account.devices` | content | The sender's device list: `devices` = the certificates of its active devices (base64) and `revocation` = its newest revocation list (base64), with the author device's certificate in `auth`. Sent by a device new to its server and after a revocation; a list older than the one held is refused. A silent service message. See `Identity.md`, Revocation list. |
+| `device.epochs` | device | The private halves of epoch keys, to the account's own devices: `epochs` = `[{n, g, by, pem}]`. Taken only from a primary device, and only keys a primary device made. See `DeviceSync.md`. |
+| `device.devices` | device | The account's device list for its own devices: `devices` = `[{cert, sealing}]`, each active device's certificate and its public sealing key (checked against the certificate's digest), and `revocation`; the author device's certificate in `auth`. See `DeviceSync.md`. |
 
 ### Forwarding
 
@@ -561,6 +575,12 @@ across a restart included. The protocol fixes the following:
   leaseset of the recipient's that is newer than the one the unanswered attempt
   used (`api/Federation.md`), so a recipient that restarted is not dialled again
   on the leaseset its previous process left in the netDb.
+- The outbox keeps a message unsealed, inside the profile database, and seals it
+  anew at every attempt: to the recipient's epoch key current at that attempt, or
+  to the own key of the device it is for. A message for a recipient whose current
+  epoch key the sender does not hold waits until it arrives (`Identity.md`, Epoch
+  keys), and a message for one of the account's own devices that is revoked is
+  withdrawn.
 - A call signal, a file request and a file offer are worth sending only for a
   while (`api/Calls.md`, `api/FileTransfer.md`); one that waits longer is dropped
   from the outbox and reported as out of date.

@@ -124,7 +124,7 @@ DeliveryEnvelope:
 5. A reply constitutes an answer, and a typed refusal ends the delivery. An unknown pass or an oversized payload is **final**: repeating the delivery does not change the outcome. A full mailbox (`STORAGE_FULL`) or a rate limit (`CONTACT_RATE_LIMITED`) is **transient**: the same delivery is accepted once the owner's devices have taken their mail in or the limit has passed, and the sender may repeat it later. An attempt without a reply does not end the delivery: the sending client keeps it, and no server holds it or retries it on another party's behalf. The next attempt to that destination is made only on a leaseset newer than the one the unanswered attempt used:
    - the sender drops what it holds of the recipient's leaseset and looks it up again right after the unanswered attempt, and again whenever something arrives from that contact; a leaseset published later than the one it held opens the way at once;
    - eleven minutes after the unanswered attempt - a lease's ten minutes and the 60 seconds by which two routers' clocks may differ - the leaseset that attempt used has expired everywhere, so any leaseset found then is a newer one;
-   - a sender whose own link has come back, or whose device has moved to another network, tries every recipient again, since the silence may have been its own.
+   - a sender whose own link has come back, or whose device has moved to another network, tries every recipient again once its own server has answered it, since the silence may have been its own.
 
    A recipient that stays unreachable is therefore tried once every eleven minutes for as long as a delivery to it waits, and not at all when none does. A repeated delivery carries the same delivery id, so a recipient's server that stored the first copy recognises it and stores no second copy.
 
@@ -171,14 +171,14 @@ b33), carried in the user-signed **contact card** (`../Identity.md`,
 never a server card.
 
 This holds in both directions on first contact: a contact request carries the
-sender's own **routing** (sealing key + destination + serving sealing key) in
+sender's own **routing** (epoch keys + destination + serving sealing key) in
 its bootstrap, so the recipient replies by federating to the sender's destination
 over I2P, having learned only that destination - not a server fingerprint.
 
 ## First-contact discovery
 
-First contact needs the peer's UID and contact card (sealing key + destination +
-serving sealing key) without leaking to intermediaries and without the client
+First contact needs the peer's UID and contact card (epoch keys + devices +
+destination + serving sealing key) without leaking to intermediaries and without the client
 contacting a foreign facade. The model is specified in `FederatedResolve.md`; in
 summary:
 
@@ -223,6 +223,6 @@ The client is built with the production resolver's coordinate
 A serving destination admits mail at 120 a minute per
 delivery pass, and contact requests at 3 a minute and at most 30 waiting, and one a
 day per sending I2P destination; every rate limit, and a contact request that does
-not fit the quota, refuses with `CONTACT_RATE_LIMITED`. A contact request is at most 17590 bytes
+not fit the quota, refuses with `CONTACT_RATE_LIMITED`. A contact request is at most 33966 bytes
 (`CONTACT_REQUEST_TOO_LARGE`) and a message at most 512 KiB (`MESSAGE_TOO_LARGE`).
 Revoking a pass (`../Contacts.md`) stops an established contact.

@@ -87,7 +87,7 @@ Server-side components see only opaque blobs of a generic message.
 | `call.accept` | callee -> caller | `callId`, `dest` (the callee's media b33 routing address) |
 | `call.decline` | callee -> caller | `callId`, `reason` (`declined` / `busy` / `refused`). Honoured only while the caller is still calling: with several devices on one account, one of them answering and another refusing must not end the call that was answered |
 | `call.end` | either | `callId` |
-| `call.taken` | device -> the account's own devices | `callId`, `device`. Self-delivered (`DeviceSync.md`): every device of an account is shown the same invitation, and the one that answers or refuses stops the others. They drop the call without recording anything - the device that took it owns the outcome |
+| `call.taken` | device -> the account's own devices | `callId`; the device is the letter's author. Self-delivered (`DeviceSync.md`): every device of an account is shown the same invitation, and the one that answers or refuses stops the others. They drop the call without recording anything - the device that took it owns the outcome |
 
 Media is real-time and the rest of a client's traffic is not. How an
 implementation keeps the two from competing - for threads, for a router's

@@ -19,24 +19,28 @@ The contact card is **user-signed** and carries the routing itself. Routing is
 destination.
 
 ```
-ContactCard  (hybrid-signed by user U - the only artifact a contact fetches):
+ContactCard  (hybrid-signed by a device of user U - the only artifact a contact fetches):
   v
   t:           "contact-card"      # what this document is, checked first
   issuedAt:    <unix seconds>      # what orders two cards of one person
-  sealingKey:  <SPKI DER>          # what U's mail is sealed to, first and after
+  kind:        user | bot | chat
+  epochs:      [{n, from, g, by, key}]  # what U's mail is sealed to, this epoch and the next
   dest:        <i2p destination>   # dest_U - where to deliver to U
   servingKey:  <SPKI DER>          # key the delivery envelope is sealed to
+  devices:     [device-cert]       # U's active devices, each certified by U's root
+  revocation:  revocation-list     # U's newest list of revoked devices, signed by U's root
 ```
 
-The owner is not written in the body: it is the signer, and `fingerprint()` is
-taken from the keys that signed. One fact, one place.
+The owner is not written in the body: it is the root that certified the
+devices, and the card's signer must be one of them. One fact, one place.
 
-The card carries **exactly one signature - U's**, and no server signature
-appears anywhere on the contact path. `dest` and `servingKey` are plain fields
-the user vouches for under that one signature.
+The card carries **only U's signatures** - one device's over the card and the
+root's over each certificate and the list - and no server signature appears
+anywhere on the contact path. `dest` and `servingKey` are plain fields
+the user vouches for under the card's signature.
 
 Why this is safe without a server signature: the first message is E2E-sealed to
-`sealingKey`, whose private half only U holds, so confidentiality does not depend
+U's current epoch key, whose private half only U's devices hold, so confidentiality does not depend
 on the server. If `dest`/`servingKey` are tampered with, delivery fails (the
 recipient server cannot produce a forged acceptance the sender's client would
 believe, and no plaintext is exposed). Routing is a hint the user vouches for,
@@ -50,7 +54,7 @@ keys:
 
 | Layer | Contents | Decrypted by | Key |
 |---|---|---|---|
-| Content (E2E) | the message itself | **U** (while offline, on next sync) | `sealingKey` |
+| Content (E2E) | the message itself | **U** (while offline, on next sync) | the current key in `epochs` |
 | Admission header | `mailbox` + `pass` | **U's server** (while U is offline) | `servingSealingKey` |
 
 The server stores-and-forwards while U is offline, so it **must** read
@@ -65,7 +69,7 @@ the client delivers it, so that server never learns the recipient
 **Ownership**: the account issues the
 serving key with its destination and hands its private half to the server that
 operates it; the client publishes its public half in the card, which carries
-only U's signature.
+only U's signatures.
 
 ## Routing by destination
 
@@ -187,8 +191,9 @@ it was handed and the dest<->mailbox mapping.
 - **addByInvite** - fetch and verify the card; deliver to `card.dest`, seal the
   envelope to `card.servingSealingKey`.
 - **contact-request bootstrap** (`../Contacts.md`) - the bootstrap carries the
-  sender's **contact card** (dest + serving sealing key + sealing key), so the
-  peer replies by federating to the sender's dest.
+  sender's routing (dest + serving sealing key + epoch keys), and its first
+  letter the sending device's certificate, so the peer replies by federating to
+  the sender's dest.
 - **addByAlias / alias resolve** - the central resolver answers with a
   descriptor (`FederatedResolve.md`), and the client then fetches the contact
   card as for an invite. The lookup is not sealed; the client dials the

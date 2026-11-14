@@ -163,36 +163,40 @@ type (1 byte) || subscription id (8 bytes) || body
 
 | Type | Name | Direction | Body |
 |---|---|---|---|
-| 1 | `watch` | watcher -> holder | `hybrid::seal` to the account's `sealingKey` of the CBOR below |
+| 1 | `watch` | watcher -> holder | `hybrid::seal` to the watched account's current epoch key of the CBOR below |
 | 2 | `renew` | watcher -> holder | `nonce (12) || AES-256-GCM(CBOR)` |
 | 3 | `state` | holder -> watcher | `nonce (12) || AES-256-GCM(CBOR)` |
 
 The **watch** is
-`{ t: "presence.watch", from, reply, sub, key, sentAt, sig }`, sealed with
-the hybrid seal to the watched account's sealing key, so only that account learns
-who is watching, now or after a quantum computer exists:
+`{ t: "presence.watch", from, dev, reply, sub, key, sentAt, sig }`, sealed with
+the hybrid seal to the watched account's epoch key current at that moment
+(`Identity.md`, Epoch keys), so only that account learns who is watching, now or
+after a quantum computer exists:
 
 - `from` - the watcher's fingerprint;
+- `dev` - the id of the watching device;
 - `reply` - the watching address the state goes to. The holder does not check
   it: a reader may name any address, and that address then receives the holder's
   sealed state frames for the life of the subscription and nothing more;
 - `sub` - the subscription id, in hex, equal to the one in the frame header;
 - `key` - a fresh 32-byte AES-256-GCM key for this subscription, base64;
 - `sentAt` - Unix seconds;
-- `sig` - an Ed25519 signature by the classical half of the watcher's identity
-  over the ASCII string `bazarish presence watch v1` followed by the CBOR of the
+- `sig` - an Ed25519 signature by the classical half of the watching device's
+  signing key over the ASCII string `bazarish presence watch v1` followed by the CBOR of the
   watch without `sig`.
 
 The signature is Ed25519 alone, the one exception to the rule that an identity
 signs with both halves (`Identity.md`). It is checked once, when the watch
 arrives, and a watch older than 120 seconds is dropped, so forging one later
 gains nothing. The seal is hybrid, because what it hides - who watches whom - is
-worth recording now and reading later. Neither key ever leaves the device, so a gateway that holds the
-day's reader key can neither read a watch nor forge one.
+worth recording now and reading later. Neither the device's signing key nor the
+epoch keys ever leave the account's devices, so a gateway that holds the day's
+reader key can neither read a watch nor forge one. A device that holds no
+current epoch key of a contact sends that contact no watch.
 
 The holder drops a watch whose type or `sub` does not match, whose `from` is
-not one of its readers, whose `sig` does not verify
-against the Ed25519 identity key of that `from`, or whose `sentAt` is more than
+not one of its readers, whose `dev` is not an active device of that `from`, whose
+`sig` does not verify against that device's Ed25519 key, or whose `sentAt` is more than
 120 seconds away from its own clock.
 
 **Renew** and **state** are sealed under the subscription key. The nonce is

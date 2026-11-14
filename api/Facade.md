@@ -197,7 +197,7 @@ Consequences for first contact (`Contacts.md`, `Federation.md`):
   (`FederatedResolve.md`) - a direct fetch over a transient I2P destination of
   its own, never through the requester's server and never through the foreign
   facade. The contact
-  request bootstrap carries the sender's own routing (sealing key + destination +
+  request bootstrap carries the sender's own routing (epoch keys + destination +
   serving sealing key), so the reply path is equally facade-free.
 - **By `<alias>`** - resolved at the **central resolver** over its I2P endpoint
   (`FederatedResolve.md`); again the client's own direct dial, never through its

@@ -8,7 +8,7 @@ Registration opens an account without a term; the only clock is the delegated de
 
 | Request | Purpose |
 |---|---|
-| `get-card` | fingerprint -> the user's **contact card** (sealing key + destination + serving sealing key) and its card key, which seals the exchange. Backs the federation `card` request - the first-contact card fetch (`api/FederatedResolve.md`). The query arrives on that user's own destination and is answered for that user alone, so it cannot be used to ask a server whether it hosts some other fingerprint |
+| `get-card` | fingerprint -> the user's **contact card** (epoch keys + devices + destination + serving sealing key) and its card key, which seals the exchange. Backs the federation `card` request - the first-contact card fetch (`api/FederatedResolve.md`). The query arrives on that user's own destination and is answered for that user alone, so it cannot be used to ask a server whether it hosts some other fingerprint |
 
 ## Service node -> Server
 

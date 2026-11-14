@@ -119,7 +119,7 @@ Keeping the transient fresh is therefore an unconditional background duty of
 the client: if it lapses, the destination goes down and senders cannot deliver.
 
 On install/enable the client also sends the master to its **other devices** as a
-`device.i2p-master` service message - sealed to the account's own sealing key and
+`device.i2p-master` service message - sealed to each of those devices' own keys and
 written to the account's own mailbox with `POST /v1/messaging/self` - so every
 device adopts the same master (preserving the address) and can re-issue
 transients.

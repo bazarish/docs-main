@@ -25,8 +25,7 @@ is not here: it is documented in its own repository
   re-fetched or transmitted afterwards (`Messages.md`).
   Rendered for humans as `fp:b33` (the `:` distinguishes it from an alias). It
   points at the contact card.
-- **Contact card** - user-signed (`t`, `issuedAt`, `dest`, `sealingKey`, `servingKey`, the owner taken from the signature;
-  ~= 8.7 KB, the hybrid post-quantum signature dominates), fetched live and
+- **Contact card** - signed by one of the user's devices (`t`, `issuedAt`, `kind`, `dest`, `epochs`, `servingKey`, `devices`, `revocation`, the owner taken from the root that certified the devices; its size grows with the number of devices), fetched live and
   verified against `fp` (`../Identity.md`). It names **no server**: a card that
   did would tell every contact who hosts its owner, and let two cards be compared
   for co-location.

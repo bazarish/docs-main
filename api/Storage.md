@@ -6,11 +6,13 @@ implementation, on disk, behind the server's `Storage` interface.
 ## Stored data
 
 - Pending encrypted blobs, keyed per recipient user.
-- Per blob: its delivery class, which of the user's client IDs have acked it, and
-  its **arrival stamp** in milliseconds. The stamp is what the mailbox is ordered
+- Per blob: its delivery class, which of the user's devices have acked it, the
+  one device it is for when it is an item to self, and its **arrival stamp** in
+  milliseconds. The stamp is what the mailbox is ordered
   by, and it is the one thing a mailbox knows about a delivery beyond its size and
   its class - when it received it, never when it was written.
-- Per user: the registered client IDs, the hashes of the delivery passes it
+- Per user: the registered devices, each with the install token it registered
+  from (`ClientApi.md`), the hashes of the delivery passes it
   issued, the replay markers (seen delivery ids, kept 30 days) and a quota
   override when the operator set one.
 
@@ -19,8 +21,8 @@ never interprets blob contents.
 
 ## Lifecycle rules
 
-1. A blob is **deleted immediately** once all **registered** client IDs of the user (see `../DeviceSync.md`) have acked it - before any quota pressure. Retiring a client ID triggers re-evaluation: blobs that were waiting only on the retired client are deleted.
-2. A blob nobody acks is kept: the account's quota bounds a mailbox, and once it is reached admission is refused (rule 4).
+1. A blob is **deleted immediately** once all **registered** devices of the user (see `../DeviceSync.md`) have acked it - before any quota pressure. An item to self is listed only to the one device it is for and deleted as soon as that device acks it. Unregistering a revoked device triggers re-evaluation: blobs that were waiting only on it, and every item to self for it, are deleted.
+2. A blob is deleted **30 days after it arrived** (`kMailRetentionDays`), acked or not. The account's quota bounds a mailbox in the meantime, and once it is reached admission is refused (rule 4). The same 30 days are how long a device keeps an epoch key after its epoch ends (`../Identity.md`, Epoch keys).
 3. When the service node deletes an account (idle, ended by its owner, or removed by an operator), it notifies the messaging server, which discards **everything** held for that fingerprint: pending content, replay markers, delivery passes, the device registry and any quota override. No mailbox may remain in service for an account that no longer exists.
 4. Admission is refused (typed errors, see `../Errors.md`) when a blob exceeds the per-message limit or the user's quota - a contact request over the quota gets `CONTACT_RATE_LIMITED`; nothing is partially stored.
 5. A listing is returned **oldest arrival first**. A mailbox is a queue, and its
@@ -31,16 +33,17 @@ never interprets blob contents.
 
 | Operation | Purpose |
 |---|---|
-| `putBlob(user, blobId, data, class, quota, receivedAt, alreadyAcked)` | Store a pending blob and its replay marker, or report it a duplicate or over the quota; the per-message limit is checked before the call, and `alreadyAcked` is the sending device of a self-delivery |
-| `listPending(user, clientId)` | The blobs this client has not acked, with their class and size, oldest arrival first |
-| `isPendingFor(user, blobId, clientId)` | Whether the blob is held and this client has not acked it; a fetch serves only those |
+| `putBlob(user, blobId, data, class, quota, receivedAt)` | Store a pending blob and its replay marker, or report it a duplicate or over the quota; the per-message limit is checked before the call |
+| `putAddressedBlob(user, blobId, data, class, quota, receivedAt, device)` | The same for an item to self, pending for that one device |
+| `listPending(user, device)` | The blobs this device has not acked and that are not for another device, with their class and size, oldest arrival first |
+| `isPendingFor(user, blobId, device)` | Whether the blob is held, is not for another device and this device has not acked it; a fetch serves only those |
 | `getBlob(user, blobId)` | Read blob data |
-| `ackBlob(user, blobId, clientId)` | Record receipt; deletes the blob once every registered client has acked it |
+| `ackBlob(user, blobId, device)` | Record receipt; deletes the blob once every registered device has acked it, or at once when it is an item to self for this device |
 | `forgetUser(user)` | Drop everything held for a user (account deleted) |
-| `purgeExpired(receivedBefore)` | Drop replay markers and contact-request rate windows older than the cut-off; pending blobs are not touched. The server runs it hourly with a cut-off of 30 days |
+| `purgeExpired(receivedBefore, storedBefore)` | Drop replay markers and contact-request rate windows older than the first cut-off and blobs that arrived before the second. The server runs it hourly with both cut-offs 30 days back |
 | `usage(user)` | Current usage in bytes |
 
-Beside these, storage keeps the client registry, the delivery passes, the replay
+Beside these, storage keeps the device registry, the delivery passes, the replay
 markers, the contact-request windows and the per-user quota.
 
 ## At rest and after a crash
@@ -59,6 +62,6 @@ therefore keeps everything that was answered:
   and ack it before the marker that recognises a retry is on disk;
 - the ack that completes a delivery removes it, blob first, without rewriting its
   record; a record left without its blob is never listed and counts for nothing;
-- retiring a client removes what only that client still owed before the client
-  itself;
+- unregistering a device removes what only that device still owed before the
+  device itself;
 - a temporary left by an interrupted write is not a blob and counts for nothing.

@@ -25,7 +25,9 @@ three things carry it:
 - a **login blob** (section 3);
 - the client API's **first contact**: the tunnel hello, which carries the five
   values inside its sealed frame and signs method `BZ-TUNNEL`, path `/hello`,
-  body the hello's fresh secret (`ClientApi.md`);
+  body the hello's fresh secret (`ClientApi.md`). The hello is signed by a
+  device's own keys, not the root, and names its signer by the device's
+  certificate (`X-Bazarish-Device`, below) instead of `X-Bazarish-Keys`;
 - every **operator call** - from the admin panel to a service, and between the
   messaging server and the service node - where the callee then requires the
   signer's fingerprint to be in its configured operator set (`AdminPanel.md`).
@@ -44,7 +46,6 @@ The **base string** names the request:
 "v2\n" + t + "\n" + METHOD + "\n" + target + "\n" + hex(sha256(body)) + "\n"
 ```
 
-followed by `clientId + "\n"` when the request names a device (`ClientApi.md`).
 `target` is the request target exactly as sent: the path, and `?` and the query
 when there is one - a verifier that acts on a query parameter acts on what was
 signed.
@@ -57,13 +58,14 @@ travels.
 | Header | Holds |
 |---|---|
 | `X-Bazarish-Keys` | base64 of the JSON `{"c": base64(Ed25519 SPKI DER), "pq": base64(ML-DSA-65 SPKI DER)}`: the signer's two public keys |
+| `X-Bazarish-Device` | in a device's request, in place of `X-Bazarish-Keys`: base64 of the device's certificate (`Identity.md`), whose keys are the signer's |
 | `X-Bazarish-Timestamp` | `t`, when it was signed |
 | `X-Bazarish-Nonce` | `n`, 16 random bytes, base64, fresh for every request |
 | `X-Bazarish-Sig-Classical` | base64 of the Ed25519 signature (RFC 8032, pure) over the signed string |
 | `X-Bazarish-Sig-Pq` | base64 of the ML-DSA-65 signature (FIPS 204, empty context) over the signed string |
 
 Both halves sign the same bytes, and both must verify - one alone proves
-nothing. The five headers come to 8258 bytes, measured.
+nothing. The five headers come to 8258 bytes with `X-Bazarish-Keys`, measured.
 
 ### Verifying one
 
@@ -76,6 +78,11 @@ nothing. The five headers come to 8258 bytes, measured.
    base32 (RFC 4648) of `sha256(Ed25519 SPKI DER || ML-DSA SPKI DER)`, 52
    characters - the identity fingerprint of `Identity.md`. This is *who signed*,
    with no prior key exchange.
+
+A device's request is verified the same way with its certificate in place of
+the keys: the certificate must verify under the root it names, its keys are the
+ones steps 2 and 3 check, and the signer is that root's account, acting as the
+device the certificate names, in the role it states.
 
 Where a request must be accepted once, the verifier also remembers every
 accepted `n` for the window and refuses it a second time. A legitimate resend
@@ -220,8 +227,8 @@ Produced by the client, `base64(JSON)`:
 
 It is a signed request (section 1) whose five values travel as the blob's fields,
 over method `BZ-LOGIN`, path `/portal/login` and body =
-the challenge exactly as issued, the whole link. A login blob names no
-device, so its base string has no device line. The string signed is therefore
+the challenge exactly as issued, the whole link. A login is signed by
+the account's root, so only a primary device signs one (`Identity.md`). The string signed is therefore
 
 ```
 "v2\n" + t + "\nBZ-LOGIN\n/portal/login\n" + hex(sha256(challenge)) + "\n" + n + "\n"
