@@ -183,7 +183,7 @@ shape:
   "from": <sender fingerprint>,
   "sentAt": <unix milliseconds>,   // client send clock; drives ordering and the displayed time
   "replyTo": <id>,            // optional
-  "routing": { "dest": <sender b32>, "servingKey": <base64 SPKI> },   // contact.routing only
+  "routing": { "dest": <sender b33>, "servingKey": <base64 SPKI> },   // contact.routing only
   "auth": { "d": <the author device's id>,
             "c": <Ed25519 signature, CBOR bytes>,
             "p": <ML-DSA-65 signature, CBOR bytes>,
@@ -214,7 +214,8 @@ go on writing in its account's name.
 The certificate travels in three places only: the **contact request**, the
 `account.devices` letter a device sends its account's contacts, and the
 `device.devices` letter it sends its account's own devices - the first thing each
-of them hears of a device. Adding a contact goes through their card, so the adder
+of them hears of a device. A reader drops any other message that carries a
+certificate. Adding a contact goes through their card, so the adder
 holds the certificates of the added party's devices before the first word is
 sent, and the added party takes the adder's from the request that started the
 dialog. Everywhere else the block is the device id and the two signatures alone,
@@ -234,7 +235,8 @@ new serving sealing key with it. Whenever the pair a card carries changes, the
 account sends every contact one
 `contact.routing` message carrying `{dest, servingKey}`, and a receiver whose
 stored pair differs adopts the new one and persists it. It is carried by that
-message alone. The sender's queue keeps retrying a contact it could not reach,
+message alone. A receiver takes it only from a primary device of the sender and
+only with a b33 `dest`; one written by a secondary device is dropped. The sender's queue keeps retrying a contact it could not reach,
 so the update is not lost to one offline device.
 
 The resulting rule is: **after changing an address, tell everyone.** This message
@@ -270,7 +272,7 @@ face, with the same retry.
 | `text` | content | `text` - a plain text line. |
 | `contact.routing` | content | A routing change pushed to an established contact: the `routing` block, on a message with nothing else in it. The only message that carries one. |
 | `device.chat-pin` | device | One conversation pinned or unpinned, on every device of the account. |
-| `contact.request` | contact | Carries a `bootstrap` block (`kind`, `epochs` - the account's current and next epoch keys, as the card publishes them -, `dest`, `servingKey`, `cardKey`, `pass`) plus `text`, and the author device's certificate in `auth`. The first message; see `Contacts.md`. |
+| `contact.request` | contact | Carries a `bootstrap` block (`kind`, `epochs` - the account's current and next epoch keys, as the card publishes them -, `dest`, `servingKey`, `cardKey`, `pass`) plus `text`, and the author device's certificate in `auth`. The reader takes the `epochs` of a bootstrap only when a primary device wrote the message; otherwise it gets them from the card (`Identity.md`, Epoch keys). The `dest` must be a b33. The first message; see `Contacts.md`. |
 | `contact.accept` | content | Agreeing to a received `contact.request`: an empty-bodied message whose first-reply `bootstrap` delivers our descriptor + our pass to the requester, making the pair mutual contacts. The requester's client completes adding the contact automatically and surfaces a note. See `Contacts.md`. |
 | `file` | content | `name`, `size`, `sha256` and `mime`, plus `data` - the bytes - when the file is at most `kMaxMediaBytes`. Without `data` it is an announcement: the bytes stay on the sender's disk until the recipient asks for them. See `api/FileTransfer.md`. |
 | `image` | content | A picture, carried inline: the bytes travel in the envelope. Its body block is named `image`. |
@@ -289,8 +291,8 @@ face, with the same retry.
 | `device.avatar` | device | Self-sync of the user's own avatar to their other devices: the same `avatar` block, sealed to each device's own key and stored through `POST /v1/messaging/self`. See `DeviceSync.md`. |
 | `device.contact-name` | device | Self-sync of a local contact rename to the user's other devices: `peer` (fingerprint), `name`. A purely local label, never sent to the contact. See `DeviceSync.md`. |
 | `device.i2p-master` | device | Self-sync of the user's own I2P master key to their other devices: `i2pMaster` (base64), sealed to each device's own key and stored through `POST /v1/messaging/self`, so every device keeps the same personal address. Applied only when `from` is the user themselves. See `DeviceSync.md`, `Identity.md`. |
-| `call.invite` | content | Places an audio call: `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b32), `key` (base64 per-call media key). See `api/Calls.md`. |
-| `call.accept` | content | Accepts a call: `callId`, `dest` (the callee's media b32). See `api/Calls.md`. |
+| `call.invite` | content | Places an audio call: `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b33), `key` (base64 per-call media key). See `api/Calls.md`. |
+| `call.accept` | content | Accepts a call: `callId`, `dest` (the callee's media b33). See `api/Calls.md`. |
 | `call.decline` | content | Rejects a call: `callId`, `reason`. See `api/Calls.md`. |
 | `call.end` | content | Hangs up / cancels a call: `callId`. See `api/Calls.md`. |
 | `call.ring` | content | A device of the callee's is showing the call: `callId`. What turns the caller's "invitation delivered" into "their device is ringing". See `api/Calls.md`. |
@@ -396,7 +398,9 @@ recipient finds the message whose `id` equals `ref` and replaces its `text` and
 
 A `delete` is the sibling primitive: the recipient removes the message whose `id`
 equals `ref` outright, leaving **no tombstone** (a true delete-for-everyone). The client always removes its own copy; for a one-to-one message
-it sends the `delete` so the peer removes theirs too.
+it sends the `delete` so the peer removes theirs too. A message that never left -
+still in the outbox in a letter of its own and not on its way - is withdrawn from
+the outbox instead, and no `delete` is sent.
 
 A client applies an `edit` or a `delete` **only** to a message sent by the `from`
 party (for a recipient, an incoming message from that peer); it must not

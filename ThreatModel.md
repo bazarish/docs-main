@@ -54,10 +54,19 @@ A device erases an epoch key's private half 30 days after its epoch ends, and a
 server deletes every mailbox item 30 days after it arrived (`api/Storage.md`).
 Keys taken from a device therefore open what was sealed to the epochs that device
 held - at most the current one, the next one and those that ended within the last
-30 days - and nothing sealed to an epoch whose key it had already erased.
+30 days - and nothing sealed to an epoch whose key it had already erased. A backup
+or a pairing bundle carries only the keys the device still keeps: keys due for
+erasure are erased before any bundle is made, and an import drops any it finds.
+A backup written earlier holds the keys that were kept when it was written, so
+whoever takes it with its password opens what those keys open.
 
 The history already on a device is not under any of these keys: the transcript is
 kept decrypted inside the account database, which only its passphrase protects.
+A deleted message, and the old text of an edited one, is overwritten in the
+database and taken out of its write-ahead log in the same step. The secrets the
+code holds itself - keys, session secrets, the plaintext it opens - are wiped
+after use; copies of a message's text elsewhere in the app's memory are dropped,
+not guaranteed to be wiped.
 
 Pairing a device takes a one-shot destination, a key in the link and a four-digit
 code. Without the key no guess is counted, and ten wrong codes under it take the
@@ -126,11 +135,16 @@ read pauses between them, the shape of browsing one host; real traffic takes
 the place of a burst and is not added to one. While the user is idle it sees
 one WebSocket that stays open, with a ping after a silence drawn afresh
 each time between 180 and 260 s. Every
-message inside the WebSocket but a call's media is padded: for messages up to
-1.5 KB the length of a record tells nothing, above that only a lower bound. What
-still shows is when traffic flows and how much of it (a call is a steady stream
-of small records, each as long as its voice frame; a file transfer is volume),
-and when the device changes network. The
+message inside the WebSocket is padded: for messages up to
+1.5 KB the length of a record tells nothing, above that only a lower bound. A
+call's media goes in records sent in random slots whose spacing drifts over the
+call, each carrying one or two voice frames padded to a small random size, with
+fillers of widely spread sizes in empty slots between them; over a simulated
+ten-minute call that is about 11 to 21 KB/s, per second between p5 and p95,
+varying over the call (`bazarish-server/gateway/PROTOCOL.md`, Media pacing).
+What still shows is when traffic flows and how much of it (a call is a stream
+of small records for as long as it lasts; a file transfer is volume), and when
+the device changes network. The
 client's TLS handshake is Chrome's (its ClientHello, a WebSocket offering
 `http/1.1` and a page offering `h2,http/1.1`, session resumption), pinned to one
 Chrome release: a client that falls behind Chrome's releases shows an older

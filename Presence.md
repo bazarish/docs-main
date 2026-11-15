@@ -165,7 +165,7 @@ type (1 byte) || subscription id (8 bytes) || body
 |---|---|---|---|
 | 1 | `watch` | watcher -> holder | `hybrid::seal` to the watched account's current epoch key of the CBOR below |
 | 2 | `renew` | watcher -> holder | `nonce (12) || AES-256-GCM(CBOR)` |
-| 3 | `state` | holder -> watcher | `nonce (12) || AES-256-GCM(CBOR)` |
+| 3 | `state` | holder -> watcher | `salt (16) || nonce (12) || AES-256-GCM(CBOR)` |
 
 The **watch** is
 `{ t: "presence.watch", from, dev, reply, sub, key, sentAt, sig }`, sealed with
@@ -199,10 +199,16 @@ not one of its readers, whose `dev` is not an active device of that `from`, whos
 `sig` does not verify against that device's Ed25519 key, or whose `sentAt` is more than
 120 seconds away from its own clock.
 
-**Renew** and **state** are sealed under the subscription key. The nonce is
+A **renew** is sealed under the subscription key. A **state** is sealed under a
+key of its own for each accepted watch: the holder draws a random 16-byte salt
+when it accepts the watch and seals every state of that subscription under
+HKDF-SHA256(subscription key, salt, `bazarish presence state v1`), the salt
+carried in front of the nonce. The nonce is
 `direction || 0 0 0 || sequence`, with direction 1 towards the holder and 2 from
 it, and a 64-bit big-endian sequence that only grows: a frame whose sequence is
 not above the last one opened is dropped, as is one whose direction is wrong.
+The watcher keeps the sequence of states for each salt apart, and takes states
+under at most 4 salts for one watch; a state under a fifth salt is dropped.
 
 - A renew is `{}`.
 - A state is `{ online, typing }`, `typing` meaning typing to the watcher. A
@@ -210,7 +216,7 @@ not above the last one opened is dropped, as is one whose direction is wrong.
   state before the holder takes the destination down.
 
 Measured sizes: a watch is 1447 bytes, most of it the hybrid seal; a renew is 109
-and a state 64.
+and a state 80.
 
 ### Typing
 

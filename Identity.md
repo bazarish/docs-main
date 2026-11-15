@@ -2,7 +2,7 @@
 
 ## Principles
 
-- OpenSSL only; standardized algorithms and containers: keys in PEM and DER, certificates as one composite CBOR frame, CMS for the password envelope alone. No custom cryptographic constructions (codestyle requirement).
+- OpenSSL only; standardized algorithms and containers: keys in PEM and DER, certificates as one composite CBOR frame, CMS for the file-transfer envelope alone. No custom cryptographic constructions (codestyle requirement).
 - Every long-lived identity is a **hybrid keypair set** (classical + post-quantum, see Algorithms below); human-readable names are optional, revocable mappings on top.
 
 ## User identity
@@ -13,7 +13,7 @@
   - `<alias>` - an exclusive **alias** on the central resolver (paid; the project's monetization, `api/FederatedResolve.md`). Resolving it yields a descriptor, after which the contact card is fetched and verified.
 - Users have no binding to a server in anything a contact can see. Registration opens an unbounded channel with the server, and the only thing that expires is the delegation of the user's destination - which the network itself enforces. Nothing signed by the user names the server.
 - **Every device has keys of its own**, certified by the root: a signing pair (Ed25519 + ML-DSA-65) and a sealing pair (X25519 + ML-KEM-768). A device signs everything it sends - messages, the contact card, its requests to the server - with its own signing pair, and never with the root. Its **device id** is the first 10 characters of the fingerprint of its signing pair (`kDeviceIdLength`), computed as the root fingerprint is; it names the device on the server, on the self-channel and in the device lists (`DeviceSync.md`).
-- A device is **primary** or **secondary**. A primary device holds the root in its account database; a secondary one does not. The role is chosen when the device is added (`DeviceSync.md`) and is written into its certificate.
+- A device is **primary** or **secondary**. A primary device holds the root in its account database; a secondary one does not. The role is chosen when the device is added (`DeviceSync.md`) and is written into its certificate. Only a primary device publishes the contact card and delegates the address: the first delegation, every renewal and taking the address offline. A secondary device publishes no card and delegates nothing: it joins a server by registering itself as a device of the account, and a device of an account that has no card yet cannot join.
 - The user's **I2P destination is the account's, not a device's**: contacts hold that one address, so every device of the account operates the same master key. A device that arrives without it takes it from the account (its enrollment material, or `device.i2p-master-request` to the account's other devices) and never mints one, because a second address delegated to the server strands every contact holding the first. A delivery pass follows the same rule for the same reason: it is the account's, not a device's, so it travels in the address book and every device presents the same one (`DeviceSync.md`).
 
 ## Server identity
@@ -65,7 +65,7 @@
 
 ### Contact card
 
-Issued **by the user** and signed by one of the account's devices, under a
+Issued **by the user** and signed by an active primary device of the account, under a
 certificate from the root: the cryptographic answer to "where and how do I
 deliver to U?". Signed by U's own keys, so it stays trustworthy through any
 untrusted intermediary.
@@ -88,12 +88,14 @@ fields, each non-empty, no other field, and `v` 1.
   one after it, `[{n, from, g, by, key}]` (*Epoch keys*, below): what a contact
   encrypts to. The very first contact request is sealed to the current one, and so
   is **every message afterwards**. Each key must have been made by an active
-  primary device of the card's own device list. Because they are carried inside
+  primary device of the card's own device list, and its `g` must not exceed the
+`number` of the card's revocation list. Because they are carried inside
   the signed card, no intermediary can substitute them.
 - `dest` - the user's serving **destination** as a `.b32.i2p` host - the blinded
   **b33** of its encrypted LeaseSet2, like every other destination this project
   publishes: where a contact routes deliveries. Never a raw destination or an
-  addressbook name (`api/Federation.md`).
+  addressbook name (`api/Federation.md`); a card whose `dest` is not a b33 is
+  refused.
 - `servingKey` - the public **serving sealing key** of that destination: a contact
   seals the delivery envelope's admission header to it. The user vouches for it
   under their one signature; a wrong value only makes delivery fail (`InviteAnonymity.md`). The account issues it
@@ -108,7 +110,8 @@ fields, each non-empty, no other field, and `v` 1.
 **The owner is the root, the signer is a device.** A card is a statement its
 owner makes about themselves, so the subject is taken from the root that
 certified the devices in `devices`, and the signature must verify under one of
-those devices that the list does not revoke. A reader who wants a particular
+those devices that the list does not revoke, and that device must be primary:
+the card carries epoch keys, which only a primary device makes. A reader who wants a particular
 person compares fingerprints, because only the reader knows whose card they
 asked for.
 
@@ -123,6 +126,10 @@ after its epoch ends; a server deletes every mailbox item 30 days after it
 arrived (`api/Storage.md`). So whoever obtains the keys held on a device opens
 what was sealed to the epochs that device still holds - at most the current one,
 the next one and those that ended within the last 30 days - and nothing older.
+A backup or a pairing bundle carries the same keys and no others: keys due for
+erasure are erased before any bundle is made, and an import drops any such key
+it finds. A backup written earlier holds the keys that were kept when it was
+written.
 `servingKey` is issued anew whenever the account raises a new destination, and
 only then. The transcript is stored decrypted inside the account's own database,
 so a device and its passphrase yield the history whatever the message keys did;
@@ -195,8 +202,10 @@ that lost that choice still opens.
 - **Only a primary device makes epoch keys.** A card naming a key whose maker is
   not an active primary device of its own list is refused, an `account.epochs`
   letter is taken only when a primary device signed it, and a key whose maker is
-  not an active primary device is dropped by a reader that holds the account's
-  device list. A secondary device holds the private halves and reads with them;
+  not an active primary device, or whose `g` is above the `number` of the
+  revocation list the reader holds, is dropped by a reader that holds the
+  account's device list. A reader also drops a key whose `n` is more than two
+  epochs past the current one. A secondary device holds the private halves and reads with them;
   were it to make keys, it could hand contacts a key whose private half the
   account's other devices never got.
 - A primary device keeps a key for the current epoch and for the next. It makes a
@@ -220,8 +229,10 @@ holds. Moving S1 -> S2:
 2. Register there the hash of every pass the account has issued: each is derived
    from the account's delivery secret and the contact's fingerprint
    (`Contacts.md`), so the client computes them again.
-3. Delegate the same address to S2 with the same serving and signing keys, and
-   publish the same card there.
+3. A primary device delegates the same address to S2 with the same serving and
+   signing keys, and publishes the same card there; it is also the device that
+   renews the delegation. A secondary device joins S2 without a delegation of
+   its own.
 4. The client stops renewing the delegation on S1, which runs out by the end
    of its term, and S1 stops publishing the address. What reached S1 meanwhile
    stays there: the client does not fetch it or close the account on S1 by
@@ -288,7 +299,8 @@ Trust ladder for adding a contact, strongest first:
 - **Sealing keys: X25519 + ML-KEM-768 (FIPS 203), one composite KEM.** A sealing key is distinct from the identity keys by design, and it is a pair: its public form is the CBOR `{t, c, q}` carrying both public halves (1268 bytes, measured).
   - A sealed blob is **one** AES-256-GCM layer under a key derived with HKDF-SHA256 from both shared secrets at once - `ikm = ss_ML-KEM || ss_X25519`, salt = the frame's transcript (KEM ciphertext, ephemeral X25519 public key, recipient public pair, SHA-256 of `kid`), info = the seal's domain-separation string - carried as `{v, kid, kem, eph, n, ct}`. Opening needs **both** private halves, so breaking one scheme alone reveals nothing, and no public field of the frame can be moved without changing the derived key. This covers everything encrypted in the project - delivery-envelope headers, message bodies end to end, federation queries - because they all go through the same `hybrid::seal`.
   - `kid` names the recipient key, at most 19 bytes: for an epoch key `0x01`, `n` and `g` as 4-byte big-endian numbers, and the maker's device id, 19 bytes in all; for a device's own key `0x02` and the device id, 11 bytes in all. A reader picks the private key by it, and a frame naming a key the reader no longer holds does not open. Elsewhere it is empty. Overhead over the plaintext is at most 1200 bytes (`kHybridSealOverheadBytes`, measured with the longest `kid` on a body of 64 KiB or more; a few bytes less on a smaller one).
-  - **CMS is used for the password envelope only** (RFC 3211 PWRI, AES-256-CBC): the account backup and the file-transfer payload are keyed by a password, involve no asymmetric key, and stream, so the standard container is used there.
+  - **CMS is used for the file-transfer envelope only** (RFC 3211 PWRI, AES-256-CBC): the file-transfer payload is keyed by a password, involves no asymmetric key, and streams, so the standard container is used there.
+  - **The account backup** is `BZE1 || memory (KiB) || passes || salt (16) || nonce (12) || AES-256-GCM(bundle)`, the two numbers 32-bit little-endian and the whole header the GCM associated data. Its key is Argon2id of the backup password (64 MiB, 3 passes, one lane) over that salt. The file names its own cost, and a reader refuses one above 1 GiB or 16 passes before deriving anything.
 - **Alias syntax**: `a-z` and `0-9` only, case-insensitive (normalized to lowercase), 1-16 characters (`api/FederatedResolve.md`). The length cap keeps an alias distinct from the 52-character fingerprint form.
 
-Implementation: the `common` repository (`Crypto`, `Hybrid`, `Certificates`, `Devices` and `Epochs` modules; `Cms` is the password envelope alone). Tests cover tamper, downgrade and half-splicing cases. Notable sizes, measured: ML-DSA-65 signature 3309 bytes and public key 1974 bytes against Ed25519's 64 and 44, so an alias certificate is 5593 bytes. A contact card carries two epoch keys and a certificate for every active device, so its size grows with the number of devices.
+Implementation: the `common` repository (`Crypto`, `Hybrid`, `Certificates`, `Devices` and `Epochs` modules; `Cms` is the file-transfer envelope alone). Tests cover tamper, downgrade and half-splicing cases. Notable sizes, measured: ML-DSA-65 signature 3309 bytes and public key 1974 bytes against Ed25519's 64 and 44, so an alias certificate is 5593 bytes. A contact card carries two epoch keys and a certificate for every active device, so its size grows with the number of devices.

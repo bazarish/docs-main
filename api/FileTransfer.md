@@ -92,7 +92,7 @@ attempt**. Two transfers between the same two people are therefore not linkable
 by address, and neither is a resumed attempt to the attempt it continues.
 
 The offer's `host` is a b33 (encrypted LeaseSet), and it is shared only inside the
-sealed offer.
+sealed offer. A recipient refuses an offer whose `host` is not a b33.
 
 ## Wire protocol
 

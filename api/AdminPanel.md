@@ -83,7 +83,8 @@ listener separate from its API, and the panel is configured with that address an
 the key the service prints at startup (`pin`). The pinning runs both ways: the
 socket asks for a client certificate and admits only the keys in its
 `opsClients`, so an unlisted caller is refused at the handshake and never
-reaches the signature check. Neither certificate decides what a caller may do -
+reaches the signature check. A server-core, service-node, facade-http or gateway
+whose operator socket has an empty `opsClients` refuses to start. Neither certificate decides what a caller may do -
 that is still the signature and the `operators` list; TLS binds the two sockets
 to each other. For **facade-http** this is what keeps the endpoint off the
 sockets its clients reach: every client of the server holds that address, and

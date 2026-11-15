@@ -322,7 +322,7 @@ The owner's ops:
 | 403 | `NO_CALLER` | As above |
 | 404 | `UNSUPPORTED_OP` | No op of this face goes by that name |
 | 400 | `MALFORMED_REQUEST` | The request could not be processed |
-| 404 | `REQUEST_REFUSED` | The signature does not verify, the request is outside its freshness window, it names another op than the one it was sent as, or it was carried out already |
+| 404 | `REQUEST_REFUSED` | The signature does not verify, the request is outside its freshness window, it names another op than the one it was sent as, or it was carried out already. A carried-out request is recorded in the resolver's state directory until its freshness window ends, so a restart and the pair's other node refuse it too |
 | 404 | `NOT_OWNER` | The signer does not hold the name (`alias.update`, `alias.binding`, `alias.word`, `alias.autorenew`, `alias.renew`) |
 | 404 | `BAD_DESCRIPTOR` | `alias.update`: the descriptor or the owner's certificate does not check out |
 | 404 | `WRONG_STATE` | `alias.renew`: the name is not in a state that renews |

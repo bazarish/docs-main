@@ -65,8 +65,9 @@ in the project encrypted to a public key - a message body end to end, a delivery
 envelope's header, a request in the facade tunnel - goes through the same
 `hybrid::seal`, whose key is derived from both shared secrets at once, so opening
 one needs both private halves. Breaking one scheme alone forges nothing and
-reveals nothing. Keys are PEM and DER, the composite frame is CBOR, and the
-password envelope is CMS. Every primitive is OpenSSL's; no custom cryptographic
+reveals nothing. Keys are PEM and DER, the composite frame is CBOR, the
+file-transfer envelope is CMS, and the account backup is AES-256-GCM under an
+Argon2id key. Every primitive is OpenSSL's; no custom cryptographic
 algorithms.
 
 ## Implementation
