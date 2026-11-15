@@ -215,8 +215,8 @@ under at most 4 salts for one watch; a state under a fifth salt is dropped.
   holder in place says `online: true`; `online: false` is sent only as the last
   state before the holder takes the destination down.
 
-Measured sizes: a watch is 1447 bytes, most of it the hybrid seal; a renew is 109
-and a state 80.
+Measured sizes: a watch is 1447 bytes, most of it the hybrid seal; a renew is 38
+bytes and a state 70.
 
 ### Typing
 

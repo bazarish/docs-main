@@ -394,7 +394,9 @@ recipient finds the message whose `id` equals `ref` and replaces its `text` and
   a message changes in response to a button press - by sending an `edit` whose
   `ref` is the callback's `ref`.
 - **Users** edit their own line: the client updates its local copy and sends an
-  `edit` so the peer updates theirs.
+  `edit` so the peer updates theirs. A message that never left - still in the
+  outbox in a letter of its own and not on its way - is rewritten there with the
+  new text and sent as the message itself, and no `edit` is sent.
 
 A `delete` is the sibling primitive: the recipient removes the message whose `id`
 equals `ref` outright, leaving **no tombstone** (a true delete-for-everyone). The client always removes its own copy; for a one-to-one message
