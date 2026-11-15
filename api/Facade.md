@@ -33,11 +33,12 @@ The facade is the "last mile" between the client and the server infrastructure. 
   router reads it with no special case anywhere. It is not a facade and speaks no
   Bazarish API: the client's I2P engine appends that name, fetches the archive,
   unpacks it and loads the routers, each of which carries its own signature. The
-  archive's own signature is not required, since a reseed an operator runs
-  privately is signed by nobody a stock client trusts; the address must be
-  **https** because the transport is what stands between the archive and the
-  network. The router refuses a reseed
-  entry of any other form.
+  archive's own signature is not checked, since a reseed an operator runs
+  privately is signed by nobody a stock client trusts. The address must be
+  **https**, which keeps the archive from a passive observer; the router does
+  not check the host's certificate, so an observer on the path can serve an
+  archive of its own (`ThreatModel.md`, A network observer). The router refuses
+  a reseed entry of any other form.
 - **A server may pack its own**, and its **portal** publishes it at
   `i2pseeds.su3` - never a facade. A facade is an I2P address and this is the one
   file a client needs before it has I2P; the portal is on the clearnet in any

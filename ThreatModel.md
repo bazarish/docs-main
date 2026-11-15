@@ -140,6 +140,16 @@ An observer can block I2P or the reseed. The router can reach I2P through a SOCK
 proxy, and a device can start from any https reseed it is given
 (`client-qt/docs/I2pRouter.md`).
 
+An observer on the path of the reseed fetch (the device's ISP, its Wi-Fi, the
+SOCKS5 proxy) can answer it with an archive of its own. The router checks neither
+the https host's certificate nor the archive's signature, and each router in the
+archive carries only its own signature, which the observer makes for routers it
+runs as easily as anyone. A router that loads such an archive knows only the
+observer's routers and builds its tunnels through them, so the observer can link
+the device to the destinations it uses. This is open whenever the router starts
+knowing too few routers, the first start included. It is a minor risk,
+accepted: it is how the stock i2pd router reseeds by default (`api/Facade.md`).
+
 ## I2P routers
 
 A router that carries a tunnel sees encrypted traffic between its neighbours.
