@@ -19,10 +19,7 @@ The facade is the "last mile" between the client and the server infrastructure. 
   facade.
 - **A facade is an I2P address, and the API is spoken over nothing else.** Every
   connection to a facade, the first included, goes over I2P, so a client never
-  shows its address to the server it is about to register with. Where a stand on a LAN has no I2P at all,
-  the client is started with `--allow-facade-without-i2p-for-dev-purposes` and
-  the node's configuration key of the same name; both state their consequences, and
-  both are disabled by default.
+  shows its address to the server it is about to register with.
 - **Clearnet is the bootstrap, and only the bootstrap.** A client with no netDb
   cannot dial anything on I2P, so the descriptor carries **reseed** addresses
   beside the facades: clearnet, fetched once, and never queried again once the
@@ -155,11 +152,9 @@ the untrusted last mile in any case - all security is end-to-end and anchored in
 the server fingerprint. A descriptor whose facade carries a scheme or a path is
 refused.
 
-A clearnet facade address (`host:port`, plain HTTP) exists only for a client
-started with `--allow-facade-without-i2p-for-dev-purposes` (above); without it,
-a descriptor that names one is refused. A client that hosts its own
-server reaches that server's facade on its own loopback, which leaves the
-machine for nothing.
+A descriptor that names a facade outside I2P is refused. A client that hosts
+its own server reaches that server's facade on its own loopback, which leaves
+the machine for nothing.
 
 ### Connections
 
