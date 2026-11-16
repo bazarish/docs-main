@@ -45,6 +45,8 @@ Only a primary device adds one, and the new device's role - primary or secondary
 
 **From a file.** An exported backup is the same bundle sealed with a password under Argon2id and AES-256-GCM (`Identity.md`, Algorithms), and only a primary device exports one, for a role chosen the same way. A **primary** backup carries the root; the device that imports it makes its own keys and certifies them as primary itself. A **secondary** backup cannot do that, so the exporting device makes the new device's keys and certificate itself and puts them, private halves included, in the backup. Such a backup is for one device: its id is taken by the first copy that registers, and a second import of it is refused by the server with `409 DEVICE_TAKEN` (`api/ClientApi.md`).
 
+A device restored from a **primary** backup asks which of the account's other active devices to revoke. Nothing is chosen in advance: the user picks devices one by one or all of them, and confirms; confirming with none picked keeps them all. The question is kept in the profile until it is answered; one that is put off is asked again. The chosen devices are revoked as below.
+
 ## Revocation (removing a device)
 
 - Only a primary device revokes, and never itself; a lost or stolen device is revoked from any primary device that remains. Revocation is the root's signed revocation list (`Identity.md`, Revocation list): the revoking device signs the next list, makes new epoch keys under it and hands them only to the devices that stay, withdraws what its outbox still held for the revoked device, publishes the card, and sends the new device list and the new epoch keys to the account's other devices and to every contact.

@@ -84,6 +84,8 @@ The messaging server and the service node serve the account. They learn:
 - the number of the account's devices and of the delivery passes it holds, which
   is its number of contacts;
 - the arrival time, size and delivery class of every item in its mailbox;
+- which of those items a device holds without acknowledging them, at most 32,
+  because its held wait for mail names them (`Messages.md`, Encoding);
 - that a pass registered right after a contact request belongs to that request
   (`Contacts.md`, Residual disclosure to the server).
 
@@ -218,7 +220,11 @@ while it watches. A contact holds the presence schedule it was last sent, up to 
 days ahead: one removed, blocked or past the 100 readers stops being a reader at
 once, and until that schedule runs out can still tell from the network database
 when the user is online (`Presence.md`, What anyone learns). The card names no server, so
-a contact cannot tell which server hosts the user.
+a contact cannot tell which server hosts the user. A letter that does not open, or
+that is signed by a device the contact's card does not list, is let go and leaves
+a note in that contact's conversation; at most 32 entries wait unacknowledged for
+a key or a device list, and those beyond are let go the same way (`Messages.md`,
+Encoding).
 
 ## A gateway
 

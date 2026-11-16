@@ -210,14 +210,26 @@ that lost that choice still opens.
   account's other devices never got.
 - A primary device keeps a key for the current epoch and for the next. It makes a
   missing key after a random pause of up to an hour; a key that arrives from
-  another primary device in that pause is taken instead.
+  another primary device in that pause is taken instead. A card is never
+  published without both: a primary device about to publish one makes a missing
+  key for the current or the next epoch at once.
 - The private halves travel to the account's other devices sealed to each
   device's own key (`device.epochs`, `DeviceSync.md`); the public halves travel in
   the card and to every contact in `account.epochs`, which a device sends when
   what it last sent leaves less than one epoch ahead.
 - A sender seals each attempt to the key of the epoch current at that attempt
   (`Messages.md`). A sender that holds no key for the current epoch keeps the
-  message and fetches the recipient's card, once a day, for the keys.
+  message and fetches the recipient's card for the keys. Only a card that came
+  counts for the day: the client's own upkeep asks once a day, and each of these
+  asks again at once unless the card already came that day - a user act on that
+  contact (a message, an edit, a deletion, a reaction, a request for a file), a
+  letter from the contact, or a newer lease set of the contact's address. A new
+  address of the contact (`contact.routing`) asks again even when the card came
+  that day. A download that broke off after the connection opened is asked again
+  at once, at most twice (`kCardBrokenRetries`) for each lease set of the
+  contact's address seen. A lease set that was not found or a connection that did
+  not open is not asked again at once: the waiting letters wait for one of the
+  asks above.
 
 ### Moving to another server
 

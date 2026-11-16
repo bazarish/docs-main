@@ -46,7 +46,9 @@ every message in it keeps its own `auth`, and a receiver checks each on its own.
 A message that fails the checks is dropped alone and the rest are kept. The
 mailbox entry is acknowledged once, after the last message in the array is kept,
 so an envelope is never let go with part of it unkept, and a redelivery is
-recognised message by message through each `id`.
+recognised message by message through each `id`. A reader that fails to write
+what it took in to its own storage ends the pass with that error and acknowledges
+nothing of the entry, which it takes in again on a later pass.
 
 Two kinds of mailbox entry wait instead of being let go. An entry sealed to an
 epoch key the reader does not hold, whose key id names an active primary device
@@ -244,8 +246,8 @@ a read receipt as much as a letter. The second is what the contact-request cap i
 measured against (`api/ClientApi.md`): a request carries no pass and no card, so
 its signature is the only thing that names the sender.
 
-**`routing` - where to answer, sent once when it changes.** A destination is not
-permanent: raising a new I2P key changes the address, and the account issues a
+**`routing` - where to answer, sent when it changes and after a long silence.**
+A destination is not permanent: raising a new I2P key changes the address, and the account issues a
 new serving sealing key with it. Whenever the pair a card carries changes, the
 account sends every contact one
 `contact.routing` message carrying `{dest, servingKey}`, and a receiver whose
@@ -274,11 +276,23 @@ differently, because the remedy differs:
 - a **contact** whose server refused the update leaves a notice in that contact's
   own chat, saying the new details did not arrive, with a **Try again** beside it.
   One notice per contact, removed when the update is delivered;
-- the **alias registry** is asked again every 10 seconds, silently, until it
-  takes the new descriptor.
+- the **alias registry** is asked at once, again whenever the device connects to
+  or registers with its server, and otherwise at most once an hour, silently,
+  until it takes the new descriptor.
 
 A client with no chat window (the daemon) lists the pending entries on its own
 face, with the same retry.
+
+A contact that missed the fan-out learns the pair from ordinary mail. When more
+than 30 days (`kMailRetentionDays`) have passed since the last exchange with a
+contact, the next content letter to it carries a `contact.routing` message signed
+by a primary device of the account, appended to the letter's array. An exchange
+is a letter received from the contact, or a letter of ours that carries the
+routing - the fan-out's, a first reply's bootstrap, or this one - stored by the
+contact's server. Whether a letter carries it is decided at each attempt, when
+the letter is sealed, and only when the letter still fits the envelope with it;
+once a letter carrying it is stored, the next ones go without it. A secondary
+device, and an account with no address of its own, add nothing.
 
 ### Content-type registry (v1)
 
@@ -464,8 +478,8 @@ it. Each device deletes **its own copy only**: nothing is sent when a message go
 A message is counted from when it was sent on the sender's devices and from when it
 was read on the recipient's, under the timer in force at that moment, so turning the
 timer on does not touch what was already sent or read. Text, pictures, voice messages
-and files expire; service notices do not. A client checks for expired messages when
-a conversation is opened and from time to time across every conversation. Group
+and files expire; service notices do not. A client deletes a message when its time
+comes, and checks for expired messages when a conversation is opened. Group
 conversations carry no timer.
 
 ### Avatars and display names
