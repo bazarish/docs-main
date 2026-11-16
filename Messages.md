@@ -48,6 +48,21 @@ mailbox entry is acknowledged once, after the last message in the array is kept,
 so an envelope is never let go with part of it unkept, and a redelivery is
 recognised message by message through each `id`.
 
+Two kinds of mailbox entry wait instead of being let go. An entry sealed to an
+epoch key the reader does not hold, whose key id names an active primary device
+of its own account other than the reader, before that key has ended its 30 days
+of keeping, waits for the key (`device.epochs`). An envelope whose first message
+is signed by a device the reader's list of that contact does not hold, when the
+contact is not blocked and the contact's card did not come during that pass,
+waits for the contact's device list (`account.devices` or a card that comes).
+A waiting entry is not acknowledged; it is opened again when what it waits for
+arrives, and when the account is opened. At most 32 entries wait
+(`kMaxDeferredMailItems`); the held `events` request names them, so they alone do
+not end it (`api/ClientApi.md`). An entry beyond that bound, an entry sealed to a
+key no active primary device of the account made or that has been erased, and an
+entry that does not open are let go: an entry whose sender can be named leaves a
+note in that contact's conversation, any other leaves a notice on the account.
+
 A voice message is a bare sequence of Opus frames in the call format - 48 kHz
 mono, 20 ms frames, each length-prefixed.
 
