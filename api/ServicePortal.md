@@ -139,7 +139,8 @@ per-user-destination endpoint) and reports its state on
 Proving the key is the registration, and the node records a pending grant for
 that fingerprint. The grant becomes an account in the store when the client
 publishes its card; the client reads its state back via
-`GET /v1/account/i2p-status`.
+`GET /v1/account/i2p-status`, and a pending account holds that request open until
+the operator approves, declines or bans it (`ClientApi.md`).
 
 An operator chooses one of two modes (`registration.requireApproval`):
 
