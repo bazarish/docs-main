@@ -18,11 +18,12 @@ write, everyone else reads.
 
 ## What a member sees, and what they do not
 
-- The number of members, as a snapshot - never the list.
+- The number of members, as a snapshot. In a `group` also the names of the
+  members (*Member list*); in a `channel` never the list.
 - Other members only by their name in the chat - never a fingerprint.
 - Every post signed by the host. **Authorship inside a group is not
   verifiable**: the host could put any text under any name. That is the price
-  of a hidden member list, and trust in a group is trust in its host.
+  of hiding who the members are, and trust in a group is trust in its host.
 - The host knows everything: fingerprint and name of every member, every post,
   who wrote it and when.
 - An admin additionally sees the descriptor of a member who asks to join, and
@@ -168,11 +169,94 @@ starts over.
 - Two names that **look alike** are the same name: names are compared by their
   confusable skeleton (Unicode UTS #39) after case folding and NFKC, so `a` and
   Cyrillic `a` clash, and a name that mixes scripts is refused.
+- A name holds no white space other than the space U+0020.
+- Two names whose mention forms (*Mentions*) look alike are the same name, so
+  `Anna Maria` and `Anna_Maria` cannot both be in one chat: the comparison
+  above is made on the name with every space written as `_`.
 - A name stays with its member: a member who leaves keeps it, and the same
   fingerprint coming back gets it back.
 - A member changes it with `bot.command` `rename`. The next text they send is
   the new name, checked as above and not relayed; a refused one is answered and
   the host waits for another. The old name is freed.
+
+## Member list
+
+In a `group` every member who is in holds the names of all members. A
+`channel` has no list.
+
+```
+{ "type":  "group.members",
+  "op":    "full" | "added" | "removed" | "none",
+  "names": [ <name>, ... ],   // full, added, removed
+  "total": <int>,             // full, added, removed: the member count after this letter
+  "part":  <int>,             // full only: 1 for the first part
+  "parts": <int>,             // full only: how many parts the list has
+  "you":   <name> }           // optional: which of `names` is the recipient
+```
+
+- It comes from the host only, with the `group` block, and is never shown as a
+  bubble.
+- `full` is the whole list, split into parts of at most 1000 names, sent part 1
+  first and in order. The client takes the list when the last part has come and
+  the names it collected number `total`.
+- `added` and `removed` are one change each, sent as it happens, in order with
+  the posts. `total` is the member count after the change.
+- A rename is a `removed` with the old name followed by an `added` with the new
+  one. The client keeps names, not people, so to it a rename is exactly the old
+  name leaving and the new one coming; a second operation would carry nothing
+  more.
+- `you` names the recipient: in the part of a full list that holds the
+  recipient's own name, and in the `added` that brings the recipient's new name
+  after a rename. The client keeps it as its own name in the chat; mentions of
+  the recipient are matched against it (*Mentions*).
+- The host sends the full list to a member it admits, and to a member who asks
+  for it with `group.members.ask` (a message with no body). It answers only a
+  member who is in; an ask from someone choosing a name, waiting for an admin,
+  or gone gets nothing.
+- A client asks when it has a `group` block from the host and no list, once per
+  run of the client for that chat; and again whenever a full list arrives
+  broken (a part out of order, a count other than `total`) or a change leaves
+  it a count other than `total`.
+- In a `channel` the host answers the ask with `{"op": "none"}` and sends no
+  changes, and the client offers no member list. When the owner changes the
+  kind, every member receives the full list or `none`.
+- `total` is exact: unlike the hourly `members` of the block, it tells the
+  members of a `group` of a join or a leave as it happens.
+- A name in `names` or `you` is at most 128 bytes (32 code points, *Names*), and
+  one letter carries at most 1000 names. A letter outside these bounds is
+  malformed.
+
+## Mentions
+
+A mention is `@` followed by a member's **mention form** in the text of a post:
+the name as the member list spells it, with every space (U+0020) written as
+`_`. Member `Anna` is mentioned as `@Anna`, member `Anna Maria` as
+`@Anna_Maria`. There is no field for it: the host relays the text as it is and
+checks nothing. An `@` that names no member is plain text.
+
+The reader's client finds mentions against its member list and its own name:
+
+1. A mention starts at an `@` that is the first character of the text or
+   follows white space or one of `(` `[` `{` `"` `'` U+00AB U+201C U+2018.
+2. The run is every character after the `@` up to the next white space or the
+   end of the text.
+3. The candidates are the run, then the run without its last character, again
+   and again while that character is one of `,` `.` `!` `?` `:` `;` `)` `]`
+   `}` `"` `'` U+00BB U+201D U+2019 U+2026. The first candidate that is a
+   member's mention form is the mention; when none is, the `@` mentions nobody.
+
+White space is the Unicode `White_Space` set: U+0009-U+000D, U+0020, U+0085,
+U+00A0, U+1680, U+2000-U+200A, U+2028, U+2029, U+202F, U+205F, U+3000.
+
+- A post **mentions the recipient** when the recipient's own name (`you`) is a
+  mention in it, or when its `replyTo` names a post of the recipient's own.
+- An edit finds the mentions of the new text.
+- The client marks such a post, counts the unread ones per chat and leads to
+  the first of them. It wakes a notification for such a post even when the
+  chat's notifications are off; the client's own notification settings still
+  apply.
+- The composer offers names from the local list, the recipient's own left out,
+  and writes the chosen one in its mention form.
 
 ## Roles
 
