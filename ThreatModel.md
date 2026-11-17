@@ -135,8 +135,9 @@ Through a gateway the observer sees TLS to the gateway's host instead
 sees bursts of page and resource requests over up to six connections, with
 read pauses between them, the shape of browsing one host; real traffic takes
 the place of a burst and is not added to one. While the user is idle it sees
-one WebSocket that stays open, with a ping after a silence drawn afresh
-each time between 180 and 260 s. Every
+one WebSocket that stays open, with a ping of a drawn length after a silence
+drawn afresh each time: between 30 and 70 s while the app is in front, between
+120 and 240 s in the background. Every
 message inside the WebSocket is padded: for messages up to
 1.5 KB the length of a record tells nothing, above that only a lower bound. A
 call's media goes in records sent in random slots whose spacing drifts over the
