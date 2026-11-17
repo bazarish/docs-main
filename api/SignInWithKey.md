@@ -43,7 +43,7 @@ three things carry it:
 The **base string** names the request:
 
 ```
-"v2\n" + t + "\n" + METHOD + "\n" + target + "\n" + hex(sha256(body)) + "\n"
+"v1\n" + t + "\n" + METHOD + "\n" + target + "\n" + hex(sha256(body)) + "\n"
 ```
 
 `target` is the request target exactly as sent: the path, and `?` and the query
@@ -231,7 +231,7 @@ the challenge exactly as issued, the whole link. A login is signed by
 the account's root, so only a primary device signs one (`Identity.md`). The string signed is therefore
 
 ```
-"v2\n" + t + "\nBZ-LOGIN\n/portal/login\n" + hex(sha256(challenge)) + "\n" + n + "\n"
+"v1\n" + t + "\nBZ-LOGIN\n/portal/login\n" + hex(sha256(challenge)) + "\n" + n + "\n"
 ```
 
 | Field | Value of | Meaning |
