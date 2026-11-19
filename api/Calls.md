@@ -85,7 +85,7 @@ Server-side components see only opaque blobs of a generic message.
 | `call.invite` | caller -> callee | `callId`, `dest` (the caller's media b33 routing address), `key` (base64 per-call media key), `sentAt` |
 | `call.ring` | callee -> caller | `callId`. Sent when a device of the callee presents the call. Until it arrives the caller only knows the invitation reached their server; from it, the caller's screen shows their device is ringing and the ringing tone starts |
 | `call.accept` | callee -> caller | `callId`, `dest` (the callee's media b33 routing address) |
-| `call.decline` | callee -> caller | `callId`, `reason` (`declined` / `busy` / `refused`). Honoured only while the caller is still calling: with several devices on one account, one of them answering and another refusing must not end the call that was answered |
+| `call.decline` | callee -> caller | `callId`, `reason` (`declined` / `busy` / `refused`). Honoured only while the caller is still calling: with several devices on one account, one of them answering and another refusing must not end the call that was answered. A caller that honours it sends `call.end`, so the callee's other devices stop ringing |
 | `call.end` | either | `callId` |
 | `call.taken` | device -> the account's own devices | `callId`; the device is the letter's author. Self-delivered (`DeviceSync.md`): every device of an account is shown the same invitation, and the one that answers or refuses stops the others. They drop the call without recording anything - the device that took it owns the outcome |
 
@@ -128,12 +128,16 @@ that same call, whenever it arrives.
 3. Both sides now know each other's media destination and the shared key. Each
    captures the microphone, encodes Opus, AES-256-GCM-seals each datagram and
    sends it to the peer's b33; received datagrams are opened, decoded and played.
+   The callee sends nothing until it has opened a datagram from the caller: the
+   caller sends media only to the first `call.accept` it took, so a second device
+   of the callee's that answered at the same moment hears nothing, sends nothing
+   and never reuses a nonce of the call's key.
    Nothing is played until media has been observed in **both** directions: what
    arrives before that belongs to a path still being established, and playing it
    produces broken audio immediately before the call starts. A side with no audio
    to send - muted, or with no frame from the microphone - sends a datagram with
    an empty payload at least every 500 ms, and a side that has received nothing
-   for 20 seconds ends the call.
+   for 20 seconds, counted from the accept, ends the call.
 4. Either side hangs up with `call.end`; the media engine and the one-time
    datagram destination are torn down.
 
@@ -155,3 +159,20 @@ that against, is for that client's implementation to document.
 - **Loss.** A receiver decodes each datagram as it arrives. A datagram whose
   sequence is not past the last one played is dropped, and a gap of up to five
   frames (100 ms) is filled by Opus loss concealment.
+
+## Call record
+
+Every call leaves one notice in the conversation on every device of an account:
+the call was answered, declined or not answered. The device that owns the outcome
+writes it and sends it to the account's other devices as `call.record` inside
+`device.message` (`DeviceSync.md`): the caller's device for an outgoing call; for an
+incoming one, the device that answered or declined it, or each ringing device when
+nobody answered. Its `id` is derived from `callId`, so the copies from several devices
+of the callee's are one notice. A `call.record` that is not from the account's own
+device is dropped. The notice carries no duration.
+
+| Outcome | When |
+|---|---|
+| `answered` | the call was answered |
+| `declined` | `call.decline` with any reason, sent or received |
+| `missed` | nobody answered within the window, or the caller hung up first |
