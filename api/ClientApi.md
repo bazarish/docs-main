@@ -186,6 +186,7 @@ user chose.
 | Endpoint | Purpose |
 |---|---|
 | `POST /v1/messaging/clients` | Register the device that signs the request, `{install}`: `install` is a random token made once for each copy of the account database. The same device registered again from the same copy is answered as registered; from another copy, `409 DEVICE_TAKEN` |
+| `DELETE /v1/messaging/clients/{device}` | A primary device drops another device of the account from the mailbox: the mail held for it alone is deleted and the device is no longer registered. The device is not revoked and registers again the next time it connects. From a secondary device, `403 DEVICE_NOT_PRIMARY`; for the caller's own device, `400` |
 | `POST /v1/messaging/self` | Store `{deliveryId, to, payload}` (payload base64) in the account's own mailbox for the one device `to` names: it must be an active device of the account's card other than the caller, else `404 CLIENT_UNREGISTERED`. Answers `{ok, stored}` (`../DeviceSync.md`) |
 
 The device is the one the request's certificate names; the "delete when all devices received" rule operates on the registered set, and an item to self waits for its one device. Requests to `events`, `pending`, `fetch`, `ack`, `passes` and `self` from an unregistered device fail with `CLIENT_UNREGISTERED`. A device leaves the set only by being revoked (`../Identity.md`, Revocation list). A successful write that has nothing to report answers `{ok: true}`.
