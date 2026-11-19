@@ -163,7 +163,8 @@ that against, is for that client's implementation to document.
 ## Call record
 
 Every call leaves one notice in the conversation on every device of an account:
-the call was answered, declined or not answered. The device that owns the outcome
+whether the call was incoming or outgoing (`incoming`), and whether it was answered,
+declined or not answered (`outcome`). The device that owns the outcome
 writes it and sends it to the account's other devices as `call.record` inside
 `device.message` (`DeviceSync.md`): the caller's device for an outgoing call; for an
 incoming one, the device that answered or declined it, or each ringing device when
