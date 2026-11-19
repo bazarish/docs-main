@@ -26,9 +26,9 @@ write, everyone else reads.
   of hiding who the members are, and trust in a group is trust in its host.
 - The host knows everything: fingerprint and name of every member, every post,
   who wrote it and when.
-- An admin additionally sees the descriptor of a member who asks to join, and
-  a member's descriptor when the member asks for contact (see *Contact
-  requests*); an ordinary member never does.
+- An admin additionally sees the descriptor and the request text of a member
+  who asks to join, and a member's descriptor when the member asks for contact
+  (see *Contact requests*); an ordinary member never does.
 
 The host delivers to all its members from one outbound address, the one
 exception to one address per correspondent (`api/Federation.md`). A server
@@ -143,8 +143,8 @@ notice. A picture or a voice note that fits one envelope is relayed.
    is an answer: a receipt or any other service message from the member gets
    no reply.
 4. In an **open** group the member is in. In an
-   **approval** group every admin receives the applicant's name and descriptor
-   with two inline buttons; the first admin to decide settles it, and the host
+   **approval** group every admin receives the applicant's name, descriptor and
+   the text of their contact request with two inline buttons; the first admin to decide settles it, and the host
    edits the card for every admin to say who decided. Requests no admin has
    decided are also listed in the host's own interface.
 5. A member who is in receives the last N posts (N chosen by the owner, 0
