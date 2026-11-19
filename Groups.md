@@ -52,8 +52,10 @@ Every `content` envelope a group host sends carries one additive block:
   receives from the host already tells their client it is a group.
 - All five fields are required. A block missing one is rejected with the
   envelope, as any malformed envelope is.
-- `members` is a snapshot the host refreshes **once an hour**, so the count
-  does not tell members the moment somebody joined.
+- `members` is the count of members. In a `group`, whose member list every
+  member sees, it is current. In a `channel` it is a snapshot the host refreshes
+  **once an hour**, so the count does not tell members the moment somebody
+  joined.
 - `write` and `admin` are computed for the recipient. `write` is true while the
   member is choosing a name, true for one who left or was excluded (writing is
   how they join again), true for every member of a `group` and for an admin of
@@ -220,8 +222,8 @@ In a `group` every member who is in holds the names of all members. A
 - In a `channel` the host answers the ask with `{"op": "none"}` and sends no
   changes, and the client offers no member list. When the owner changes the
   kind, every member receives the full list or `none`.
-- `total` is exact: unlike the hourly `members` of the block, it tells the
-  members of a `group` of a join or a leave as it happens.
+- `total` is exact: it tells the members of a `group` of a join or a leave as
+  it happens.
 - A name in `names` or `you` is at most 128 bytes (32 code points, *Names*), and
   one letter carries at most 1000 names. A letter outside these bounds is
   malformed.
