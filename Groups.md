@@ -285,9 +285,9 @@ sends `group.state` - a message with no body, only the block - when `write` or
 - A post marked `contactable` offers "request contact". The member sends
   `bot.command` `contact <id>`, and the host passes the requester's descriptor
   to the author, in a message only the author sees. The author decides; the
-  author's own descriptor goes nowhere. A member asks a given author once; a repeated ask is
-  not passed on. A member who asks an author who refuses contact requests is
-  told so, and the author learns nothing of it.
+  author's own descriptor goes nowhere. A member asks a given author once a day;
+  an ask inside that day is not passed on. A member who asks an author who
+  refuses contact requests is told so, and the author learns nothing of it.
 - A member turns this on and off with `bot.command` `contactable on` /
   `contactable off`. The owner can switch it off for the whole group.
 
