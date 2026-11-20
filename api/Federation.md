@@ -72,7 +72,8 @@ request. No check distinguishes a server from a client, which is what allows a
 client to deliver its own messages over the same frame.
 
 Every message federates, including one between two users the same server hosts,
-so delivery latency reveals no co-location (`InviteAnonymity.md`). The one write that does not
+so delivery latency reveals no co-location (`InviteAnonymity.md`); the two
+carriers below that skip I2P each stay inside one trust boundary. The one write that does not
 federate is a message to the sender's **own other devices**, which their server
 stores directly (`ClientApi.md`) - there is no second party for it to reach.
 
@@ -83,6 +84,13 @@ gateway carries its users' dials to the server it is linked to over TLS
 own users directly, without I2P (Meeting on the gateway, same document). A dial to
 a recipient that server hosts goes over that TLS link even when the recipient does
 not use the gateway. The frame and the admission are the same as over I2P.
+
+**Inside one daemon.** A daemon that both serves destinations and runs the
+accounts behind them - a bot host (`bazarish-bot/docs/Design.md`, Self-hosting) -
+carries a delivery between two of its own accounts over a pipe in memory,
+without I2P. The frame and the admission are the same as over I2P, and the
+recipient is told the sending account's address, so what is counted per sending
+address is counted the same.
 
 ## Delivery envelope
 

@@ -111,6 +111,12 @@ gateway serves a narrow circle of family or friends who chose it. A client on it
 own router, or on a gateway somebody else runs, sees the same latency for every
 recipient.
 
+A daemon that both serves destinations and runs the accounts behind them - a bot
+host - carries a delivery between two of its own accounts in memory, without
+I2P. Those accounts belong to the one operator who runs the daemon, so the
+latency tells that operator what they already know; a correspondent anywhere
+else is dialled over I2P.
+
 ## The destination parameter (`dest_U`)
 
 **Fundamental rule: a server has no single, shared federation destination.** Every
