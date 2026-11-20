@@ -116,6 +116,8 @@ notice. A picture or a voice note that fits one envelope is relayed.
   stays: it is their outgoing message, and a `delete` applies only to messages
   sent by its `from`.
 - Nobody edits another member's post.
+- Clearing a group chat clears it on the member's own devices only. A client
+  sends no `chat.clear` to a group host, and a host ignores one.
 
 ## Reactions
 

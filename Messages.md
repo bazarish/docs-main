@@ -469,7 +469,8 @@ local transcript and leaves the chat row in place. **For everyone** additionally
 sends a `chat.clear` to the peer; the peer's client honours it, wiping its own
 transcript and leaving a single "cleared the chat" notice. This is a cooperative
 request (the peer's client chooses to honour it), distinct from `delete`, which
-removes a single message. Deleting a **contact** is a separate, local-only,
+removes a single message. A group chat is cleared only for me: see `Groups.md`, Edits and deletes.
+Deleting a **contact** is a separate, local-only,
 irreversible action: it removes the contact and the whole conversation from the
 deleting device (the peer is not told).
 
