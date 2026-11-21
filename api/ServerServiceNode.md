@@ -21,7 +21,7 @@ that fingerprint.
 | `PUT /v1/messaging/card` | `{user}`: the account published a new card. The server drops the copy it holds, so the next `get-card` reads the new one |
 | `PUT /v1/messaging/quota` | Set the mailbox quota granted by the account, in place of the server's default |
 | `GET /v1/messaging/account?user=` | State held for one account: registered devices, bytes in use, effective quota; displayed by the administration panel |
-| `POST /v1/messaging/node-card` | `{sealingKey}`, the node's public sealing key (DER, base64) -> `{card}`: the **node card**, `{ v, t: "node-card", server, sealingKey, issuedAt }`, signed with the server root like the server card. The node asks for it at every start and serves it at `GET /v1/node/card`; a client seals the account tunnel to the key in it and trusts it by the same fingerprint as the server card (`ClientApi.md`). A node that cannot get one does not start |
+| `POST /v1/messaging/node-card` | `{sealingKey}`, the node's public sealing key (DER, base64) -> `{card}`: the **node card**, `{ v, t: "node-card", server, sealingKey }`, signed with the server root like the server card. The node asks for it at every start over its pinned link to the server, which vouches for the signer: the `server` in the card is the fingerprint the node then authorises the server by and serves it at `GET /v1/node/card`; a client seals the account tunnel to the key in it and trusts it by the same fingerprint as the server card (`ClientApi.md`). A node that cannot get one does not start |
 | `DELETE /v1/messaging/account?user=` | The account has been deleted: discard the mailbox, the replay markers, the delivery passes, the device registry, the quota override and the destination record with its keys. Issued whenever an account is deleted, by its owner or by an operator. Idempotent: a fingerprint for which the server holds no state is already in the requested condition |
 
 ## Client-ID registry
@@ -40,5 +40,5 @@ Owned by the **server** (it drives the delete-when-all-acked storage rule, see `
   mailbox, so the panel and the portal read usage from the server
   (`GET /v1/messaging/account`).
 - **Signed per request.** Every call carries the caller's hybrid signature and
-  each side authorises it by fingerprint - the node by the server card it is
-  bound to, the server by its configured `operators` list.
+  each side authorises it by fingerprint - the node by the `server` named in its
+  node card, the server by its configured `operators` list.

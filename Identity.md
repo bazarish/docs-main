@@ -21,7 +21,7 @@
 - A server's root identity is a hybrid keypair set.
 - **Server card** - a document signed by the server's root key, binding the
   server's identity to a server-level sealing key
-  (`{ v, t: "server-card", server, sealingKey, issuedAt }`; it names no transport
+  (`{ v, t: "server-card", server, sealingKey }`; it names no transport
   endpoint). It is the server's own identity document (the service node is
   bound to it), and it is also what a **client** fetches in the open before it can
   speak in private: the messaging tunnel is sealed to the sealing key in it, and the card is
