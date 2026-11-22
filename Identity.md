@@ -22,7 +22,7 @@
 - **Server card** - a document signed by the server's root key, binding the
   server's identity to a server-level sealing key
   (`{ v, t: "server-card", server, sealingKey }`; it names no transport
-  endpoint). It is the server's own identity document (the service node is
+  endpoint). It is the server's own identity document (the server service is
   bound to it), and it is also what a **client** fetches in the open before it can
   speak in private: the messaging tunnel is sealed to the sealing key in it, and the card is
   trusted because it is signed by the fingerprint the user already had
@@ -55,7 +55,7 @@
   **root identity** signs only **outside** federation - the server card above
   (the `https://bazari.sh/#server` configuration link carries no signature, only the
   fingerprint that card is verified against, `api/Facade.md`) and the
-  service-node binding - so two users one server hosts share no signer and cannot be
+  server-service binding - so two users one server hosts share no signer and cannot be
   clustered by a common server fingerprint: no two users share a destination, so
   none share its signing key (`InviteAnonymity.md`).
 
@@ -77,7 +77,7 @@ fields, each non-empty, no other field, and `v` 1.
 - `t` - what this document is. Checked before any of the body is believed, so
   that one signed document cannot be read as another.
 - `issuedAt` - when it was signed. Two cards of one person are ordered by this
-  and by nothing else, and the node that holds one **refuses any that is not
+  and by nothing else, and the server service that holds one **refuses any that is not
   newer** (`api/ClientApi.md`), so a device holding an old copy cannot republish
   it and revert the account's routing.
 - `kind` - `user`, `bot` or `chat` (a group or channel host, `Groups.md`): what
@@ -105,7 +105,7 @@ fields, each non-empty, no other field, and `v` 1.
 - `devices` - the certificate of every active device of the account, each once
   (*Device certificate*, below).
 - `revocation` - the account's newest **revocation list** (below). A card whose
-  list is older than the one the node holds is refused (`api/ClientApi.md`).
+  list is older than the one the server service holds is refused (`api/ClientApi.md`).
 
 **The owner is the root, the signer is a device.** A card is a statement its
 owner makes about themselves, so the subject is taken from the root that

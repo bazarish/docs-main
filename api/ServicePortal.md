@@ -1,6 +1,6 @@
 # Service Portal (account onboarding)
 
-The **service node** owns user accounts. It exposes a **web portal** (the
+The **server service** owns user accounts. It exposes a **web portal** (the
 "Service site") through which a user registers and proves ownership of their key.
 The **messaging server (server-core)** stays a pure delivery layer: it never
 registers anyone. Proving the key is the whole registration, whether it is proven
@@ -16,11 +16,11 @@ alias service is a separate deployment with its own portal and payment layer
             +---------------------------------+  paste | (key never enters browser) |
                            | HTTP                 sig   +----------------------------+
                   +--------v---------+
-                  |   service node   |  accounts and approval      
+                  |   server service   |  accounts and approval      
                   +------------------+
        grants registration | quota
                   +--------v---------+
-                  |   server-core    |  delivery only; relays the node's
+                  |   server-core    |  delivery only; relays the server service's
                   +------------------+  answers unchanged
 ```
 
@@ -36,20 +36,20 @@ user signs it in their client, the portal verifies the blob and consumes the
 challenge, and the signer's fingerprint is the userId. On success the portal sets
 a session cookie carrying `userId` and an expiry (HttpOnly, SameSite=Strict).
 
-What this node puts in the consumer, and how an operator changes it without a
+What this server service puts in the consumer, and how an operator changes it without a
 restart, is in `SignInWithKey.md`.
 
 ## 2. Registration from a client
 
 A client never sends its user to the portal. It publishes its card
-(`POST /v1/account/card`); a node that holds no account and no pending grant for
+(`POST /v1/account/card`); a server service that holds no account and no pending grant for
 that key answers `ACCOUNT_UNKNOWN`, and the client registers itself
 (`POST /v1/account/registration`) and publishes the card again. On a moderated
-node the answer to that card says `approval: pending` and carries the operator's
+server service the answer to that card says `approval: pending` and carries the operator's
 `registration.message`, and the client shows it while the account waits. Every
 key that is not banned is registered.
 
-server-core serves only accounts whose card the node holds and answers `ACCOUNT_UNKNOWN` for any other key. A client that asks
+server-core serves only accounts whose card the server service holds and answers `ACCOUNT_UNKNOWN` for any other key. A client that asks
 server-core for its destination before it has registered reads that answer as
 "no destination served here yet".
 
@@ -66,11 +66,11 @@ Per user (`subscriptions/<fp>.json` - the account record - and `grants/<fp>.json
 - **account** - created when the client first publishes its card; holds the
   granted quota, the published card and when a destination was last delegated.
   The account itself has no term - only the delegated transient expires (below):
-  `GET /v1/account/i2p-status` reports what the client needs to see, and the node
+  `GET /v1/account/i2p-status` reports what the client needs to see, and the server service
   deletes an account idle for `idleDeleteDays` (180). Idle counts from the last
   accepted delegation, or from registration for an account that never delegated;
   a revocation is not a delegation and does not restart the count.
-- **approval** - `requestedAt` and `approvedAt`. On an open node an account is
+- **approval** - `requestedAt` and `approvedAt`. On an open server service an account is
   approved the moment it is created; on a moderated one it stays pending (see
   below). Publishing the card again restarts neither `requestedAt` nor the
   registration time the sweep counts from, so a pending account cannot postpone
@@ -105,10 +105,10 @@ A destination can only be delegated once the account exists, so the client
 publishes its card first, delegates its transient, and immediately re-publishes its
 contact card (`POST /v1/account/card` again, which grants nothing and consumes no
 grant) with the routing folded in. On a moderated
-node the delegation is refused until an operator approves the account, so the
+server service the delegation is refused until an operator approves the account, so the
 client publishes its routing once the account is approved.
 
-The transient is short: 14 days by default, 1 to 30 as the user sets it (the node
+The transient is short: 14 days by default, 1 to 30 as the user sets it (the server service
 refuses a longer one), kept the same on every device of the account by a
 `device.delegation-term` message. The client re-issues a fresh one
 about 5 days before it lapses, less up to 6 hours of per-device **jitter**, and
@@ -136,7 +136,7 @@ per-user-destination endpoint) and reports its state on
 
 ## 4. Registration: open or moderated
 
-Proving the key is the registration, and the node records a pending grant for
+Proving the key is the registration, and the server service records a pending grant for
 that fingerprint. The grant becomes an account in the store when the client
 publishes its card; the client reads its state back via
 `GET /v1/account/i2p-status`, and a pending account holds that request open until
@@ -156,22 +156,22 @@ An operator chooses one of two modes (`registration.requireApproval`):
 | Endpoint | Purpose |
 |---|---|
 | `POST /v1/account/approve` | Operator-signed: approve one account (the ones awaiting approval are listed by `GET /v1/account/users?state=pending`) |
-| `GET /v1/account/users?q&state&limit&offset` | Operator-signed: the accounts on this node, searched and paged here |
+| `GET /v1/account/users?q&state&limit&offset` | Operator-signed: the accounts on this server service, searched and paged here |
 | `GET /v1/account/user?user=` | Operator-signed: one account in full |
 | `PUT /v1/account/quota` | Operator-signed: set an account's storage quota (and push it to server-core) |
 | `POST /v1/account/undelegate` | Operator-signed: revoke the account's destination and put it back on hold, with a message for its owner |
 | `DELETE /v1/account/user?user=` | Operator-signed: delete the account (certificate, grants, destination) |
 | `POST /v1/account/ban` | Operator-signed: delete the account and refuse this key from now on (reason defaults to "Banned") |
 | `POST /v1/account/unban` | Operator-signed: lift a ban |
-| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed, and the whole of what an operator can change: registration mode and its message, `loginConsumer`, `portalLinks`, `facades`, `reseeds` (each an `https` URL, or the write is refused; a config file naming a reseed that is not `https` is refused at start), `defaultQuotaBytes`, `idleDeleteDays`, `logLevel`, and the three addresses `listen`, `portalListen`, `messaging` - plus the account count and the sum of the quotas. Everything is written back into the node's config file, so a restart keeps it; `logLevel` and the portal's own words apply at once, the three addresses at the next start |
-| `POST /v1/account/restart` | Operator-signed, on the operator socket: the node exits with the restart code (90) so that its supervisor starts it again |
+| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed, and the whole of what an operator can change: registration mode and its message, `loginConsumer`, `portalLinks`, `facades`, `reseeds` (each an `https` URL, or the write is refused; a config file naming a reseed that is not `https` is refused at start), `defaultQuotaBytes`, `idleDeleteDays`, `logLevel`, and the three addresses `listen`, `portalListen`, `messaging` - plus the account count and the sum of the quotas. Everything is written back into the server service's config file, so a restart keeps it; `logLevel` and the portal's own words apply at once, the three addresses at the next start |
+| `POST /v1/account/restart` | Operator-signed, on the operator socket: the server service exits with the restart code (90) so that its supervisor starts it again |
 | `POST /v1/login/expect` | Operator-signed: `{challenge, token}` - the admin panel's challenge waits in the sign-in box under its nonce |
 | `POST /v1/login/claim` | Operator-signed: `{nonce, token}` -> `{state, challenge, blob}`, `state` being `waiting`, `signed` or `gone`; a signed entry is handed over once |
 
 The **sign-in box** keeps the challenges the portal and the admin panel wait on,
 in memory, for the challenge's window (300 s), at most 1024 of them. On the
 client socket, which only a facade reaches, `GET /login/c/<nonce>` answers the
-challenge and `POST /login/callback` takes `{challenge, blob}`: the node checks
+challenge and `POST /login/callback` takes `{challenge, blob}`: the server service checks
 the blob's signature over that challenge (`403` if it fails) and that the
 challenge is the one waiting under its nonce (`404` if not, or if a signature
 already came). The tag is checked by whoever issued the challenge, when it
@@ -184,14 +184,14 @@ way back to lifting it. A banned key is refused at the portal and at
 `POST /v1/account/card`, and the reason the operator wrote is what its owner is
 shown.
 
-Settings changed here are applied live and written back to the node's config
-file, so what an operator sets in the panel is what the node reads at its next
+Settings changed here are applied live and written back to the server service's config
+file, so what an operator sets in the panel is what the server service reads at its next
 start. A write that cannot be persisted is refused and not applied.
 
 `q` is a case-insensitive substring of the fingerprint **or of the account's
 destination address**, and `state` is
 `all` / `pending` / `approved`; the answer carries the page (`users`) and the
-number of matches (`total`). The search runs on the node, the only side that
+number of matches (`total`). The search runs on the server service, the only side that
 holds the accounts, so no more of the roster than the page asked for reaches a
 browser.
 
@@ -202,34 +202,34 @@ full-page reloads, post-redirect-get). It presents one action at a time:
 
 1. **the user's key** - the page renders a challenge; the user signs it in their client
    and pastes the blob back. `POST /login` verifies it and sets the session
-   cookie. When the node's first facade is a `.b32.i2p` address, the challenge
+   cookie. When the server service's first facade is a `.b32.i2p` address, the challenge
    names a callback on it and the page also shows a QR code of a link to the
    challenge (`SignInWithKey.md`). The client fetches the challenge and posts the
-   signature through the facade (`Facade.md`), and the node's sign-in box keeps
+   signature through the facade (`Facade.md`), and the server service's sign-in box keeps
    it until the browser that showed the code asks for it at `GET /login/wait`.
    Only that browser can: it holds the `signin` cookie the page set. The wait
    needs scripts; without them the pasted form still works.
 The grant is issued as the key is proven, so the page
 that follows the sign-in already reports the account - its quota, what the
 messaging server holds for it, and the server descriptor to paste into a client -
-or, on a moderated node, the "waiting for the operator" notice with the
+or, on a moderated server service, the "waiting for the operator" notice with the
 operator's instructions. An account's owner can also end it from here.
 `POST /logout` drops the session.
 
 The portal's **web files are stored on disk**: `portal.assets
 <dir>` (mandatory with `portal.listen`) holds one template per state of the
 flow, the text catalog `messages.json`, the stylesheet, the logo, the fonts and
-an optional `portal.js`. Every word on the page is in those files; the node only
+an optional `portal.js`. Every word on the page is in those files; the server service only
 fills in the values a template asks for by name:
 
 | Template | Placeholders |
 |---|---|
-| `page.html` (shell) | `title`, `strapline` (the line naming this node's messaging-server fingerprint), `session`, `content`, and `lang`, `dir`, `switch` for the page's language |
+| `page.html` (shell) | `title`, `strapline` (the line naming this server service's messaging-server fingerprint), `session`, `content`, and `lang`, `dir`, `switch` for the page's language |
 | `session.html` | `fingerprint` |
 | `signin.html` | `challenge`, `error`, `scan` (empty, or `signin-scan.html`) |
 | `signin-scan.html` | `qr`, `nonce` |
 | `registered.html` | `quota`, `descriptor`, `mailbox`, `devices` |
-| `registered-approval.html` (moderated node) | the same, plus `message` - the operator's note |
+| `registered-approval.html` (moderated server service) | the same, plus `message` - the operator's note |
 | `waiting.html` | the same as the approval page |
 | `banned.html` | `message` - the operator's reason |
 | `confirm-delete.html` | `mailbox`, `devices` |
@@ -248,7 +248,7 @@ in that directory, of a type the portal publishes, are served.
 
 | Caller | Endpoint | Auth | Purpose |
 |---|---|---|---|
-| Client | `POST /v1/account/card`, `POST /v1/account/registration` | sig | publish the card; register when the node knows no such account |
+| Client | `POST /v1/account/card`, `POST /v1/account/registration` | sig | publish the card; register when the server service knows no such account |
 | Client | signs the challenge (local) | key | produce the login blob |
 | Browser | `GET /`, `POST /login` | sig -> session | sign-in-with-key, which is the registration |
 | Browser | `GET /login/wait?nonce=` | `signin` cookie | the sign-in by code: `waiting`, `signedIn` (with the session cookie) or `gone` |
@@ -257,7 +257,7 @@ in that directory, of a type the portal publishes, are served.
 | Client | `POST /v1/account/registration` | key | the same registration, with no page to visit |
 | Panel | `POST /v1/account/approve` | operator sig | moderation |
 | Panel | `GET /v1/account/users`, `GET /v1/account/user`, `PUT /v1/account/quota` | operator sig | the operator's account list, search and quota |
-| Panel | `POST /v1/account/restart` | operator sig | restart the node, so that a start-only setting takes effect |
+| Panel | `POST /v1/account/restart` | operator sig | restart the server service, so that a start-only setting takes effect |
 | Client | `POST /v1/account/card` | key | publish the card, redeem the grant |
 | Client | `POST /v1/account/i2p-dest` | key | upload a signed offline transient (refused while the account is unapproved) |
 | Client | `GET /v1/account/i2p-status` | key | approval state and the recorded transient validity |

@@ -10,7 +10,7 @@ This document is the whole of authentication by signature: the signed request
 verifier checks a login (section 4), what a client must do before it signs
 (section 5) and how it may hand the blob over itself (section 6). Other documents refer here and do not restate it.
 
-Every verifier in the project speaks this one contract: the service-node portal
+Every verifier in the project speaks this one contract: the server-service portal
 (`ServicePortal.md`), the alias registry and the admin panel
 (`AdminPanel.md`). A site outside the project verifies logins with
 [auth-sdk](https://github.com/bazarish/auth-sdk), which implements the verifier
@@ -29,7 +29,7 @@ three things carry it:
   device's own keys, not the root, and names its signer by the device's
   certificate (`X-Bazarish-Device`, below) instead of `X-Bazarish-Keys`;
 - every **operator call** - from the admin panel to a service, and between the
-  messaging server and the service node - where the callee then requires the
+  messaging server and the server service - where the callee then requires the
   signer's fingerprint to be in its configured operator set (`AdminPanel.md`).
 
 ### Encodings
@@ -196,7 +196,7 @@ What each of the project's verifiers puts there:
 
 | Verifier | name | place | role |
 |---|---|---|---|
-| Service node portal | `portal.name`, else "Bazarish server" | `portal.address`, else all of `portal.links` | `portal.role`, else Account owner |
+| Server service portal | `portal.name`, else "Bazarish server" | `portal.address`, else all of `portal.links` | `portal.role`, else Account owner |
 | Alias registry, visitor face | `portal.name`, else "Bazarish alias resolver" | `portal.address` (required) | `portal.role`, else Alias owner |
 | Alias registry, operator face | `admin.name`, else "Bazarish alias resolver admin" | `admin.address` (required) | `admin.role`, else Operator |
 | Admin panel | `consumer.name`, else "Bazarish admin panel" | `consumer.place`, else where it listens | `consumer.role`, else Administrator |
@@ -208,10 +208,10 @@ nobody can compare is the same as no address at all. `place` is what the user
 has in their address bar, so a verifier fronted under a name of its own says so
 in its config.
 
-The service node's three are **live**: they are among the settings an operator
+The server service's three are **live**: they are among the settings an operator
 edits in the admin panel (`loginConsumer` on `/v1/account/settings`), a change
 takes effect on the next challenge, and it is written back to `portal.name` /
-`portal.address` / `portal.role` in the node's config file. A challenge issued
+`portal.address` / `portal.role` in the server service's config file. A challenge issued
 before the change names the old consumer and stops verifying - it was shown to a
 user under words the portal no longer asserts, and re-labelling it is what the
 tag exists to prevent. The user loads a fresh challenge. The other verifiers

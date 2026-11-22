@@ -7,7 +7,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 | Component | Form | Responsibility |
 |---|---|---|
 | **Server** | daemon (C++) | Core messaging: pending content storage, delivery, federation over hidden networks |
-| **Service node** | separate daemon (C++) | User management: accounts, portal, moderation. Isolated from messaging logic |
+| **Server service** | separate daemon (C++) | User management: accounts, portal, moderation. Isolated from messaging logic |
 | **Facade** | daemon (C++) | "Last mile" between client and server infrastructure. HTTP over its own I2P destination (b33), answered at `/` |
 | **Gateway** | optional daemon (C++) | Runs the I2P router for a client that does not run its own. An optional part of an operator's deployment: nothing else in it depends on a gateway, and a gateway needs nothing else from it |
 | **Client** | separate repositories | Qt6 desktop app (`client-qt`); the same client core behind a REST API for bots (`bazarish-bot`) |
@@ -23,7 +23,7 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
     |                   |      |                            ^ |                              |
     |                   |      |                     pushes | | card lookups                 |
     |                   |      |                            | v                              |
-    |                   |      +----account tunnel----> [Service node] --> [its own records] |
+    |                   |      +----account tunnel----> [Server service] --> [its own records] |
     |                   +....................................................................+
     |
     |    [Server] <== its embedded i2pd router ==> correspondents' clients (federation)
@@ -32,38 +32,38 @@ Bazarish is a messenger whose architectural root is full resistance to protocol 
 ```
 
 The facade has two backends and a sealed tunnel to each: the messaging tunnel
-ends at the server, the account tunnel at the service node. Neither backend
+ends at the server, the account tunnel at the server service. Neither backend
 forwards a client's call to the other.
 
 - The server has **no public IP interfaces**. Its only public presence is in hidden networks (I2P first).
-- Facade <-> Server, Facade <-> Service node and Server <-> Service node communication goes over an **operator-controlled private channel**: TLS in which each side is named by the hash of the key in its certificate, written in the other's configuration, with no certificate authority and no hostname in the question. Splitting the services across hosts therefore needs no tunnel of its own; the operator may still place one there.
+- Facade <-> Server, Facade <-> Server service and Server <-> Server service communication goes over an **operator-controlled private channel**: TLS in which each side is named by the hash of the key in its certificate, written in the other's configuration, with no certificate authority and no hostname in the question. Splitting the services across hosts therefore needs no tunnel of its own; the operator may still place one there.
 - **The facade carries two sealed tunnels and reads neither.** A client's
   requests arrive as opaque frames on one path per backend; each backend opens its
   own frames, authenticates the user itself and runs what was inside through its
   own routes. The facade learns which backend a frame is for and nothing else.
-  The service node seals its tunnel under a key of its own, which the server root
+  The server service seals its tunnel under a key of its own, which the server root
   signs in the node card, so a client checks both cards against the one server
   fingerprint. See `api/Facade.md`, `api/ClientApi.md`.
 
 ## Key decisions
 
-1. **Repository scope** - the server components live in one repository, `bazarish-server` (`server-core`, `service-node`, `facade-http`, `admin-panel` and the optional `gateway`, a host that runs the I2P router for a client that will not, sharing one build of `common`); separate from it are `client-qt` (client core + Qt6 GUI), `bazarish-bot` (the same core with a REST API and a web UI instead of a window), `common-cpp` (the shared C++ library, checked out as each repository's `common` submodule), `alias-resolver` (the alias registry, the only paid component) and `docs-main` (this repository - the canonical protocol specification all components implement). Repositories are developed side by side in a single workspace.
-2. **Service node is a separate process** with its own API, keeping messaging logic and user management separated.
+1. **Repository scope** - the server components live in one repository, `bazarish-server` (`server-core`, `server-service`, `facade-http`, `admin-panel` and the optional `gateway`, a host that runs the I2P router for a client that will not, sharing one build of `common`); separate from it are `client-qt` (client core + Qt6 GUI), `bazarish-bot` (the same core with a REST API and a web UI instead of a window), `common-cpp` (the shared C++ library, checked out as each repository's `common` submodule), `alias-resolver` (the alias registry, the only paid component) and `docs-main` (this repository - the canonical protocol specification all components implement). Repositories are developed side by side in a single workspace.
+2. **Server service is a separate process** with its own API, keeping messaging logic and user management separated.
 3. **Facade <-> server transport** - operator private channel.
 4. **Wire format** - JSON for control messages, raw HTTP bodies for binary content (no base64 overhead). E2E-encrypted payloads are opaque blobs to all server-side components.
 5. **Destination routing** - delivery routes by the recipient's I2P **destination** (its b33), carried in the user-signed contact card; the sender dials it directly. A server has **no single federation address**: every user is served by their own destination, which admits what arrives and initiates no connections. The sending **client** performs the dialling, from a destination held for that one correspondent; a server that initiates no connections cannot derive a correspondence graph from the addresses it contacted. A contact is shared as a **descriptor** (`fp:b33`); an **alias** resolves at the central resolver. Every routing target is a `.b32.i2p` host. See `Identity.md`, `api/Federation.md`, `api/InviteAnonymity.md`, `api/FederatedResolve.md`.
-6. **Single facade entry point** - the client holds a list of facade addresses and uses one at a time; behind each one there are two tunnels, `/t` to the messaging server and `/n` to the service node, and the facade relays each to its backend. Account calls (`/v1/account/*`) go into the second, everything else into the first.
+6. **Single facade entry point** - the client holds a list of facade addresses and uses one at a time; behind each one there are two tunnels, `/t` to the messaging server and `/n` to the server service, and the facade relays each to its backend. Account calls (`/v1/account/*`) go into the second, everything else into the first.
 6a. **A changed address is announced once** - an account whose destination or serving sealing key changes sends each contact one `contact.routing` message carrying the new destination and serving sealing key, and the receiver adopts the pair. Ordinary messages carry no routing. See `Messages.md`.
 6b. **Tunnel length is a user setting** - three levels: minimal (1 hop each way, no variance), middle (1 hop, variance 1: I2P adds between zero and one hop and never subtracts), maximum (3 hops, no variance, the depth I2P itself defaults to). The client defaults to minimal and states what one hop does and does not conceal; call media remains minimal at every setting, three hops in each direction introducing audible delay in a live call. Server components accept `i2p.privacy` and default to maximum.
 7. **Docs language** - English (code comments are English per codestyle).
 8. **Shared code** - protocol types, OpenSSL wrappers, and JSON helpers live in the `common` repository, consumed by the other components as a git submodule. No duplicated crypto code.
 9. **A client delivers its own outgoing messages.** It dials the recipient's serving destination over I2P from a destination held for that correspondent; single-use destinations are used only for discovery lookups (card fetch, alias resolve), device pairing, file transfers and call media. Nothing is spooled on a server: every outgoing message waits in the sending client's outbox, in its encrypted profile, until the recipient's server stores it or refuses it, and a silent attempt is repeated only once a newer lease set of the recipient is found, something arrives from the recipient, the client's own server answers it after its network came back, or the stale lease set has expired everywhere (`api/Federation.md`). Repetition is safe at any time, the delivery id being derived from the message and the recipient mailbox. The recipient's server returns a signed confirmation in the reply on the same stream; a read receipt reports a read. See `api/ClientApi.md`, `api/Federation.md`, `Messages.md`.
-10. **Sealed delivery envelopes.** The recipient identity, delivery pass and deliveryId are encrypted by the sending client to the **serving sealing key of the recipient's destination** (per-destination, held by the recipient's server). The sender's own server observes nothing, the envelope not passing through it; the recipient's server does not learn the sender's identity. **Federation signing is per-destination too**: each serving destination has its own signing key (the only key that signs live federation traffic, e.g. the confirmation in a deliver reply) stored bound to the destination, so no two users share a signer; the server root identity is reserved for non-federation use (the `https://bazari.sh/#server` configuration link, the service-node binding). See `api/InviteAnonymity.md`, `api/Federation.md`.
+10. **Sealed delivery envelopes.** The recipient identity, delivery pass and deliveryId are encrypted by the sending client to the **serving sealing key of the recipient's destination** (per-destination, held by the recipient's server). The sender's own server observes nothing, the envelope not passing through it; the recipient's server does not learn the sender's identity. **Federation signing is per-destination too**: each serving destination has its own signing key (the only key that signs live federation traffic, e.g. the confirmation in a deliver reply) stored bound to the destination, so no two users share a signer; the server root identity is reserved for non-federation use (the `https://bazari.sh/#server` configuration link, the server-service binding). See `api/InviteAnonymity.md`, `api/Federation.md`.
 11. **Contact admission via delivery passes** - one per correspondent, derived and revocable, so the server enforces "contacts only" without holding a readable social graph (see `Contacts.md`).
 12. **Keys of its own for every device** - each device has its own signing and sealing keys, certified by the account's root; a primary device also holds the root, a secondary one does not, and only a primary device adds, revokes or exports. A new device receives the account from a primary one over a one-shot I2P destination, named by a pairing link (shown as a QR code) and unlocked by a four-digit code (see `Identity.md`, `DeviceSync.md`).
 13. **Explicit device registry** - devices are registered via the API and leave it by being revoked; the delete-when-all-acked rule operates on the registered set, and every mailbox item is deleted 30 days after it arrived. The registry is owned by the server.
 14. **Device sync via the own mailbox** - E2E self-messages (contacts, settings, an echo of each message sent) written through a dedicated endpoint of their own and read back through the standard pending/ack path.
-15. **The contact card is what answers** "where and how do I deliver?" - the epoch keys, devices, destination and serving key, signed by one of the user's devices, published to the serving server and fetched by contacts. It names no server and carries no expiry; the account's lifecycle on that server is clocked by the delegation of its destination alone. Exactly one serving server at a time. The address and its serving and signing keys are issued by the account and handed to the server with each delegation, so a move to another server keeps the address, the keys and every pass, and contacts are told nothing; mail that reaches the old server's lease set meanwhile fails at the sender, who retries (messages delayed, not lost). A client registers itself with the service node (`POST /v1/account/registration`); a node runs open or admin-approved registration. See `Identity.md`, `api/ServicePortal.md`, `api/InviteAnonymity.md`.
+15. **The contact card is what answers** "where and how do I deliver?" - the epoch keys, devices, destination and serving key, signed by one of the user's devices, published to the serving server and fetched by contacts. It names no server and carries no expiry; the account's lifecycle on that server is clocked by the delegation of its destination alone. Exactly one serving server at a time. The address and its serving and signing keys are issued by the account and handed to the server with each delegation, so a move to another server keeps the address, the keys and every pass, and contacts are told nothing; mail that reaches the old server's lease set meanwhile fails at the sender, who retries (messages delayed, not lost). A client registers itself with the server service (`POST /v1/account/registration`); a server service runs open or admin-approved registration. See `Identity.md`, `api/ServicePortal.md`, `api/InviteAnonymity.md`.
 16. **All certificates are one composite CBOR frame over a JSON body** (contact card, device certificate, revocation list, alias, server card) - both signatures and both public keys in one frame, consistent with the JSON wire format.
 17. **Direct alias resolution** - first-contact lookups are dialled by the client itself from a transient I2P destination; the requester's own server is not on the path and never learns the alias. The I2P stream is encrypted to the destination dialled, and the lookup and the answer are sealed again inside it, for the client's own router may be a gateway: the resolver's channel key is signed under its root, and the contact card that follows is sealed under the card key the descriptor carries. The resolver's answer is a self-verifying chain (a record signed by a delegated key, its delegation certificate to the built-in root, and the owner's alias certificate) naming a descriptor, from which the client fetches the contact card. The client is built with the production resolver's coordinate (`defaultResolverCoordinate`). See `api/FederatedResolve.md`.
 18. **The post-quantum hybrid covers sealing as well as signing (mandatory)** - signing is Ed25519 + ML-DSA-65, and every identity statement is dual-signed and valid only when both verify; the fingerprint covers both public keys. Sealing is X25519 + ML-KEM-768 and covers everything encrypted to a public key anywhere in the project, because it all goes through one `hybrid::seal`, whose key is derived from both shared secrets at once (`Identity.md`).
@@ -93,14 +93,14 @@ docs-main/                       # this repository - canonical protocol specific
 |-- Errors.md                    # typed error registry
 |-- ThreatModel.md               # what each party learns and can do
 +-- api/
-    |-- ClientApi.md             # client <-> facade <-> {server, service node}
+    |-- ClientApi.md             # client <-> facade <-> {server, server service}
     |-- Facade.md                # last-mile contract
     |-- Federation.md            # client -> serving destination over I2P (destination-routed)
     |-- InviteAnonymity.md       # destination-routed contact cards (invite anonymity)
     |-- FederatedResolve.md      # descriptor + card fetch, alias -> descriptor
     |-- SignInWithKey.md         # authentication by signature
     |-- ServicePortal.md         # sign-in-with-key portal, account onboarding, grants
-    |-- ServerServiceNode.md     # internal server <-> service node API
+    |-- CoreService.md     # internal server <-> server service API
     |-- FileTransfer.md          # direct client-to-client file transfer over I2P
     |-- Calls.md                 # call signaling and media tunnels
     |-- AdminPanel.md            # server status + management web panel
@@ -109,7 +109,7 @@ docs-main/                       # this repository - canonical protocol specific
 common-cpp/ (dir: common/)      # shared C++ library: protocol types, OpenSSL wrappers, embedded i2pd
 bazarish-server/                 # the server components, one build tree:
     server-core/                 #   messaging server daemon (I2P federation, destination-routed)
-    service-node/                #   service node daemon (accounts, portal, moderation)
+    server-service/                #   server service daemon (accounts, portal, moderation)
     facade-http/                 #   HTTP facade daemon (I2P last mile)
     admin-panel/                 #   server status + management web panel (sign-in-with-key)
     gateway/                     #   optional: runs the I2P router for a client that will not

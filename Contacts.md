@@ -9,7 +9,7 @@ A server stores incoming content only if the sender is an approved contact of th
 A **delivery pass** is a 256-bit value the recipient's client derives for one correspondent and delivers to them over the E2E channel. It does not expire, it is not spent, and every device that correspondent writes from presents the same one.
 
 - The value is derived: `sha256(the account's static delivery secret || that correspondent's fingerprint)`. The secret is drawn once with the account, travels with its backup, and never leaves it. So an account keeps no list of what it issued, every device of it arrives at the same value for the same correspondent, and a restored device can write from its first sync.
-- The recipient's client registers the **hash** of the pass with its own server (`POST /v1/messaging/passes`). The sender presents the pass itself, so what is on a node's disk recognises a delivery and cannot produce one.
+- The recipient's client registers the **hash** of the pass with its own server (`POST /v1/messaging/passes`). The sender presents the pass itself, so what is on a server's disk recognises a delivery and cannot produce one.
 - A sender attaches the pass to each message, inside the sealed envelope (see `api/Federation.md`) - readable by the recipient's server only.
 - The recipient's server hashes the presented pass and looks it up in the mailbox's registered set. Absence of a match is a rejected delivery. Nothing is consumed: the same value admits the next message.
 - No signatures involved; plain hashing only (standard primitives).
@@ -72,7 +72,7 @@ Before A can send the contact request above it must learn B's routing (`{ kind, 
 
 **Co-location rule (mandatory).** Two clients of the same server always have *different* I2P destinations - every account owns one - so first-contact discovery goes over I2P and never as a by-fingerprint lookup through a facade: a lookup that told a shared server "client A is asking for client B" would disclose that A and B are **co-located on it**.
 
-The same rule binds the answering end. A card fetch arrives on a destination, and that destination answers for **its own user only**. Answering for any fingerprint the node serves would turn every published address into an oracle: dial A's destination, ask for B, and a returned card would prove the two are served by the same server. The attack requires only a fingerprint and a destination, and every contact holds both.
+The same rule binds the answering end. A card fetch arrives on a destination, and that destination answers for **its own user only**. Answering for any fingerprint the server serves would turn every published address into an oracle: dial A's destination, ask for B, and a returned card would prove the two are served by the same server. The attack requires only a fingerprint and a destination, and every contact holds both.
 
 For the same reason the contact request **delivery** is routed by destination over federation (I2P) in every case, including one in which the same server operates both destinations. The sending client performs the delivery, so no server can short-circuit it locally. See `api/Federation.md`.
 

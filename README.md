@@ -24,13 +24,13 @@ component implements.
 - [Errors](Errors.md) - typed error registry
 - [ThreatModel](ThreatModel.md) - what is protected, and what each party learns and can do
 - API contracts:
-  - [ClientApi](api/ClientApi.md) - client <-> facade <-> {server, service node}
+  - [ClientApi](api/ClientApi.md) - client <-> facade <-> {server, server service}
   - [Facade](api/Facade.md) - the last-mile contract
   - [Federation](api/Federation.md) - client -> a user's serving destination over I2P (destination-routed)
   - [InviteAnonymity](api/InviteAnonymity.md) - destination-routed contact cards
   - [SignInWithKey](api/SignInWithKey.md) - authentication by signature: the signed request, the login challenge and blob, and who consumes a signature
   - [ServicePortal](api/ServicePortal.md) - sign-in-with-key portal, account onboarding, grants
-  - [ServerServiceNode](api/ServerServiceNode.md) - internal server <-> service node API
+  - [CoreService](api/CoreService.md) - internal server <-> server service API
   - [FileTransfer](api/FileTransfer.md) - direct client-to-client file transfer over I2P
   - [Storage](api/Storage.md) - pending-content storage backends
   - [Calls](api/Calls.md) - audio calls
@@ -45,7 +45,7 @@ One repository per component, developed side by side:
 | Component | Repository |
 |---|---|
 | Shared C++ library | [common-cpp](https://github.com/bazarish/common-cpp) |
-| Server components: messaging server, service node, HTTP facade, admin panel, optional gateway (runs the I2P router for a client that does not run its own) | [bazarish-server](https://github.com/bazarish/bazarish-server) |
+| Server components: messaging server, server service, HTTP facade, admin panel, optional gateway (runs the I2P router for a client that does not run its own) | [bazarish-server](https://github.com/bazarish/bazarish-server) |
 | Client (core, Qt6 GUI) | [client-qt](https://github.com/bazarish/client-qt) |
 | Client daemon (the same core behind a REST API and a web UI, for bots) | [bazarish-bot](https://github.com/bazarish/bazarish-bot) |
 | Alias registry (signed resolve + portal; the one paid component; closed, and documented in its own repository) | [alias-resolver](https://github.com/bazarish/alias-resolver) |

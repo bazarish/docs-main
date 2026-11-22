@@ -94,7 +94,7 @@ client has descriptor {fp, dest, key}
 
 `key` is the account's **card key**: 32 random bytes the account makes once, keeps
 with its profile (so it survives a backup and travels with device pairing) and hands
-to its node with every card it publishes; the node gives it to the messaging server
+to its server service with every card it publishes; the server service gives it to the messaging server
 with the card. It reaches a contact only inside the descriptor - an invite link, a
 QR, a resolver record - or inside the `bootstrap` block of a contact request and its
 acceptance, so a contact who came in by request can share the descriptor onward.

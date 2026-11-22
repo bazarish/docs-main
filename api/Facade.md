@@ -69,7 +69,7 @@ The facade is the "last mile" between the client and the server infrastructure. 
   is relayed over the **operator private channel** to its backend: TLS pinned by
   the key that backend prints, so it need not be a loopback address or a tunnel:
   - `POST /t` and `POST /n` - the two client tunnels, `/t` to the messaging
-    server and `/n` to the service node. One opaque body in, one opaque body out;
+    server and `/n` to the server service. One opaque body in, one opaque body out;
     the answer is always `200`, because a status code outside the seal would be a
     channel of its own. What is inside - the method, the path, the headers, the
     device the request speaks for, the body, and the real status of the answer -
@@ -79,11 +79,11 @@ The facade is the "last mile" between the client and the server infrastructure. 
     the fingerprint the user already had, so a facade may withhold one but cannot
     put its own in its place.
   - `POST /login/callback` and `GET /login/c/<nonce>` - a sign-in by code
-    (`SignInWithKey.md`), both to the service node. The client posts the
+    (`SignInWithKey.md`), both to the server service. The client posts the
     signature for a challenge whose callback names this facade, or fetches the
     challenge a QR code links to. The facade is the deployment's only I2P
     address, so it is where the portal and the admin panel name their callback;
-    the service node keeps the challenges they wait on. The nonce is 32
+    the server service keeps the challenges they wait on. The nonce is 32
     lowercase hex characters; any other shape is a 404.
   - anything else -> 404 (never forwarded). The reseed archive is served by the
     portal: the messaging server passes it to the portal over its private channel
@@ -224,7 +224,7 @@ https://bazari.sh/#server?v=1&fp=<server fingerprint>&facade=<facade address>[&f
 Every field is human-readable (no base64): the fingerprint is the trust anchor
 (everything the server signs is verified against it as usual), each `facade`
 parameter is one facade address, in client failover order, and each `reseed` one
-reseed address (above). The service node renders this exact string in the user's
+reseed address (above). The server service renders this exact string in the user's
 cabinet after sign-in, so a client reads back precisely what the server
 published. Facade and reseed addresses are carried verbatim, so they must not
 contain `&`.

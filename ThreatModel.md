@@ -36,7 +36,7 @@ optional, and without it the database opens for whoever holds its files.
 Whoever opens the database of a **secondary** device reads and writes as the
 account, keeps its contacts and sees its presence. It cannot add, revoke or
 export a device, raise a new address, sign in to a site with the key or change an
-alias, because the root is not on it, and the service node refuses it deleting
+alias, because the root is not on it, and the server service refuses it deleting
 the account or moving it to a new address (`DeviceSync.md`).
 
 Whoever opens the database of a **primary** device holds the root and is the
@@ -75,7 +75,7 @@ gateway on either side reads neither (`DeviceSync.md`, Enrollment).
 
 ## The user's own server
 
-The messaging server and the service node serve the account. They learn:
+The messaging server and the server service serve the account. They learn:
 
 - the account's fingerprint, its contact card, and when it registered and
   delegated its destination;
@@ -100,7 +100,7 @@ The server cannot publish anything in the user's name: the contact card carries
 the signature of one of the user's devices, under a certificate from the
 account's root.
 
-A user opens the service node's portal in a browser to finish registration on a
+A user opens the server service's portal in a browser to finish registration on a
 moderated server. The portal sees what the browser's connection shows
 (`api/ServicePortal.md`).
 

@@ -1,18 +1,18 @@
-# Server <-> Service Node API
+# server-core <-> server-service API
 
-Internal API over the operator private channel - mutually pinned TLS, each side holding the hash of the other's key, and every call signed by the identity that makes it. What the node asks of the server rides the server's operator socket; the one call the other way, a card lookup by fingerprint, rides the node's own listener and is authorised to the server's fingerprint alone. The server reaches the node only at an `https` `serviceNode.url` with the node's pin, and takes a lookup's answer only when the card in it is the asked account's. The service node owns per-operator user-management state (accounts: the quota granted and the card published); the server owns content and delivery, and consults the service node to make admission decisions. The global **alias** namespace belongs to a separate central service (`api/FederatedResolve.md`).
+Internal API over the operator private channel - mutually pinned TLS, each side holding the hash of the other's key, and every call signed by the identity that makes it. What the server service asks of the server rides the server's operator socket; the one call the other way, a card lookup by fingerprint, rides the server service's own listener and is authorised to the server's fingerprint alone. The server reaches the server service only at an `https` `serverService.url` with the server service's pin, and takes a lookup's answer only when the card in it is the asked account's. The server service owns per-operator user-management state (accounts: the quota granted and the card published); the server owns content and delivery, and consults the server service to make admission decisions. The global **alias** namespace belongs to a separate central service (`api/FederatedResolve.md`).
 
-Registration opens an account without a term; the only clock is the delegated destination, and an account that has none for the node's idle window is deleted (`idleDeleteDays`, 180 by default).
+Registration opens an account without a term; the only clock is the delegated destination, and an account that has none for the server service's idle window is deleted (`idleDeleteDays`, 180 by default).
 
-## Server -> Service node
+## Server -> Server service
 
 | Request | Purpose |
 |---|---|
 | `get-card` | fingerprint -> the user's **contact card** (epoch keys + devices + destination + serving sealing key) and its card key, which seals the exchange. Backs the federation `card` request - the first-contact card fetch (`api/FederatedResolve.md`). The query arrives on that user's own destination and is answered for that user alone, so it cannot be used to ask a server whether it hosts some other fingerprint |
 
-## Service node -> Server
+## Server service -> Server
 
-Requests are signed with the node's own identity and authorised by the server on
+Requests are signed with the server service's own identity and authorised by the server on
 that fingerprint.
 
 | Request | Purpose |
@@ -21,24 +21,24 @@ that fingerprint.
 | `PUT /v1/messaging/card` | `{user}`: the account published a new card. The server drops the copy it holds, so the next `get-card` reads the new one |
 | `PUT /v1/messaging/quota` | Set the mailbox quota granted by the account, in place of the server's default |
 | `GET /v1/messaging/account?user=` | State held for one account: registered devices, bytes in use, effective quota; displayed by the administration panel |
-| `POST /v1/messaging/node-card` | `{sealingKey}`, the node's public sealing key (DER, base64) -> `{card}`: the **node card**, `{ v, t: "node-card", server, sealingKey }`, signed with the server root like the server card. The node asks for it at every start over its pinned link to the server, which vouches for the signer: the `server` in the card is the fingerprint the node then authorises the server by and serves it at `GET /v1/node/card`; a client seals the account tunnel to the key in it and trusts it by the same fingerprint as the server card (`ClientApi.md`). A node that cannot get one does not start |
+| `POST /v1/messaging/node-card` | `{sealingKey}`, the server service's public sealing key (DER, base64) -> `{card}`: the **node card**, `{ v, t: "node-card", server, sealingKey }`, signed with the server root like the server card. The server service asks for it at every start over its pinned link to the server, which vouches for the signer: the `server` in the card is the fingerprint the server service then authorises the server by and serves it at `GET /v1/node/card`; a client seals the account tunnel to the key in it and trusts it by the same fingerprint as the server card (`ClientApi.md`). A server service that cannot get one does not start |
 | `DELETE /v1/messaging/account?user=` | The account has been deleted: discard the mailbox, the replay markers, the delivery passes, the device registry, the quota override and the destination record with its keys. Issued whenever an account is deleted, by its owner or by an operator. Idempotent: a fingerprint for which the server holds no state is already in the requested condition |
 
 ## Client-ID registry
 
-Owned by the **server** (it drives the delete-when-all-acked storage rule, see `../DeviceSync.md`); the service node never learns the user's device count.
+Owned by the **server** (it drives the delete-when-all-acked storage rule, see `../DeviceSync.md`); the server service never learns the user's device count.
 
 ## Split of responsibilities
 
-- **Push.** The node pushes what it owns (the delegated transient, the
+- **Push.** The server service pushes what it owns (the delegated transient, the
   quota, a deletion) and reconciles the quotas once at
-  start, so the messaging server needs the node for nothing on the delivery path.
-  The one thing the server asks the node for is a user's contact card, and it holds
+  start, so the messaging server needs the server service for nothing on the delivery path.
+  The one thing the server asks the server service for is a user's contact card, and it holds
   the answer briefly; a new card drops that copy at once (`PUT /v1/messaging/card`).
-- **The quota is the node's, the usage is the server's.** The node grants and
+- **The quota is the server service's, the usage is the server's.** The server service grants and
   stores the number; only the filesystem under the server knows what is in a
   mailbox, so the panel and the portal read usage from the server
   (`GET /v1/messaging/account`).
 - **Signed per request.** Every call carries the caller's hybrid signature and
-  each side authorises it by fingerprint - the node by the `server` named in its
+  each side authorises it by fingerprint - the server service by the `server` named in its
   node card, the server by its configured `operators` list.

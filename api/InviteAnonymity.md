@@ -170,7 +170,7 @@ never a federated message.
   person.
 - **Registration** opens an unbounded channel; the client authenticates every
   request by signature. The only clock is the **delegation** of the destination,
-  which the I2P network itself enforces, and an account with none for the node's
+  which the I2P network itself enforces, and an account with none for the server service's
   idle window is deleted.
 - The card fetch is answered on the account's own destination and for that
   account alone, so a card cannot be requested by fingerprint alone and a server

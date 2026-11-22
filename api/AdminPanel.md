@@ -1,11 +1,11 @@
 # Admin panel
 
 The `admin-panel` is a web interface for monitoring and managing one Bazarish
-server: **one messaging server, the service node bound to it, and the facades
+server: **one messaging server, the server service bound to it, and the facades
 placed in front of the pair**. One setup has one admin panel. A registration
-certificate names one messaging server, and the node that issues it is bound to
-that server's card, so the two do not scale independently: the panel holds **one
-server-core and one service-node**, and refuses a second of either. Facades do
+certificate names one messaging server, and the server service that issues it is bound to
+that server, so the two do not scale independently: the panel holds **one
+server-core and one server-service**, and refuses a second of either. Facades do
 scale: several may front the pair. The panel may also list private gateways, as
 many as the server has or none: a gateway is an optional part of the server and
 runs without the panel. Every service has a **name of its own**, because the name
@@ -35,14 +35,14 @@ in**. What follows is only what the panel adds to it.
    fingerprint to be one of the configured admins, consumes the challenge, and
    sets a session cookie (`HttpOnly; SameSite=Strict`).
 
-When the service node answers and its first facade is a
+When the server service answers and its first facade is a
 `.b32.i2p` address, the login page also shows a QR code. Its challenge names a
-callback on that facade, and the panel places it in the node's sign-in box with
+callback on that facade, and the panel places it in the server service's sign-in box with
 a token it keeps in the browser's `adminsignin` cookie (`ServicePortal.md`). The
 page asks `GET /login/wait?nonce=` every 2 s; the panel claims the signature
-from the node and runs step 4 on it. The node holds the signature, never the
-session. With the node away the page shows the pasted form alone. `/setup`
-shows the pasted form alone too: an unclaimed panel knows no node yet.
+from the server service and runs step 4 on it. The server service holds the signature, never the
+session. With the server service away the page shows the pasted form alone. `/setup`
+shows the pasted form alone too: an unclaimed panel knows no server service yet.
 
 What the panel puts in the consumer is listed with the other verifiers' in
 `SignInWithKey.md`.
@@ -53,14 +53,14 @@ Privileged service endpoints are authenticated by **hybrid signature**. The pane
 its state directory); every service call it makes is a signed request
 (`SignInWithKey.md`, section 1). Each service verifies it and then requires the
 signer's fingerprint to be one of its configured operators (`operators`,
-repeatable). The service node likewise signs its own
+repeatable). The server service likewise signs its own
 quota/transient pushes with its identity, so server-core authorises both the
-service node and the panel.
+server service and the panel.
 
 | Service | Authorised operators |
 |---|---|
-| server-core | service-node, admin-panel |
-| service-node | admin-panel |
+| server-core | server-service, admin-panel |
+| server-service | admin-panel |
 | facade-http | admin-panel |
 | gateway | admin-panel |
 
@@ -83,7 +83,7 @@ listener separate from its API, and the panel is configured with that address an
 the key the service prints at startup (`pin`). The pinning runs both ways: the
 socket asks for a client certificate and admits only the keys in its
 `opsClients`, so an unlisted caller is refused at the handshake and never
-reaches the signature check. A server-core, service-node, facade-http or gateway
+reaches the signature check. A server-core, server-service, facade-http or gateway
 whose operator socket has an empty `opsClients` refuses to start. Neither certificate decides what a caller may do -
 that is still the signature and the `operators` list; TLS binds the two sockets
 to each other. For **facade-http** this is what keeps the endpoint off the
@@ -107,16 +107,16 @@ A sidebar carries the views:
   flight. These are sampled from bucketed counters (one per second for the last
   minute, one per minute for the last day): a current reading, so nothing is
   stored. A service's name
-  opens its settings: the Server tab, the node's Addresses tab, or the page of
+  opens its settings: the Server tab, the server service's Addresses tab, or the page of
   that one facade or gateway.
-- **Users** - the accounts on the service node. Search by fingerprint or by the
+- **Users** - the accounts on the server service. Search by fingerprint or by the
   address the account is served at, filter by approval state, and scroll: the
   list loads a page at a time. Each row carries whether the account is approved
   and whether its destination is currently delegated; the two are independent, and
   an account may be approved and unreachable. Opening an account shows its terms
   and the available actions: set the storage quota (in whole megabytes), approve it,
   undelegate it (the address is revoked and the account waits again, with a
-  message its owner is shown in place of the node-wide one), delete it, or ban
+  message its owner is shown in place of the server-wide one), delete it, or ban
   the key. The open account is in the address bar (`#/users/<fingerprint>`), so a
   link points at one account.
 - **Settings** - every setting of the server, in eight tabs. Each tab saves on its own and is in the address bar
@@ -129,10 +129,10 @@ A sidebar carries the views:
   |---|---|
   | Registration | open or moderated, the message a new client is told and the one a waiting account is shown |
   | Portal | the login consumer (name, address, role) the client shows before a user signs, the portal's public links, and the socket the portal binds |
-  | Addresses | the facades' addresses as they report them (read-only: the panel writes them, see below), the reseeds, the descriptor built from both, the node's own API (where facades and the messaging server reach it) and the messaging server it is bound to, and the log level |
+  | Addresses | the facades' addresses as they report them (read-only: the panel writes them, see below), the reseeds, the descriptor built from both, the server service's own API (where facades and the messaging server reach it) and the messaging server it is bound to, and the log level |
   | Accounts | the storage a new account gets and how long an idle one is kept, beside the two numbers that show whether that promise can still be kept: what the quotas have allocated and what the disk holds (`GET /v1/messaging/storage`) |
-  | Server | server-core's own file: log level and libi2pd's log level, its I2P privacy and tunnel count, its private listener, the listener its gateways reach it on (`gatewayListen`) and the node it reports to |
-  | Facades | every facade with its address and whether the descriptor carries it; a facade's page holds its own file, read and written over its ops socket - its three listeners (`listen`, `directListen`, `opsListen`), the messaging server and the service node it forwards to, its I2P address's privacy and tunnel count - its address, read-only, and **New address** |
+  | Server | server-core's own file: log level and libi2pd's log level, its I2P privacy and tunnel count, its private listener, the listener its gateways reach it on (`gatewayListen`) and the server service it reports to |
+  | Facades | every facade with its address and whether the descriptor carries it; a facade's page holds its own file, read and written over its ops socket - its three listeners (`listen`, `directListen`, `opsListen`), the messaging server and the server service it forwards to, its I2P address's privacy and tunnel count - its address, read-only, and **New address** |
   | Gateways | every gateway with its sessions and destinations; a gateway's page holds the tunnels it builds for all its clients (privacy, count), its two warm pools (streams, calls), and its link to server-core and its routes to the facades, read-only (the panel writes them, see below) |
   | Panel | the panel's own file: who may sign in, the words it signs under, the services it manages, and where it listens - plus what it cannot change (its fingerprint, its config file, its state and web directories, its version) |
 
@@ -148,32 +148,32 @@ A sidebar carries the views:
   start carries a **restart** mark beside the field, next to the control. The log level is the exception on the Addresses tab: it
   applies at once, which is the reason it is there.
 
-  The page of every service - the Server tab, the Addresses tab for the node, a
+  The page of every service - the Server tab, the Addresses tab for the server service, a
   facade's page and a gateway's page - opens with its **Logs** section: the
   service's log level and, where the service embeds the I2P router (server-core,
   a facade, a gateway), libi2pd's log level (`none`, `error`, `warn`, `info`,
   `debug`; `i2pLogLevel` in the service's settings, `i2p.logLevel` in its file).
   Both apply at once; `[open]` beside the heading opens the service's log.
 
-The **search is performed on the service node**: the panel
+The **search is performed on the server service**: the panel
 passes `q`, `state`, `limit` and `offset` through and displays the result, so a
-node with many accounts does not transfer the whole set to locate one.
+server service with many accounts does not transfer the whole set to locate one.
 
 | Panel route | Passed through to |
 |---|---|
 | `GET /api/services` | each service's `/healthz` |
-| `GET /api/users?q&state&limit&offset` | service-node `GET /v1/account/users` |
+| `GET /api/users?q&state&limit&offset` | server-service `GET /v1/account/users` |
 | `GET /api/account?user=` | server-core `GET /v1/messaging/account` (mailbox usage and device count) |
-| `POST /api/approve` | service-node `POST /v1/account/approve` |
-| `PUT /api/quota` | service-node `PUT /v1/account/quota` |
-| `POST /api/undelegate`, `POST /api/delete`, `POST /api/ban`, `POST /api/unban` | the matching service-node operator endpoints |
-| `GET /api/settings`, `PUT /api/settings` | service-node `/v1/account/settings`, plus server-core `GET /v1/messaging/storage` for the disk figure |
+| `POST /api/approve` | server-service `POST /v1/account/approve` |
+| `PUT /api/quota` | server-service `PUT /v1/account/quota` |
+| `POST /api/undelegate`, `POST /api/delete`, `POST /api/ban`, `POST /api/unban` | the matching server-service operator endpoints |
+| `GET /api/settings`, `PUT /api/settings` | server-service `/v1/account/settings`, plus server-core `GET /v1/messaging/storage` for the disk figure |
 | `GET /api/panel`, `PUT /api/panel` | nothing - the panel's own configuration file |
 | `POST /api/panel/restart` | nothing - the panel's own process |
-| `GET /api/service-settings`, `PUT /api/service-settings` (`?kind=` for server-core or service-node, `?service=<name>` for anything) | server-core `/v1/messaging/settings`, service-node `/v1/account/settings`, a facade's or a gateway's `/settings` (ops socket) |
-| `POST /api/restart` (same) | server-core `POST /v1/messaging/restart`, service-node `POST /v1/account/restart`, a facade's or a gateway's `POST /restart` (ops socket) |
-| `GET /api/facades` | each facade's `GET /settings` for its address, and the node's `GET /v1/account/settings` for the descriptor |
-| `POST /api/facade/new-address?service=<name>` | that facade's `POST /new-address`, then the node's `PUT /v1/account/settings` and every gateway's `GET`/`PUT /settings` (below) |
+| `GET /api/service-settings`, `PUT /api/service-settings` (`?kind=` for server-core or server-service, `?service=<name>` for anything) | server-core `/v1/messaging/settings`, server-service `/v1/account/settings`, a facade's or a gateway's `/settings` (ops socket) |
+| `POST /api/restart` (same) | server-core `POST /v1/messaging/restart`, server-service `POST /v1/account/restart`, a facade's or a gateway's `POST /restart` (ops socket) |
+| `GET /api/facades` | each facade's `GET /settings` for its address, and the server service's `GET /v1/account/settings` for the descriptor |
+| `POST /api/facade/new-address?service=<name>` | that facade's `POST /new-address`, then the server service's `PUT /v1/account/settings` and every gateway's `GET`/`PUT /settings` (below) |
 
 ### Facade addresses and the descriptor
 
@@ -181,7 +181,7 @@ A facade mints its own address - its I2P destination - and reports it
 (`Facade.md`); the operator never types one. The panel is what puts them into
 the server descriptor: it asks every facade for its address
 and writes the list, in the order the facades are listed on the Panel tab,
-into the node's `facades` (`PUT /v1/account/settings`). It does so whenever that
+into the server service's `facades` (`PUT /v1/account/settings`). It does so whenever that
 list is saved and whenever a facade is given a new address. If a facade does not
 answer, the descriptor is left as it was and the panel says which facade it was:
 a descriptor missing a working facade is worse than one that is a step behind.
@@ -215,9 +215,9 @@ from the gateway to server-core and to the facades directly
 (`bazarish-server/gateway/PROTOCOL.md`, The server link): the panel is not in
 it.
 
-The quota is set **on the service node**, which is the component that grants it and
+The quota is set **on the server service**, which is the component that grants it and
 pushes it to server-core. A quota set directly on server-core is overwritten by
-the node's next push.
+the server service's next push.
 
 The panel serves its web files from `assets <dir>` (mandatory): the page shell,
 the sign-in page, the stylesheet, the script and the logo, read once at startup and
@@ -225,7 +225,7 @@ served from memory. An operator changes the presentation by editing these files 
 restarting the panel.
 
 A user's destination is delegated by their own client and published by the
-service node (`PUT /v1/messaging/i2p-dest` on server-core is that push).
+server service (`PUT /v1/messaging/i2p-dest` on server-core is that push).
 
 ## Configuration
 
@@ -238,8 +238,8 @@ service node (`PUT /v1/messaging/i2p-dest` on server-core is that push).
   "services": [
     {"name": "server-core", "kind": "server-core",
      "url": "https://127.0.0.1:8428", "pin": "<key server-core prints>"},
-    {"name": "service-node", "kind": "service-node",
-     "url": "https://127.0.0.1:8427", "pin": "<key service-node prints>"},
+    {"name": "server-service", "kind": "server-service",
+     "url": "https://127.0.0.1:8427", "pin": "<key server-service prints>"},
     {"name": "facade", "kind": "facade",
      "url": "https://127.0.0.1:8429", "pin": "<key facade-http prints>"},
     {"name": "gateway", "kind": "gateway",
@@ -252,7 +252,7 @@ Each service is reached on its operator socket over TLS and is named by the key
 it prints at startup (`pin`); an `http` URL or a missing pin is refused. A
 private gateway is reached the same way: the panel shows its health and edits its
 tunnels and warm pools. Names are unique, and the list holds one `server-core`
-and one `service-node` at most; a configuration that breaks either, or carries a
+and one `server-service` at most; a configuration that breaks either, or carries a
 key the panel does not know, is refused at start, and a list that breaks either
 is refused on save. An optional `consumer` (`name`,
 `place`, `role`) sets the words the panel signs under.
