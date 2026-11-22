@@ -157,13 +157,13 @@ An operator chooses one of two modes (`registration.requireApproval`):
 |---|---|
 | `POST /v1/account/approve` | Operator-signed: approve one account (the ones awaiting approval are listed by `GET /v1/account/users?state=pending`) |
 | `GET /v1/account/users?q&state&limit&offset` | Operator-signed: the accounts on this server service, searched and paged here |
-| `GET /v1/account/user?user=` | Operator-signed: one account in full |
 | `PUT /v1/account/quota` | Operator-signed: set an account's storage quota (and push it to server-core) |
 | `POST /v1/account/undelegate` | Operator-signed: revoke the account's destination and put it back on hold, with a message for its owner |
 | `DELETE /v1/account/user?user=` | Operator-signed: delete the account (certificate, grants, destination) |
 | `POST /v1/account/ban` | Operator-signed: delete the account and refuse this key from now on (reason defaults to "Banned") |
 | `POST /v1/account/unban` | Operator-signed: lift a ban |
-| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed, and the whole of what an operator can change: registration mode and its message, `loginConsumer`, `portalLinks`, `facades`, `reseeds` (each an `https` URL, or the write is refused; a config file naming a reseed that is not `https` is refused at start), `defaultQuotaBytes`, `idleDeleteDays`, `logLevel`, and the three addresses `listen`, `portalListen`, `messaging` - plus the account count and the sum of the quotas. Everything is written back into the server service's config file, so a restart keeps it; `logLevel` and the portal's own words apply at once, the three addresses at the next start |
+| `GET /v1/account/totals` | Operator-signed: `{accounts, allocatedBytes}`, the account count and the sum of their quotas |
+| `GET /v1/account/settings`, `PUT /v1/account/settings` | Operator-signed, and the whole of what an operator can change: registration mode and its message, `loginConsumer`, `portalLinks`, `facades`, `reseeds` (each an `https` URL, or the write is refused; a config file naming a reseed that is not `https` is refused at start), `defaultQuotaBytes`, `idleDeleteDays`, `logLevel`, and the three addresses `listen`, `portalListen`, `messaging`. Everything is written back into the server service's config file, so a restart keeps it; `logLevel` and the portal's own words apply at once, the three addresses at the next start |
 | `POST /v1/account/restart` | Operator-signed, on the operator socket: the server service exits with the restart code (90) so that its supervisor starts it again |
 | `POST /v1/login/expect` | Operator-signed: `{challenge, token}` - the admin panel's challenge waits in the sign-in box under its nonce |
 | `POST /v1/login/claim` | Operator-signed: `{nonce, token}` -> `{state, challenge, blob}`, `state` being `waiting`, `signed` or `gone`; a signed entry is handed over once |
@@ -228,7 +228,7 @@ fills in the values a template asks for by name:
 | `session.html` | `fingerprint` |
 | `signin.html` | `challenge`, `error`, `scan` (empty, or `signin-scan.html`) |
 | `signin-scan.html` | `qr`, `nonce` |
-| `registered.html` | `quota`, `descriptor`, `mailbox`, `devices` |
+| `registered.html` | `descriptor`, `mailbox`, `devices` |
 | `registered-approval.html` (moderated server service) | the same, plus `message` - the operator's note |
 | `waiting.html` | the same as the approval page |
 | `banned.html` | `message` - the operator's reason |
@@ -256,7 +256,7 @@ in that directory, of a type the portal publishes, are served.
 | Panel | `POST /v1/login/expect`, `POST /v1/login/claim` | operator sig | the panel's sign-in by code |
 | Client | `POST /v1/account/registration` | key | the same registration, with no page to visit |
 | Panel | `POST /v1/account/approve` | operator sig | moderation |
-| Panel | `GET /v1/account/users`, `GET /v1/account/user`, `PUT /v1/account/quota` | operator sig | the operator's account list, search and quota |
+| Panel | `GET /v1/account/users`, `GET /v1/account/totals`, `PUT /v1/account/quota` | operator sig | the operator's account list, search, totals and quota |
 | Panel | `POST /v1/account/restart` | operator sig | restart the server service, so that a start-only setting takes effect |
 | Client | `POST /v1/account/card` | key | publish the card, redeem the grant |
 | Client | `POST /v1/account/i2p-dest` | key | upload a signed offline transient (refused while the account is unapproved) |

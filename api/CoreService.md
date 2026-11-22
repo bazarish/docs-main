@@ -31,8 +31,8 @@ Owned by the **server** (it drives the delete-when-all-acked storage rule, see `
 ## Split of responsibilities
 
 - **Push.** The server service pushes what it owns (the delegated transient, the
-  quota, a deletion) and reconciles the quotas once at
-  start, so the messaging server needs the server service for nothing on the delivery path.
+  quota, a deletion), and what it could not push it pushes again once the server
+  answers, so the messaging server needs the server service for nothing on the delivery path.
   The one thing the server asks the server service for is a user's contact card, and it holds
   the answer briefly; a new card drops that copy at once (`PUT /v1/messaging/card`).
 - **The quota is the server service's, the usage is the server's.** The server service grants and

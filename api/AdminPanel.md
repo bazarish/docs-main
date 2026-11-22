@@ -77,6 +77,8 @@ Every service exposes the same liveness endpoint, built from the shared
 `uptime` is seconds since the service's API came up; `ramBytes`/`ramPeakBytes` are
 the current and peak resident set (Linux `/proc/self/status` VmRSS / VmHWM). The
 endpoint is operator-signed, so it discloses nothing to an unauthenticated caller.
+`service` names what answered: the panel shows a service whose socket answers
+as another kind than the one it is listed as unreachable, with both kinds named.
 
 Every service serves it on its private operator socket (`opsListen`), a TLS
 listener separate from its API, and the panel is configured with that address and
@@ -167,7 +169,7 @@ server service with many accounts does not transfer the whole set to locate one.
 | `POST /api/approve` | server-service `POST /v1/account/approve` |
 | `PUT /api/quota` | server-service `PUT /v1/account/quota` |
 | `POST /api/undelegate`, `POST /api/delete`, `POST /api/ban`, `POST /api/unban` | the matching server-service operator endpoints |
-| `GET /api/settings`, `PUT /api/settings` | server-service `/v1/account/settings`, plus server-core `GET /v1/messaging/storage` for the disk figure |
+| `GET /api/settings`, `PUT /api/settings` | server-service `/v1/account/settings`, its `GET /v1/account/totals` for the account figures, plus server-core `GET /v1/messaging/storage` for the disk figure |
 | `GET /api/panel`, `PUT /api/panel` | nothing - the panel's own configuration file |
 | `POST /api/panel/restart` | nothing - the panel's own process |
 | `GET /api/service-settings`, `PUT /api/service-settings` (`?kind=` for server-core or server-service, `?service=<name>` for anything) | server-core `/v1/messaging/settings`, server-service `/v1/account/settings`, a facade's or a gateway's `/settings` (ops socket) |
