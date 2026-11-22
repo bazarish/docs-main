@@ -54,9 +54,10 @@ Two kinds of mailbox entry wait instead of being let go. An entry sealed to an
 epoch key the reader does not hold, whose key id names an active primary device
 of its own account other than the reader, before that key has ended its 30 days
 of keeping, waits for the key (`device.epochs`). An envelope whose first message
-is signed by a device the reader's list of that contact does not hold, when the
-contact is not blocked and the contact's card did not come during that pass,
-waits for the contact's device list (`account.devices` or a card that comes).
+is signed by a device of a contact that the reader holds no certificate for, and
+that carries none, when the contact is not blocked, waits for that device's
+certificate: the reader sends the contact a `contact.knows` (*`auth`*, below),
+and the device's next letter carries it.
 A waiting entry is not acknowledged; it is opened again when what it waits for
 arrives, and when the account is opened. At most 32 entries wait
 (`kMaxDeferredMailItems`); the held `events` request names them, so they alone do
@@ -130,7 +131,7 @@ never appear here:
 |---|---|---|
 | `contact` | nothing | Bootstrap. Size-capped (`kMaxContactRequestBytes`), rate-limited per serving destination. The only path into a mailbox that presents nothing. |
 | `content` | the recipient's delivery pass (required) | Looked up, not consumed (see `Contacts.md`). The path for every established-contact message, whatever its content type. |
-| `device` | an authenticated request from one of the account's registered devices | An account writing to one of its own other devices, through `POST /v1/messaging/self`. Outside the budget a stranger's request is counted against; stored for the one active device it names, listed to that device alone and deleted once that device acknowledges it. |
+| `device` | an authenticated request from one of the account's registered devices | An account writing to its own other devices, through `POST /v1/messaging/self`. Outside the budget a stranger's request is counted against; stored once and counted as acknowledged by the writer, or stored for the one device it names; deleted once the registered devices have acknowledged it (`DeviceSync.md`). |
 
 A mailbox has one quota, and every class is stored against it.
 
@@ -189,9 +190,9 @@ with that name before the real envelope arrives.
 ## Layer 2 - content type (end-to-end only)
 
 The encrypted payload is an array of versioned envelopes (*Encoding*), sealed to
-the recipient's epoch key current at the attempt (`Identity.md`, Epoch keys) - or,
-for the `device` class, to the own key of the one device it is for - each of this
-shape:
+the recipient's epoch key current at the attempt (`Identity.md`, Epoch keys) - for
+the `device` class the account's own, or the own key of the one device a
+self-message names (`DeviceSync.md`) - each of this shape:
 
 ```
 { "v": 1,
@@ -200,12 +201,12 @@ shape:
   "from": <sender fingerprint>,
   "sentAt": <unix milliseconds>,   // client send clock; drives ordering and the displayed time
   "replyTo": <id>,            // optional
-  "routing": { "dest": <sender b33>, "servingKey": <base64 SPKI> },   // contact.routing only
+  "knows": [<device id>, ...],   // to a contact: the recipient's devices the sender holds
   "auth": { "d": <the author device's id>,
             "c": <Ed25519 signature, CBOR bytes>,
             "p": <ML-DSA-65 signature, CBOR bytes>,
-            "cert": <the author device's certificate, CBOR bytes - contact.request,
-                     account.devices and device.devices only> },
+            "cert": <the author device's certificate, CBOR bytes - until the
+                     recipient knows the device> },
   ... type-specific fields ...
 }
 ```
@@ -222,23 +223,30 @@ verify.
 A receiver determines the author from the signature, not from `from`: the
 signatures must verify under the keys of the named device's certificate
 (`Identity.md`), that certificate's root is the author, it must be what `from`
-claims, and the device must not be on the account's revocation list. An envelope
+claims, and the account's card must not revoke the device. An envelope
 that fails any test is consumed before it reaches a chat, a contact entry or the
 user. Without this an admitted contact could put another contact's name on a
 message and have it filed in that other conversation, and a revoked device could
 go on writing in its account's name.
 
-The certificate travels in three places only: the **contact request**, the
-`account.devices` letter a device sends its account's contacts, and the
-`device.devices` letter it sends its account's own devices - the first thing each
-of them hears of a device. A reader drops any other message that carries a
-certificate. Adding a contact goes through their card, so the adder
-holds the certificates of the added party's devices before the first word is
-sent, and the added party takes the adder's from the request that started the
-dialog. Everywhere else the block is the device id and the two signatures alone,
-and the reader checks them against the certificate it holds for that device. A
-message from a device it holds no certificate for is one it cannot check, and it
-is dropped exactly like a message from a stranger.
+**The certificate travels until the recipient knows the device.** Every message to
+a contact carries `knows`: the ids of the recipient's devices whose certificates
+the sender holds. A device attaches its certificate to its messages for a contact
+until a message from that contact lists it in `knows`, and again whenever one
+stops listing it - a contact that restored an older copy of its account forgets
+devices, and says so in the next thing it writes. The first message of an exchange,
+a contact request, always carries it. A reader takes a certificate from any
+message once it verifies against the root `from` claims and the account's card
+does not revoke the device; it reads `knows` only from a message it has
+authenticated, so nobody but the contact can stop a certificate travelling.
+
+A message from a device the reader holds no certificate for, carrying none, waits
+(*Encoding*, above), and the reader sends that contact a `contact.knows`: a message
+with nothing but `knows`, at most one per contact in a pass. The device that wrote
+the waiting message sees itself missing from it and answers with its own
+`contact.knows`, certificate attached; the waiting message is read when that
+arrives. A reader never fetches a card to learn a device. The account's own
+devices take each other's certificates from the server's list instead (`DeviceSync.md`).
 
 Measured: **3401 bytes** for the device id and the two signatures, **11794** when
 the certificate is included. Every message pays the first figure - a reaction and
@@ -246,15 +254,19 @@ a read receipt as much as a letter. The second is what the contact-request cap i
 measured against (`api/ClientApi.md`): a request carries no pass and no card, so
 its signature is the only thing that names the sender.
 
-**`routing` - where to answer, sent when it changes and after a long silence.**
-A destination is not permanent: raising a new I2P key changes the address, and the account issues a
-new serving sealing key with it. Whenever the pair a card carries changes, the
-account sends every contact one
-`contact.routing` message carrying `{dest, servingKey}`, and a receiver whose
-stored pair differs adopts the new one and persists it. It is carried by that
-message alone. A receiver takes it only from a primary device of the sender and
-only with a b33 `dest`; one written by a secondary device is dropped. The sender's queue keeps retrying a contact it could not reach,
-so the update is not lost to one offline device.
+**The card - sent when it changes and after a long silence.**
+What a contact needs to reach and trust an account is its card (`Identity.md`):
+the destination and serving key, the epoch keys and the revocation. A destination
+is not permanent: raising a new I2P key changes the address, and the account
+issues a new serving sealing key with it. Whenever the account raises a new
+destination or revokes a device, it sends every contact one `account.card`
+message carrying the newest card, and a receiver takes it when it verifies
+against the contact's fingerprint and is newer than the card it holds: it adopts
+the routing, the epoch keys and the revocation together and persists them. The
+card is signed by the root, so it does not matter which of the account's devices
+carried it. The sender's queue keeps retrying a contact it could not reach, so the
+update is not lost to one offline device. New epoch keys reach contacts the same
+way, on the schedule of `Identity.md`, Epoch keys.
 
 The resulting rule is: **after changing an address, tell everyone.** This message
 is the only mechanism that restores a pair whose stored routing is stale: the only
@@ -267,8 +279,8 @@ contact at a time, on success.
 The queue is written once the server has taken the new address and keys and
 the card naming them is published (`api/ClientApi.md`) - and it holds every
 contact, plus the alias registry when
-this account holds a name that resolves. Each contact on it is sent a
-`contact.routing` letter that goes by the delivery rule of every outgoing message
+this account holds a name that resolves. Each contact on it is sent an
+`account.card` letter that goes by the delivery rule of every outgoing message
 (Delivery status, below): it waits in the outbox until the contact's server stores
 it, and the contact leaves the queue when it does. The two kinds of entry report
 differently, because the remedy differs:
@@ -283,25 +295,24 @@ differently, because the remedy differs:
 A client with no chat window (the daemon) lists the pending entries on its own
 face, with the same retry.
 
-A contact that missed the fan-out learns the pair from ordinary mail. When more
+A contact that missed the fan-out learns the card from ordinary mail. When more
 than 30 days (`kMailRetentionDays`) have passed since the last exchange with a
-contact, the next content letter to it carries a `contact.routing` message signed
-by a primary device of the account, appended to the letter's array. An exchange
-is a letter received from the contact, or a letter of ours that carries the
-routing - the fan-out's, a first reply's bootstrap, or this one - stored by the
-contact's server. Whether a letter carries it is decided at each attempt, when
-the letter is sealed, and only when the letter still fits the envelope with it;
-once a letter carrying it is stored, the next ones go without it. A secondary
-device, and an account with no address of its own, add nothing.
+contact, the next content letter to it carries an `account.card` message,
+appended to the letter's array. An exchange is a letter received from the
+contact, or a letter of ours that carries the card or the routing - the
+fan-out's, a first reply's bootstrap, or this one - stored by the contact's
+server. Whether a letter carries it is decided at each attempt, when the letter
+is sealed, and only when the letter still fits the envelope with it; once a
+letter carrying it is stored, the next ones go without it. An account with no
+address of its own adds nothing.
 
 ### Content-type registry (v1)
 
 | `type` | Delivery class | Purpose / payload |
 |---|---|---|
 | `text` | content | `text` - a plain text line. |
-| `contact.routing` | content | A routing change pushed to an established contact: the `routing` block, on a message with nothing else in it. The only message that carries one. |
 | `device.chat-pin` | device | One conversation pinned or unpinned, on every device of the account. |
-| `contact.request` | contact | Carries a `bootstrap` block (`kind`, `epochs` - the account's current and next epoch keys, as the card publishes them -, `dest`, `servingKey`, `cardKey`, `pass`) plus `text`, and the author device's certificate in `auth`. The reader takes the `epochs` of a bootstrap only when a primary device wrote the message; otherwise it gets them from the card (`Identity.md`, Epoch keys). The `dest` must be a b33. The first message; see `Contacts.md`. |
+| `contact.request` | contact | Carries a `bootstrap` block (`kind`, `epochs` - the account's current and next epoch keys, as the card publishes them -, `dest`, `servingKey`, `cardKey`, `pass`) plus `text`, and the author device's certificate in `auth`. The reader takes the `epochs` of a bootstrap only when a primary device wrote the message; otherwise it fetches the card (`Identity.md`, Epoch keys). The `dest` must be a b33. The first message; see `Contacts.md`. |
 | `contact.accept` | content | Agreeing to a received `contact.request`: an empty-bodied message whose first-reply `bootstrap` delivers our descriptor + our pass to the requester, making the pair mutual contacts. The requester's client completes adding the contact automatically and surfaces a note. See `Contacts.md`. |
 | `file` | content | `name`, `size`, `sha256` and `mime`, plus `data` - the bytes - when the file is at most `kMaxMediaBytes`. Without `data` it is an announcement: the bytes stay on the sender's disk until the recipient asks for them. See `api/FileTransfer.md`. |
 | `image` | content | A picture, carried inline: the bytes travel in the envelope. Its body block is named `image`. |
@@ -317,9 +328,9 @@ device, and an account with no address of its own, add nothing.
 | `chat.timer` | content | Sets the one-to-one conversation's auto-delete timer for both sides: `seconds` is one of 0 (off), 3600, 86400, 604800 or 2592000, and any other value is ignored. The recipient's client takes the same timer and leaves a "set the auto-delete timer" notice. See *Auto-delete timer*. |
 | `avatar` | content | The sender's avatar pushed to a contact: `avatar` = `{ mime, data }`, `data` being the bytes of a square PNG/JPEG (a CBOR byte string, as in an `image`) compressed client-side to at most **500 KB**. A silent service message - stored as that contact's picture, never shown as a chat bubble. Sent once the dialog is mutually established and re-sent to every contact when the avatar changes. See *Avatars and display names* and `Contacts.md`. |
 | `presence.schedule` | content | A `user` account's presence addresses and reader keys for the days ahead: `days` = a list of `{ d, dest, reader }`. A silent service message, sent between `user` contacts only. See `Presence.md`, The schedule. |
-| `device.avatar` | device | Self-sync of the user's own avatar to their other devices: the same `avatar` block, sealed to each device's own key and stored through `POST /v1/messaging/self`. See `DeviceSync.md`. |
+| `device.avatar` | device | Self-sync of the user's own avatar to their other devices: the same `avatar` block, stored through `POST /v1/messaging/self`. See `DeviceSync.md`. |
 | `device.contact-name` | device | Self-sync of a local contact rename to the user's other devices: `peer` (fingerprint), `name`. A purely local label, never sent to the contact. See `DeviceSync.md`. |
-| `device.i2p-master` | device | Self-sync of the user's own I2P master key to their other devices: `i2pMaster` (base64), sealed to each device's own key and stored through `POST /v1/messaging/self`, so every device keeps the same personal address. Applied only when `from` is the user themselves. See `DeviceSync.md`, `Identity.md`. |
+| `device.i2p-master` | device | Self-sync of the user's own I2P master key to their other devices: `i2pMaster` (base64), stored through `POST /v1/messaging/self`, so every device keeps the same personal address. Applied only when `from` is the user themselves. See `DeviceSync.md`, `Identity.md`. |
 | `call.invite` | content | Places an audio call: `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b33), `key` (base64 per-call media key). See `api/Calls.md`. |
 | `call.accept` | content | Accepts a call: `callId`, `dest` (the callee's media b33). See `api/Calls.md`. |
 | `call.decline` | content | Rejects a call: `callId`, `reason`. See `api/Calls.md`. |
@@ -331,10 +342,9 @@ device, and an account with no address of its own, add nothing.
 | `group.members.ask` | content | To a group host: asks for the full member list. No body. See `Groups.md`, *Member list*. |
 | `call.taken` | device | Self-sync: the device that answered or refused an incoming call, so the account's other devices stop ringing - `callId`; the device is the author. See `api/Calls.md`, `DeviceSync.md`. |
 | `call.record` | device | Self-sync inside `device.message`: how a call ended on the device that owned it - `callId`, `incoming` (true when the account was called), `outcome` (`answered` / `declined` / `missed`); `sentAt` is the invitation's. Shown as a notice in the conversation; taken only from the account's own devices. See `api/Calls.md`, *Call record*. |
-| `account.epochs` | content | The sender's public epoch keys from the current epoch on: `epochs` = `[{n, from, g, by, key}]`. Taken only when a primary device of the sender signed it; a key whose maker is not an active primary device is dropped. A silent service message, sent to every contact the account has agreed to. See `Identity.md`, Epoch keys. |
-| `account.devices` | content | The sender's device list: `devices` = the certificates of its active devices (base64) and `revocation` = its newest revocation list (base64), with the author device's certificate in `auth`. Sent by a device new to its server and after a revocation; a list older than the one held is refused. A silent service message. See `Identity.md`, Revocation list. |
+| `account.card` | content | The sender's card (`card`, CBOR bytes), signed by its root: new routing, new epoch keys, a revocation. Taken when it verifies against the sender's fingerprint and is newer than the card held. A silent service message, sent to every contact the account has agreed to. See *The card*, above, and `Identity.md`, Contact card. |
+| `contact.knows` | content | Nothing but `knows`: sent by a reader holding a message from a device of the sender it has no certificate for. See *`auth`*, above. A silent service message. |
 | `device.epochs` | device | The private halves of epoch keys, to the account's own devices: `epochs` = `[{n, g, by, pem}]`. Taken only from a primary device, and only keys a primary device made. See `DeviceSync.md`. |
-| `device.devices` | device | The account's device list for its own devices: `devices` = `[{cert, sealing}]`, each active device's certificate and its public sealing key (checked against the certificate's digest), and `revocation`; the author device's certificate in `auth`. See `DeviceSync.md`. |
 
 ### Forwarding
 
@@ -616,9 +626,9 @@ across a restart included. The protocol fixes the following:
   on the leaseset its previous process left in the netDb.
 - The outbox keeps a message unsealed, inside the profile database, and seals it
   anew at every attempt: to the recipient's epoch key current at that attempt, or
-  to the own key of the device it is for. A message for a recipient whose current
-  epoch key the sender does not hold waits until it arrives (`Identity.md`, Epoch
-  keys), and a message for one of the account's own devices that is revoked is
+  to the own key of the device a self-message names. A message for a recipient
+  whose current epoch key the sender does not hold waits until it arrives
+  (`Identity.md`, Epoch keys), and a self-message for a device that is revoked is
   withdrawn.
 - A call signal, a file request and a file offer are worth sending only for a
   while (`api/Calls.md`, `api/FileTransfer.md`); one that waits longer is dropped

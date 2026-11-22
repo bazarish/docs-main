@@ -22,7 +22,7 @@ that fingerprint.
 | `PUT /v1/messaging/quota` | Set the mailbox quota granted by the account, in place of the server's default |
 | `GET /v1/messaging/account?user=` | State held for one account: registered devices, bytes in use, effective quota; displayed by the administration panel |
 | `POST /v1/messaging/node-card` | `{sealingKey}`, the server service's public sealing key (DER, base64) -> `{card}`: the **node card**, `{ v, t: "node-card", server, sealingKey }`, signed with the server root like the server card. The server service asks for it at every start over its pinned link to the server, which vouches for the signer: the `server` in the card is the fingerprint the server service then authorises the server by and serves it at `GET /v1/node/card`; a client seals the account tunnel to the key in it and trusts it by the same fingerprint as the server card (`ClientApi.md`). A server service that cannot get one does not start |
-| `DELETE /v1/messaging/account?user=` | The account has been deleted: discard the mailbox, the replay markers, the delivery passes, the device registry, the quota override and the destination record with its keys. Issued whenever an account is deleted, by its owner or by an operator. Idempotent: a fingerprint for which the server holds no state is already in the requested condition |
+| `DELETE /v1/messaging/account?user=` | The account has been deleted: discard the mailbox, the replay markers, the delivery passes, the device list, the quota override and the destination record with its keys. Issued whenever an account is deleted, by its owner or by an operator. Idempotent: a fingerprint for which the server holds no state is already in the requested condition |
 
 ## Client-ID registry
 

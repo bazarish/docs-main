@@ -221,11 +221,11 @@ while it watches. A contact holds the presence schedule it was last sent, up to 
 days ahead: one removed, blocked or past the 100 readers stops being a reader at
 once, and until that schedule runs out can still tell from the network database
 when the user is online (`Presence.md`, What anyone learns). The card names no server, so
-a contact cannot tell which server hosts the user. A letter that does not open, or
-that is signed by a device the contact's card does not list, is let go and leaves
-a note in that contact's conversation; at most 32 entries wait unacknowledged for
-a key or a device list, and those beyond are let go the same way (`Messages.md`,
-Encoding).
+a contact cannot tell which server hosts the user, nor how many devices the user
+has. A letter that does not open, or that is signed by a device the user's card
+revokes, is let go and leaves a note in that contact's conversation; at most 32
+entries wait unacknowledged for a key or a device's certificate, and those beyond
+are let go the same way (`Messages.md`, Encoding).
 
 ## A gateway
 

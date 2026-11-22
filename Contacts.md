@@ -65,7 +65,7 @@ A user's **avatar** (square, compressed client-side to <= 500 KB) is exchanged o
 
 ## First-contact discovery and co-location
 
-Before A can send the contact request above it must learn B's routing (`{ kind, epochs, dest, servingKey }`) and B's devices, which B's card carries. One discovery path exists:
+Before A can send the contact request above it must learn B's routing and keys (`{ kind, epochs, dest, servingKey, revocation }`), which B's card carries; B's devices it learns from B's letters (`Messages.md`, `auth`). One discovery path exists:
 
 - **Invite / alias** - A holds a self-verifying descriptor (fingerprint + serving destination + serving key) and fetches B's user-signed card **over I2P federation**, dialing B's serving destination directly. The card is verified against the fingerprint, so no server is trusted (see `api/FederatedResolve.md`).
 

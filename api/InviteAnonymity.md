@@ -19,7 +19,7 @@ The contact card is **user-signed** and carries the routing itself. Routing is
 destination.
 
 ```
-ContactCard  (hybrid-signed by a device of user U - the only artifact a contact fetches):
+ContactCard  (hybrid-signed by U's root - the only artifact a contact fetches):
   v
   t:           "contact-card"      # what this document is, checked first
   issuedAt:    <unix seconds>      # what orders two cards of one person
@@ -27,15 +27,13 @@ ContactCard  (hybrid-signed by a device of user U - the only artifact a contact 
   epochs:      [{n, from, g, by, key}]  # what U's mail is sealed to, this epoch and the next
   dest:        <i2p destination>   # dest_U - where to deliver to U
   servingKey:  <SPKI DER>          # key the delivery envelope is sealed to
-  devices:     [device-cert]       # U's active devices, each certified by U's root
-  revocation:  revocation-list     # U's newest list of revoked devices, signed by U's root
+  revocation:  {number, revoked}   # the ids of U's revoked devices
 ```
 
-The owner is not written in the body: it is the root that certified the
-devices, and the card's signer must be one of them. One fact, one place.
+The owner is not written in the body: it is the root whose keys the signature
+frame carries. One fact, one place. The card names none of U's devices.
 
-The card carries **only U's signatures** - one device's over the card and the
-root's over each certificate and the list - and no server signature appears
+The card carries **only U's signature** - the root's over the card - and no server signature appears
 anywhere on the contact path. `dest` and `servingKey` are plain fields
 the user vouches for under the card's signature.
 
