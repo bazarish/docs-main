@@ -231,7 +231,7 @@ go on writing in its account's name.
 
 **The certificate travels until the recipient knows the device.** Every message to
 a contact carries `knows`: the ids of the recipient's devices whose certificates
-the sender holds. A device attaches its certificate to its messages for a contact
+the sender holds, at most the 32 newest (`kMaxKnownDevices`). A device attaches its certificate to its messages for a contact
 until a message from that contact lists it in `knows`, and again whenever one
 stops listing it - a contact that restored an older copy of its account forgets
 devices, and says so in the next thing it writes. The first message of an exchange,
