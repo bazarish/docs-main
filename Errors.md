@@ -35,7 +35,7 @@
 | `CLIENT_UNREGISTERED` | The device that signed the request is not registered for this user, or a write to the account's own devices names a device that is not registered or is the caller. Only the routes that act for one device check it: the mailbox listing and wait, fetch, ack, the pass set, the device list and the write to the account's own devices. The account routes, registration and a departure take any request one of the account's devices signed (`DeviceSync.md`) | server |
 | `DEVICE_REVOKED` | The account's card revokes the device that signed the request (`Identity.md`, Revocation). Final for that device: a revoked device is not readmitted | server service, server |
 | `DEVICE_TAKEN` | The device is already registered from another copy of the account database: a device's keys serve one copy only (`DeviceSync.md`) | server |
-| `DEVICE_NOT_PRIMARY` | Only a primary device may do this: delete the account, publish the contact card, or delegate the address, renew its delegation or take it offline | server service |
+| `DEVICE_NOT_PRIMARY` | Only a primary device may do this: delete the account, publish the contact card, clear another device's queue, or delegate the address, renew its delegation or take it offline | server service, server |
 | `ACCOUNT_PENDING_APPROVAL` | The account exists but is frozen: a moderated server has not approved it yet, so its destination is not brought up. The message carries the operator's instructions for finishing registration | server service |
 | `CARD_UNKNOWN` | A `card` request named a fingerprint that is not this destination's user, or a user with no card - one answer for both (`api/Federation.md`) | server |
 
