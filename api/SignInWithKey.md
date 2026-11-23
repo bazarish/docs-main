@@ -74,10 +74,9 @@ nothing. The five headers come to 8258 bytes with `X-Bazarish-Keys`, measured.
    in either slot fails: a classical key in the pq slot is a downgrade.
 3. Both signatures verify over the signed string, rebuilt from the request as it
    arrived.
-4. The signer's **fingerprint** is derived from the keys: lowercase unpadded
-   base32 (RFC 4648) of `sha256(Ed25519 SPKI DER || ML-DSA SPKI DER)`, 52
-   characters - the identity fingerprint of `Identity.md`. This is *who signed*,
-   with no prior key exchange.
+4. The signer's **fingerprint** is derived from the keys: the identity
+   fingerprint of `Identity.md`, 52 characters. This is *who signed*, with no
+   prior key exchange.
 
 A device's request is verified the same way with its certificate in place of
 the keys: the certificate must verify under the root it names, its keys are the
