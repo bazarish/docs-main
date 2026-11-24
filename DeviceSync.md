@@ -19,8 +19,8 @@ full-state handover.
 Sync data travels as ordinary E2E deliveries to the user's own mailbox, through
 its own endpoint, `POST /v1/messaging/self`, with its own delivery class
 (`device`), outside the budget a stranger's contact request is counted against.
-A self-message is sealed to the newest epoch key the writer holds for the current
-epoch. A revocation makes new epoch keys at once (`Identity.md`, Revocation) and
+A self-message is sealed to the writer's key for the current epoch, chosen as a
+sender chooses (`Identity.md`, Epoch keys). A revocation makes new epoch keys at once (`Identity.md`, Revocation) and
 hands them to the remaining devices alone, so what the account's devices tell
 each other after a revocation is sealed to keys the revoked device never gets.
 

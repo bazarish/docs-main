@@ -206,11 +206,12 @@ one whose `by` is smaller. The private halves of all of them stay on the
 account's devices until 30 days after the epoch ends, so mail sealed to a key
 that lost that choice still opens.
 
-- **Only a primary device makes epoch keys.** A contact takes them only from the
-  card, which the root signs; the account's own devices take the private halves
-  only from a primary device (`device.epochs`). A key whose `g` is above the
-  revocation `number` of the card the reader holds is dropped, and so is a key
-  whose `n` is more than two epochs past the current one. A secondary device
+- **Only a primary device makes epoch keys.** A contact takes them from the card,
+  which the root signs, or from the `bootstrap` of a message a primary device
+  wrote (`Messages.md`); the account's own devices take the private halves only
+  from a primary device (`device.epochs`). A contact drops a key whose `g` is
+  above the revocation `number` of the card it holds, and a key whose `n` is more
+  than two epochs past the current one. A secondary device
   holds the private halves and reads with them; were it to make keys, it could
   hand contacts a key whose private half the account's other devices never got.
 - A primary device keeps a key for the current epoch and for the next. It makes a
