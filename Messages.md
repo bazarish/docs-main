@@ -327,8 +327,10 @@ address of its own adds nothing.
 | `chat.clear` | content | Asks the peer to clear the **whole** one-to-one conversation with the sender (no `ref`). The recipient's client wipes its transcript with `from` and leaves a single "cleared the chat" notice. The chat itself remains. The "clear for everyone" choice in the chat-info panel. |
 | `chat.timer` | content | Sets the one-to-one conversation's auto-delete timer for both sides: `seconds` is one of 0 (off), 3600, 86400, 604800 or 2592000, and any other value is ignored. The recipient's client takes the same timer and leaves a "set the auto-delete timer" notice. See *Auto-delete timer*. |
 | `avatar` | content | The sender's avatar pushed to a contact: `avatar` = `{ mime, data }`, `data` being the bytes of a square PNG/JPEG (a CBOR byte string, as in an `image`) compressed client-side to at most **500 KB**. A silent service message - stored as that contact's picture, never shown as a chat bubble. Sent once the dialog is mutually established and re-sent to every contact when the avatar changes. See *Avatars and display names* and `Contacts.md`. |
+| `status` | content | The sender's text status pushed to a contact: `status` = a UTF-8 string of at most **250 characters** and **500 bytes**, line breaks (U+000A) allowed and no other character of the set `api/SignInWithKey.md` forbids a consumer; an empty string removes it. A status outside these limits is ignored. A silent service message - stored as that contact's status, never shown as a chat bubble. Sent when and to whom an `avatar` is. See *Avatars and display names*. |
 | `presence.schedule` | content | A `user` account's presence addresses and reader keys for the days ahead: `days` = a list of `{ d, dest, reader }`. A silent service message, sent between `user` contacts only. See `Presence.md`, The schedule. |
 | `device.avatar` | device | Self-sync of the user's own avatar to their other devices: the same `avatar` block, stored through `POST /v1/messaging/self`. See `DeviceSync.md`. |
+| `device.status` | device | Self-sync of the user's own status to their other devices: the same `status` field, stored through `POST /v1/messaging/self`. See `DeviceSync.md`. |
 | `device.contact-name` | device | Self-sync of a local contact rename to the user's other devices: `peer` (fingerprint), `name`. A purely local label, never sent to the contact. See `DeviceSync.md`. |
 | `device.i2p-master` | device | Self-sync of the user's own I2P master key to their other devices: `i2pMaster` (base64), stored through `POST /v1/messaging/self`, so every device keeps the same personal address. Applied only when `from` is the user themselves. See `DeviceSync.md`, `Identity.md`. |
 | `call.invite` | content | Places an audio call: `callId`, `media` (`audio`), `codec` (`opus`), `dest` (the caller's media b33), `key` (base64 per-call media key). See `api/Calls.md`. |
@@ -532,6 +534,14 @@ stored as the sender's picture, never rendered as a chat bubble:
   user-visible send error.
 - **To the user's own devices** - via a `device.avatar` self-message
   (`DeviceSync.md`).
+
+**Status.** An account's status - a user's, a bot's or a group's - is a short
+text, empty until its owner sets one, limited to **250 characters** and
+**500 bytes** of UTF-8, with line breaks allowed. It travels as a silent
+`status` service message on the same three occasions as the avatar - on
+establishing a dialog, on change and, as `device.status`, to the account's own
+devices. An empty `status` removes it, and is
+sent only to contacts that were sent a status before.
 
 ### Forward compatibility
 

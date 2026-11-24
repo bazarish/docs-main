@@ -61,7 +61,7 @@ A contact's **display name** is a local label, captured once at add time - from 
 
 The label is symmetric across the first exchange. The requester A names B from the descriptor/alias it added by. So B is not left with a bare fingerprint, A's **contact request carries A's own display name** (`dn`); B adopts it as the initial local label for A, exactly once, **only when B holds no name yet** (it never overwrites a name B already set). This is a one-time seed: a later rename on either side is never pushed to the other.
 
-A user's **avatar** (square, compressed client-side to <= 500 KB) is exchanged only **after the dialog is mutually established**: the accepting reply carries the accepter's avatar, and the requester sends theirs on receiving that acceptance. A bare contact request neither carries an avatar nor triggers an automatic avatar reply, so nothing of a user's picture leaks to a party who has not yet been accepted. Both travel as the silent `avatar` (and self-channel `device.*`) content types in `Messages.md`.
+A user's **avatar** (square, compressed client-side to <= 500 KB) is exchanged only **after the dialog is mutually established**: the accepting reply carries the accepter's avatar, and the requester sends theirs on receiving that acceptance. A bare contact request neither carries an avatar nor triggers an automatic avatar reply, so nothing of a user's picture leaks to a party who has not yet been accepted. An account's text **status** (<= 250 characters, <= 500 bytes) follows the same rule. Both travel as the silent `avatar` and `status` (and self-channel `device.*`) content types in `Messages.md`.
 
 ## First-contact discovery and co-location
 
