@@ -81,13 +81,14 @@ request to send it as a file, and nothing is delivered.
 What a message may carry besides its media is fixed, so the room left for the
 media is too. Of the 512 KiB, sealing takes 1200 bytes (`kHybridSealOverheadBytes`,
 the hybrid frame around a body of 64 KiB or more), and the heaviest picture, voice
-or file message spends 9522 more on everything that is not its bytes
+or file message spends 18274 more on everything that is not its bytes
 (`kMediaMessageReserveBytes`: the first reply's `bootstrap` block with its two
-epoch keys, the authorship signature, a reply to a message id of 64 bytes, the
-forwarded mark, a name and a type of 255 bytes each). That leaves **513566 bytes**
+epoch keys, the `auth` block with both signatures and the device certificate,
+`knows` with 32 device ids, a reply to a message id of 64 bytes, the
+forwarded mark, a name and a type of 255 bytes each). That leaves **504814 bytes**
 for a picture, a voice note or a file carried inside one message
-(`kMaxMediaBytes`), and a test holds the heaviest such message within 64 bytes of
-the limit. A name, a type or a reply id longer
+(`kMaxMediaBytes`). A test holds the heaviest such message, with one device id in
+`knows`, within 64 bytes of the limit plus the 31 ids it leaves out. A name, a type or a reply id longer
 than those bounds is refused before sending.
 
 A larger file is announced: `sendFile` puts only its metadata (name, size,
