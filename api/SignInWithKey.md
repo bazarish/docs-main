@@ -2,13 +2,12 @@
 
 A Bazarish key is a login. A site issues a **challenge**, the user signs it in
 their client, and pastes the **login blob** back, or the client hands it to the
-site over I2P; the site recovers the signer's fingerprint and starts a session. The private key never enters the browser and no
-password exists anywhere.
+site over I2P; the site recovers the signer's fingerprint and starts a session. The private key never enters the browser.
 
 This document is the whole of authentication by signature: the signed request
 (section 1), the challenge and the blob built on it (sections 2 and 3), how a
 verifier checks a login (section 4), what a client must do before it signs
-(section 5) and how it may hand the blob over itself (section 6). Other documents refer here and do not restate it.
+(section 5) and how it may hand the blob over itself (section 6).
 
 Every verifier in the project speaks this one contract: the server-service portal
 (`ServicePortal.md`), the alias registry and the admin panel
@@ -25,7 +24,8 @@ three things carry it:
 - a **login blob** (section 3);
 - the client API's **first contact**: the tunnel hello, which carries the five
   values inside its sealed frame and signs method `BZ-TUNNEL`, path `/hello`,
-  body the hello's fresh secret (`ClientApi.md`). The hello is signed by a
+  body the CBOR map `{"secret": <the hello's fresh secret>, "server": <the
+  fingerprint of the server it is for>}` (`ClientApi.md`). The hello is signed by a
   device's own keys, not the root, and names its signer by the device's
   certificate (`X-Bazarish-Device`, below) instead of `X-Bazarish-Keys`;
 - every **operator call** - from the admin panel to a service, and between the
@@ -65,7 +65,7 @@ travels.
 | `X-Bazarish-Sig-Pq` | base64 of the ML-DSA-65 signature (FIPS 204, empty context) over the signed string |
 
 Both halves sign the same bytes, and both must verify - one alone proves
-nothing. The five headers come to 8258 bytes with `X-Bazarish-Keys`, measured.
+nothing. The five headers come to 8258 bytes with `X-Bazarish-Keys`.
 
 ### Verifying one
 
@@ -86,8 +86,7 @@ device the certificate names, in the role it states.
 Where a request must be accepted once, the verifier also remembers every
 accepted `n` for the window and refuses it a second time. A legitimate resend
 carries a fresh nonce and passes; a captured request replayed verbatim does not,
-and editing its nonce breaks both signatures. Ed25519 is deterministic, so the
-nonce is the only thing that makes a resend distinct. The client API keeps such a
+and editing its nonce breaks both signatures. The client API keeps such a
 cache, and so does every operator endpoint: there the nonce is remembered only
 after the caller is found among the operators, so a stranger cannot fill the
 cache. A login does not need one: its challenge is single-use (section 4).
@@ -98,8 +97,8 @@ Minted by the site as a link: `bazarish://sign?c=` followed by the base64url
 (RFC 4648 section 5, no padding) of this JSON. The link is the challenge: the site
 shows it as text, a link or a QR code, the client signs it in this spelling even
 when it arrived as `https://bazari.sh/#sign?c=` (`Architecture.md`), and it comes
-back with the blob. Nothing else is a challenge; a site may also show a link
-that leads to one (below).
+back with the blob. A site may also show a link that leads to a challenge (*A link
+to a challenge*).
 
 ```json
 {
@@ -118,7 +117,7 @@ that leads to one (below).
 
 | Field | Meaning |
 |---|---|
-| `v` | Envelope version, the number `1`. A client that does not know the version does not guess: it refuses. |
+| `v` | Envelope version, the number `1`. A client refuses any other version. |
 | `nonce` | 16 random bytes, hex. Single use. Not the blob's `n`: this one belongs to the challenge. |
 | `ts` | When the challenge was minted, seconds, a number. Verified within a freshness window (300 s, either side). |
 | `consumer` | Who consumes the signature. Shown to the user before signing. |
@@ -137,8 +136,8 @@ nonces have been consumed.
 
 ### A link to a challenge
 
-Three places and a callback make a QR code too dense for a phone camera to read
-reliably, so a site may show a link to its challenge instead:
+A challenge with several places and a callback makes a dense QR code. A site may
+show a short link to its challenge instead:
 
 ```
 bazarish://sign?at=<host><path>&key=<key>
@@ -150,20 +149,20 @@ port, a path that starts with `/`, at most 256 bytes with `http://` in front. Th
 `key` (section 6, *The key*) is required; a link without it is refused. The client
 fetches the path from a one-off I2P address with `GET <path>`. A `200` answer's
 body is the challenge sealed under the key and nothing else, the challenge at most
-4096 bytes; any other status is shown as a refusal with its number. The client
+4096 bytes; any other status is shown as the site's refusal. The client
 keeps the key with the challenge it fetched, so it can seal the answer as well.
 
 The challenge behind a link must carry a callback on the host the link named.
 The client refuses one without a callback or with a callback elsewhere: a link
-cannot pass on another place's challenge. Past that check the client handles the
-challenge as if it had been given it.
+cannot pass on another place's challenge. A challenge that passes this check is
+handled like one given in a `sign?c=` link.
 
 ### The consumer
 
 | Field | What it holds | Limit, UTF-8 bytes |
 |---|---|---|
 | `name` | The resource as it calls itself, in the words on its own pages | 96 |
-| `place` | **A list** of every address it answers at - URL, b32, host:port - in a stable order, because the tag covers the list. At most 4: a list nobody reads is not a check | 256 each |
+| `place` | **A list** of every address it answers at - URL, b32, host:port - in a stable order, because the tag covers the list. At most 4 | 256 each |
 | `role` | What is being signed into: `Administrator`, `Account owner`, `Alias owner`, `Operator` | 48 |
 
 All three are required and non-empty, and `place` holds at least one address.
@@ -184,12 +183,10 @@ written out here, so every implementation refuses exactly the same strings. Join
 Persian, Indic scripts and emoji, and break nothing. A challenge that breaks any
 of these rules is not signed.
 
-**Why more than one.** A place is often reachable two ways at once - over
-clearnet and over I2P - and a challenge naming only one of them is refused by the
-very user it is meant to serve: they arrived by the other. The check a person
-performs is "is where I am in this list", which is a question they can answer. It stays answerable only while
-the list is short, hence the cap, and the client says **"If the address you came
-to is not in the list, do not sign."** when there is more than one.
+`place` is a list because a site is often reachable two ways at once, over
+clearnet and over I2P, and a user compares the address they arrived at with the
+list. The cap of 4 keeps that comparison short. With more than one place the
+client says **"If the address you came to is not in the list, do not sign."**
 
 What each of the project's verifiers puts there:
 
@@ -200,21 +197,19 @@ What each of the project's verifiers puts there:
 | Alias registry, operator face | `admin.name`, else "Bazarish alias resolver admin" | `admin.address` (required) | `admin.role`, else Operator |
 | Admin panel | `consumer.name`, else "Bazarish admin panel" | `consumer.place`, else where it listens | `consumer.role`, else Administrator |
 
-Each of those settings is a **list** in the configuration file.
+`name` and `role` are strings in the configuration file; `address`, `links` and `place` are lists.
 
-A deployment that cannot state where it is reachable does not start. An address
-nobody can compare is the same as no address at all. `place` is what the user
+A verifier with no address to name does not start. `place` is what the user
 has in their address bar, so a verifier fronted under a name of its own says so
 in its config.
 
-The server service's three are **live**: they are among the settings an operator
-edits in the admin panel (`loginConsumer` on `/v1/account/settings`), a change
-takes effect on the next challenge, and it is written back to `portal.name` /
-`portal.address` / `portal.role` in the server service's config file. A challenge issued
-before the change names the old consumer and stops verifying - it was shown to a
-user under words the portal no longer asserts, and re-labelling it is what the
-tag exists to prevent. The user loads a fresh challenge. The other verifiers
-keep their consumer in their own config and read it at start.
+The server service's consumer and the admin panel's are **live**: an operator
+edits them in the panel (the server service's as `loginConsumer` on
+`/v1/account/settings`, the panel's own in its settings), a change takes effect
+on the next challenge, and it is written back to the config file (`portal.*`,
+`consumer.*`). A challenge issued before the change names the old consumer and
+stops verifying; the user loads a fresh one. The alias registry reads its two
+consumers from its config at start.
 
 ## 3. The blob
 
@@ -237,9 +232,9 @@ the account's root, so only a primary device signs one (`Identity.md`). The stri
 |---|---|---|
 | `k` | `X-Bazarish-Keys` | The signer's public keys, Ed25519 + ML-DSA. The verifier derives the fingerprint from them: this is *who signed*. |
 | `t` | `X-Bazarish-Timestamp` | When it was signed, a decimal string. Outside the freshness window the blob is invalid. |
-| `n` | `X-Bazarish-Nonce` | The per-request nonce, signed along with the rest. Without it a re-signed blob would be byte-identical to the first. |
+| `n` | `X-Bazarish-Nonce` | The per-request nonce, signed along with the rest. |
 | `c` | `X-Bazarish-Sig-Classical` | Ed25519 signature. |
-| `p` | `X-Bazarish-Sig-Pq` | ML-DSA-65 signature. Both must verify - one alone proves nothing. |
+| `p` | `X-Bazarish-Sig-Pq` | ML-DSA-65 signature. |
 
 The fixed method and path are a domain separator: a login blob is not a signature
 over any real API call, and no API signature is a login.
@@ -274,15 +269,10 @@ all three fields**, and it **refuses to sign** a challenge that is not a
 sign link in either spelling, does not decode, is of another version, does not name a
 complete consumer, or names a callback that breaks section 6. A challenge fetched
 by a link is also refused when its callback does not go back to the link's host
-(section 2). Both halves matter:
-a window that shows nothing leaves the user with nothing to compare, and a client
-that signs an unnamed challenge issues a signature for a place it could not
-name.
+(section 2).
 
-The words are shown as a claim, never as a verdict. The client says who the
-challenge says it is for and tells the user to compare that with the site in
-front of them; it does not say "trusted", it does not rank sites, and it does not
-mark anything as safe.
+The client shows the consumer as what the challenge states about itself and asks
+the user to compare it with the site in front of them.
 
 ## 6. Handing the blob over
 
@@ -343,18 +333,15 @@ without it, and a verifier never sees it in a blob. A `sign?c=` link with a
 callback and no key can still be signed and its blob copied, but not sent. A
 challenge without a callback - pasted into a browser form - needs no key.
 
-A 2xx status means accepted; any other is shown as a refusal with its number.
+A 2xx status means accepted; any other is shown as the site's refusal.
 The client follows no redirect and shows nothing of the answer's body. What the
 site does next is its own: it verifies (section 4) and lets in the browser that
 showed the challenge, which it finds by the challenge's nonce.
 
-## 7. What this stops, and what it does not
+## 7. What the consumer binds
 
-It stops the **quiet** version of the attack. A site cannot mint a challenge for
-somewhere else - the label it carries is the label the verifier will check - so
-whatever a user is asked to sign, it says truthfully where the resulting session
-will be opened, and a mismatch with the address bar is visible.
-
-It does not decide for the user. Someone can still relay a genuine challenge from
-a real service and hope the user signs without reading; the client's display, and
-the user comparing it with where they are, is what catches that.
+A challenge names the place where its session opens, and only that place's
+verifier accepts the blob (section 4, steps 2 and 4). A site that relays a genuine
+challenge of another service shows the user a consumer that differs from the
+address they are at; the user's comparison in the client's window is the check
+against it.
