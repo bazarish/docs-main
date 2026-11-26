@@ -69,7 +69,7 @@ Every `content` envelope a group host sends carries one additive block:
 
 ## Relayed posts
 
-A post is an ordinary `text`, `image` or `audio` message from the host with two
+A post is an ordinary `text`, `image`, `audio` or `file` message from the host with two
 additive fields:
 
 ```
@@ -103,15 +103,17 @@ additive fields:
 
 A post that would exceed the size limit (`Messages.md`, *Size*) once `author`
 and the block are added is refused when it arrives, with a notice to its
-author. Files are not relayed: a file message from a member is dropped without a
-notice. A picture or a voice note that fits one envelope is relayed.
+author. A file is relayed only with its bytes inside the message (`Messages.md`,
+*Files*); a file offered for a transfer is refused the same way, since the host
+does not serve transfers. A client offers a group no file larger than one
+message carries.
 
 ## Edits and deletes
 
 - The author edits or deletes their post as any message: `edit` / `delete` to
   the host. The host checks that the post is theirs and relays the same
   `edit` / `delete` to everyone else. Only a text post is edited; an edit to a
-  picture or a voice note is ignored.
+  picture, a voice note or a file is ignored.
 - An admin deletes another member's post with `bot.command` `delete <id>`. The
   host relays the `delete` to everyone except the author. The author's own copy
   stays: it is their outgoing message, and a `delete` applies only to messages
