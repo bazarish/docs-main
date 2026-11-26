@@ -129,15 +129,17 @@ address:
 
 - A state "offline" is the holder's last word: the contact is shown offline at
   once, and the watcher sends a new watch `watchRetry` later.
-- A watch not yet answered is resent every `watchRetry`. Each resend first looks
+- A watch not yet answered is resent `watchRetry` later, three times; after
+  that each wait doubles, up to `slowestWatchRetry`. Each resend first looks
   the contact's presence address up in the netDb past the lease set the watching
   address holds, and goes to whatever the lookup found: a newer lease set means
   the holder is back.
 - A renew not answered within `watchRetry` turns into a new watch, sent at once
   with that lookup. A contact shown online stays online, without typing, until
   it answers or for `subscriptionLife`.
-- A watch from a contact sends the device's own unanswered watch to that contact
-  again at once, with the lookup.
+- A message or a watch from a contact sends the device's own unanswered watch to
+  that contact again at once, with the lookup, and the next three resends go
+  `watchRetry` apart again.
 
 Through SAM there is no lookup past the cached lease set: the resend goes to the
 lease set the watching address holds, and a returning holder is found only once
@@ -229,6 +231,7 @@ the message is sent, the field is emptied or it loses focus: the holder sends th
 | Name | Value |
 |---|---|
 | `watchRetry` | 5 s |
+| `slowestWatchRetry` | 120 s |
 | `renewEvery` | 15 s |
 | `subscriptionLife` | 30 s |
 | `onlineTail` | 60 s |
