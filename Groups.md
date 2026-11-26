@@ -193,9 +193,10 @@ In a `group` every member who is in holds the names of all members. A
 
 ```
 { "type":  "group.members",
-  "op":    "full" | "added" | "removed" | "none",
-  "names": [ <name>, ... ],   // full, added, removed
-  "total": <int>,             // full, added, removed: the member count after this letter
+  "op":    "full" | "added" | "removed" | "changed" | "none",
+  "names": [ <name>, ... ],   // full, added, removed, changed
+  "contactableNames": [ <name>, ... ],   // full, added, changed: which of `names` accept contact requests
+  "total": <int>,             // full, added, removed, changed: the member count after this letter
   "part":  <int>,             // full only: 1 for the first part
   "parts": <int>,             // full only: how many parts the list has
   "you":   <name> }           // optional: which of `names` is the recipient
@@ -208,6 +209,12 @@ In a `group` every member who is in holds the names of all members. A
   the names it collected number `total`.
 - `added` and `removed` are one change each, sent as it happens, in order with
   the posts. `total` is the member count after the change.
+- `changed` carries a member who stays, sent when the member's contact requests
+  are switched on or off; the owner switching them off or on for the whole group
+  sends every member a new `full` list.
+- `contactableNames` lists the names of the letter whose members accept contact
+  requests, the owner's switch included. A name outside `names` makes the letter
+  unreadable.
 - A rename is a `removed` with the old name followed by an `added` with the new
   one. The client keeps names, not people, so to it a rename is exactly the old
   name leaving and the new one coming; a second operation would carry nothing
@@ -285,12 +292,14 @@ sends `group.state` - a message with no body, only the block - when `write` or
 
 ## Contact requests
 
-- A post marked `contactable` offers "request contact". The member sends
-  `bot.command` `contact <id>`, and the host passes the requester's descriptor
-  to the author, in a message only the author sees. The author decides; the
-  author's own descriptor goes nowhere. A member asks a given author once a day;
-  an ask inside that day is not passed on. A member who asks an author who
-  refuses contact requests is told so, and the author learns nothing of it.
+- A member asks for contact by name, from a post marked `contactable` or from
+  the member list where the name is in `contactableNames`. The member sends
+  `bot.command` `contact <name>`; the host finds the member by that name, as names
+  are compared (*Names*), and passes the requester's descriptor to that member,
+  in a message only that member sees. The asked member decides; their own
+  descriptor goes nowhere. A member asks a given member once a day; an ask
+  inside that day is not passed on. A member who asks one who refuses contact
+  requests is told so, and the one asked learns nothing of it.
 - A member turns this on and off with `bot.command` `contactable on` /
   `contactable off`. The owner can switch it off for the whole group.
 
@@ -336,7 +345,7 @@ verified, and a descriptor goes stale when its owner raises a new key.
 | `settings` | member | a message with the member's name, the `contactable` switch and Change name |
 | `rename` | member | take the next text as the new name |
 | `contactable` `on` / `off` | member | accept or refuse contact requests |
-| `contact <id>` | member | ask the author of post `<id>` for contact |
+| `contact <name>` | member | ask the member named `<name>` for contact |
 | `exclude <id>` | admin | exclude the author of post `<id>` |
 | `block <id>` | admin | exclude and ban the author of post `<id>` |
 | `delete <id>` | admin | delete post `<id>` for everyone |
