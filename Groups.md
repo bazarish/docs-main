@@ -82,7 +82,8 @@ additive fields:
   therefore names the same message on every screen, and the author's other
   devices already hold that id from their own echo (`DeviceSync.md`). The host
   refuses a post whose id it has already relayed.
-- `replyTo` is passed on unchanged.
+- `replyTo` is passed on unchanged. `after` names the post the host relayed
+  before this one, so every member places posts in the host's order.
 - `sentAt` is the moment the host accepted the post. It is the same in every
   copy and in the history a newcomer receives, so history sorts into the past.
 - The author receives no copy: their own outgoing message is the post. The

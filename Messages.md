@@ -202,6 +202,7 @@ self-message names (`DeviceSync.md`) - each of this shape:
   "from": <sender fingerprint>,
   "sentAt": <unix milliseconds>,   // client send clock; drives ordering and the displayed time
   "replyTo": <id>,            // optional
+  "after": <id>,              // optional: the message the sender's chat held last; see Ordering
   "knows": [<device id>, ...],   // to a contact: the recipient's devices the sender holds
   "auth": { "d": <the author device's id>,
             "c": <Ed25519 signature, CBOR bytes>,
@@ -369,12 +370,15 @@ What travels is what the forwarding device holds: text always; a voice message a
 a picture, which travel inside the message; a file only while its bytes are still
 on that device, since a file is announced from a path and served from it.
 
-One further field is additive and may be carried by any content message:
+Two further fields are additive and may be carried by any content message:
 
 - **`replyTo`** - the `id` of the message this one replies to. The recipient
   renders a quote of that message and, when it holds the original locally, a
   click jumps to it. A dead reference (the original was never received or was
   deleted) renders as a non-clickable quote. See *Replies*.
+- **`after`** - the `id` of the newest message the sender's conversation held,
+  in its own order, when this one was written. It places the message; see
+  *Ordering and timestamps*.
 
 A group host (`Groups.md`) adds three more, honoured only from it:
 
@@ -562,12 +566,23 @@ stamped by the sending client from its own clock at send time. It sits inside th
 sealed body, under the authorship signature, and it is the single source of truth
 for both the message's displayed time and its position in the conversation.
 
-A recipient orders a conversation by `sentAt`, with one bound: a message from the
-other side never goes above a message the recipient had already written in that
-conversation when it arrived. The order key of such a message is the later of its
-`sentAt` and one millisecond after the recipient's newest own message, while the
-time it shows stays its `sentAt`. The local arrival clock stands in only
-for an envelope that carries no `sentAt` at all.
+Clocks on two devices disagree, so `sentAt` alone can put a reply above the
+message it answers. Every message therefore gets an **order key**, and the time it
+shows stays its `sentAt`:
+
+- **A message written here** gets the later of its `sentAt` and one millisecond
+  after the newest message of the conversation, and carries that message's `id`
+  as `after`.
+- **A message that arrives with `after`** naming a message the conversation holds
+  gets the later of its `sentAt` and one millisecond after that message.
+- **A message that arrives without a usable `after`** gets the later of its
+  `sentAt` and one millisecond after the newest message from the other side as
+  seen from it: after the recipient's own newest message for one from the
+  contact or the group, after the newest message from the contact or the group
+  for one the account wrote on another device.
+
+The local arrival clock stands in only for an envelope that carries no `sentAt`
+at all.
 
 Two things disturb the order before the reader sees it, and each is repaired
 where it happens:
@@ -579,11 +594,9 @@ where it happens:
 - **In the mailbox.** A mailbox returns its waiting items in the order it received
   them (`api/ClientApi.md`), so a burst is fetched in the order it arrived.
 
-Concretely each message gets a stable **order key**: its `sentAt`, raised to the
-bound above when it came from the other side. The conversation is kept sorted by
-it, so a message written long ago and delivered only now appears where it was
-written among the other side's messages, but below anything the recipient wrote
-before it arrived. Such a message can therefore appear above the visible part of
+The order key is stable and the conversation is kept sorted by it, so a message
+written long ago and delivered only now appears right under the message it was
+written after. Such a message can therefore appear above the visible part of
 the conversation, and noticing it is not left to the reader: the unread mark is
 kept as a high-water over *stored* rows, in the order they were received, so a
 late arrival is unread whatever its timestamp says.
