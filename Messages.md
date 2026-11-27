@@ -325,7 +325,7 @@ address of its own adds nothing.
 | `bot.callback` | content | An inline-keyboard button press: `data` (the button's payload), `ref` (the `id` of the keyboard message). See *Bots & interactive messages*. |
 | `bot.menu` | content | The commands a bot offers a contact: `menuId` (a random unsigned 32-bit integer) and `items` of `{ title, command }`. A client names the menu it holds in the `menuId` of what it sends back. A silent service message. See `Bots.md`. |
 | `edit` | content | An in-place edit of a message the sender previously sent: `ref` (the target message's `id`), `text` (new text), `keyboard` (new inline keyboard, `[]` to clear). The recipient replaces its copy. Applied only to a message sent by `from`. See *Editing and deleting messages*. |
-| `delete` | content | A delete-for-everyone of a message the sender previously sent: `ref` (the target message's `id`). The recipient removes its copy with **no tombstone** left behind. Scoped, like `edit`, to a message sent by `from`. See *Editing and deleting messages*. |
+| `delete` | content | A delete-for-everyone of a message the sender previously sent: `ref` (the target message's `id`). The recipient removes its copy with **no tombstone** left behind. Scoped, like `edit`, to a message sent by `from`. Inside `device.message`, `incoming: true` names a message the account received. See *Editing and deleting messages*. |
 | `chat.clear` | content | Asks the peer to clear the **whole** one-to-one conversation with the sender (no `ref`). The recipient's client wipes its transcript with `from` and leaves a single "cleared the chat" notice. The chat itself remains. The "clear for everyone" choice in the chat-info panel. |
 | `chat.timer` | content | Sets the one-to-one conversation's auto-delete timer for both sides: `seconds` is one of 0 (off), 3600, 86400, 604800 or 2592000, and any other value is ignored. The recipient's client takes the same timer and leaves a "set the auto-delete timer" notice. See *Auto-delete timer*. |
 | `avatar` | content | The sender's avatar pushed to a contact: `avatar` = `{ mime, data }`, `data` being the bytes of a square PNG/JPEG (a CBOR byte string, as in an `image`) compressed client-side to at most **500 KB**; an empty `data` removes it, and is sent only to contacts that were sent an avatar before. A silent service message - stored as that contact's picture, never shown as a chat bubble. Sent once the dialog is mutually established and re-sent to every contact when the avatar changes. See *Avatars and display names* and `Contacts.md`. |
@@ -452,6 +452,11 @@ equals `ref` outright, leaving **no tombstone** (a true delete-for-everyone). Th
 it sends the `delete` so the peer removes theirs too. A message that never left -
 still in the outbox in a letter of its own and not on its way - is withdrawn from
 the outbox instead, and no `delete` is sent.
+
+A delete on the user's own side reaches only the account's devices: the client
+removes its copy and sends the `delete` in `device.message` (`DeviceSync.md`),
+not to the peer. `incoming: true` there makes `ref` name a message the account
+received from the peer; without it, `ref` names one the account sent.
 
 A client applies an `edit` or a `delete` **only** to a message sent by the `from`
 party (for a recipient, an incoming message from that peer); it must not
